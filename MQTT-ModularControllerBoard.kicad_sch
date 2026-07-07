@@ -1,0 +1,1362 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "fb66fec7-a625-41b0-8b4b-639a0ec63be1")
+	(paper "A4")
+	(title_block
+		(title "MQTT - Modular Controller Board")
+		(date "2026-03-14")
+		(rev "1.0")
+	)
+	(lib_symbols
+		(symbol "Mechanical:MountingHole"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom no)
+			(on_board yes)
+			(property "Reference" "H"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "MountingHole"
+				(at 0 3.175 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Mounting Hole without connection"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "mounting hole"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "MountingHole*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "MountingHole_0_1"
+				(circle
+					(center 0 0)
+					(radius 1.27)
+					(stroke
+						(width 1.27)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(circle
+		(center 186.69 41.91)
+		(radius 0.4)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type color)
+			(color 0 0 0 0)
+		)
+		(uuid 058ddd62-a30a-4c36-9b6b-1d86a2c7deed)
+	)
+	(rectangle
+		(start 127 21.59)
+		(end 274.32 133.35)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(uuid 5e3f16dc-0ffd-41ee-af1d-848714b56fb2)
+	)
+	(circle
+		(center 236.22 46.99)
+		(radius 0.4)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type color)
+			(color 0 0 0 0)
+		)
+		(uuid 6f102812-5fa4-4c67-8291-2d2114e7795c)
+	)
+	(text "MQTT - Modular Controller Board"
+		(exclude_from_sim no)
+		(at 62.23 23.114 0)
+		(effects
+			(font
+				(size 3.2 3.2)
+				(thickness 0.254)
+				(bold yes)
+			)
+		)
+		(uuid "f9ed1450-a48b-4fc2-9870-4c867a6ab566")
+	)
+	(text_box "3.3V"
+		(exclude_from_sim no)
+		(at 217.17 45.72 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "06ab61b7-34a9-4dd3-8919-00a101ca7f01")
+	)
+	(text_box "12V"
+		(exclude_from_sim no)
+		(at 236.22 118.11 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1db8f2e4-38be-47f6-8de4-3ad0378fd736")
+	)
+	(text_box "Table of Contents"
+		(exclude_from_sim no)
+		(at 20.32 62.23 0)
+		(size 33.02 3.81)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.254)
+				(bold yes)
+			)
+			(justify left top)
+		)
+		(uuid "2efebd01-83fd-401f-9d2d-421eca137092")
+	)
+	(text_box "3.3V"
+		(exclude_from_sim no)
+		(at 236.22 110.49 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "38afdf83-08ee-46d8-a6f7-7584d1097f10")
+	)
+	(text_box "5V"
+		(exclude_from_sim no)
+		(at 218.44 40.64 0)
+		(size 3.81 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "3ade31f3-1d5d-4973-8ca9-f5ee8defcf80")
+	)
+	(text_box "Page 2: ESP32 S3 WROOM 1U\nPage 3: Power Input\nPage 4: Power Conversion\nPage 5: Module Connectors\nPage 6: USB Input"
+		(exclude_from_sim no)
+		(at 20.32 67.31 0)
+		(size 85.09 19.05)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left top)
+		)
+		(uuid "6b4acb4d-5768-494c-ada6-ce1016102ff6")
+	)
+	(text_box "5V"
+		(exclude_from_sim no)
+		(at 237.49 114.3 0)
+		(size 5.08 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "73f91724-0d4a-480b-bbe4-ddac4c335435")
+	)
+	(text_box "Additional BOM Items"
+		(exclude_from_sim no)
+		(at 20.32 124.46 0)
+		(size 43.18 5.08)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.254)
+				(bold yes)
+			)
+			(justify left top)
+		)
+		(uuid "90497a74-c553-479d-a227-603ae08f007f")
+	)
+	(text_box "Summary:"
+		(exclude_from_sim no)
+		(at 20.32 34.29 0)
+		(size 20.32 3.81)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.254)
+				(bold yes)
+			)
+			(justify left top)
+		)
+		(uuid "9c5430e2-28b3-41e7-af7b-adf6f2a823cb")
+	)
+	(text_box "3.3V"
+		(exclude_from_sim no)
+		(at 223.52 71.12 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a75d392e-5c2e-4458-87b9-4c8839de35ba")
+	)
+	(text_box "5V"
+		(exclude_from_sim no)
+		(at 198.12 45.72 0)
+		(size 5.08 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "b2cea1c6-8c9d-49cf-b2a5-a3df6c334762")
+	)
+	(text_box "-"
+		(exclude_from_sim no)
+		(at 20.32 129.54 0)
+		(size 85.09 19.05)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left top)
+		)
+		(uuid "d36363ad-55a5-414a-bccd-026d45bc547d")
+	)
+	(text_box "12V"
+		(exclude_from_sim no)
+		(at 198.12 40.64 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "e0c107e0-4c3c-42da-abe3-bec1b07374da")
+	)
+	(text_box "12V"
+		(exclude_from_sim no)
+		(at 170.18 40.64 0)
+		(size 6.35 2.54)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "e32982a4-f9e2-46e1-a817-ce2eec122702")
+	)
+	(text_box "5V"
+		(exclude_from_sim no)
+		(at 147.32 101.6 90)
+		(size 2.54 5.08)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "e572cd48-c98c-4d44-8575-6ba6c660e6cb")
+	)
+	(text_box "Non BOM Items"
+		(exclude_from_sim no)
+		(at 20.32 92.71 0)
+		(size 33.02 3.81)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+				(thickness 0.254)
+				(bold yes)
+			)
+			(justify left top)
+		)
+		(uuid "f4807a53-6774-46a8-a88e-cb2f25c83477")
+	)
+	(text_box "ESP32 S3 based controller for attached modules. Designed to receive commands via MQTT and send required information.\nThis version supports four individual modules being attached.\nUSB C connection for programming, and only supports the controller itself."
+		(exclude_from_sim no)
+		(at 20.32 39.37 0)
+		(size 104.14 15.24)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left top)
+		)
+		(uuid "ff5cc306-ccb1-47fd-b6fc-f6dec9dbca04")
+	)
+	(polyline
+		(pts
+			(xy 242.57 30.48) (xy 256.54 30.48)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "2f53b893-3445-49bb-8866-ad7edf44f8b2")
+	)
+	(polyline
+		(pts
+			(xy 223.52 46.99) (xy 236.22 46.99)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "368fd8de-f899-4d1d-ad58-15e3ebbb4a2a")
+	)
+	(polyline
+		(pts
+			(xy 246.38 46.99) (xy 246.38 111.76)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "3d5182a0-031f-455c-9b00-2329104148f1")
+	)
+	(polyline
+		(pts
+			(xy 242.57 119.38) (xy 256.54 119.38)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "4291f1fb-a6cb-46bc-92d9-818bcddd1625")
+	)
+	(polyline
+		(pts
+			(xy 251.46 115.57) (xy 251.46 41.91)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "4869c45b-9a25-47a5-8384-a2a0fc335eb9")
+	)
+	(polyline
+		(pts
+			(xy 186.69 30.48) (xy 186.69 41.91)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "49fc9e39-6322-4a10-8fb0-02d4472fe28d")
+	)
+	(bus
+		(pts
+			(xy 234.95 82.55) (xy 234.95 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4bbc89c9-e1de-4426-a6a8-be7a33cbfc6f")
+	)
+	(polyline
+		(pts
+			(xy 236.22 46.99) (xy 246.38 46.99)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "52b469fb-b955-4165-883a-7a0a45096d8b")
+	)
+	(bus
+		(pts
+			(xy 238.76 101.6) (xy 238.76 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5b1081a7-216e-469d-a447-e2e5d70c3e97")
+	)
+	(polyline
+		(pts
+			(xy 236.22 46.99) (xy 236.22 72.39)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "5d096129-e462-4959-a7b7-a6203c4c4f4e")
+	)
+	(bus
+		(pts
+			(xy 191.77 72.39) (xy 171.45 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "60efbf40-da0b-44d0-a8d3-aaf5e43c6852")
+	)
+	(bus
+		(pts
+			(xy 171.45 72.39) (xy 171.45 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "612471b9-2227-4fc4-914e-a457a89b51fa")
+	)
+	(bus
+		(pts
+			(xy 191.77 82.55) (xy 186.69 82.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "65383679-3b6a-4a4a-aaab-d83415f20fd5")
+	)
+	(polyline
+		(pts
+			(xy 242.57 115.57) (xy 251.46 115.57)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "66837008-7a3f-4c79-a1d5-bfdf83778757")
+	)
+	(bus
+		(pts
+			(xy 182.88 77.47) (xy 182.88 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7912e3d0-71a7-4913-96fa-dcac51e02a39")
+	)
+	(bus
+		(pts
+			(xy 186.69 82.55) (xy 186.69 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8ad3df43-a590-4a97-8131-f52e6a0b8191")
+	)
+	(polyline
+		(pts
+			(xy 242.57 111.76) (xy 246.38 111.76)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "9b19587a-a551-4dcb-85e7-be98b4195066")
+	)
+	(polyline
+		(pts
+			(xy 176.53 41.91) (xy 198.12 41.91)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "a18d3327-4c48-49ce-a3e4-dff25f808599")
+	)
+	(polyline
+		(pts
+			(xy 229.87 72.39) (xy 236.22 72.39)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "a81ac1c3-f2a1-43d4-8c4b-604180e4ab37")
+	)
+	(bus
+		(pts
+			(xy 238.76 77.47) (xy 229.87 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "af3a739b-ad90-4267-b74f-8be75030db37")
+	)
+	(bus
+		(pts
+			(xy 191.77 77.47) (xy 182.88 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b8da13c5-5ac4-41a0-a842-e899e0dcce00")
+	)
+	(polyline
+		(pts
+			(xy 256.54 119.38) (xy 256.54 30.48)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "b93af5e1-56df-458e-b682-786bb5f39277")
+	)
+	(polyline
+		(pts
+			(xy 242.57 30.48) (xy 186.69 30.48)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "bdcf75f1-cc8a-421c-8675-abdd50e60320")
+	)
+	(bus
+		(pts
+			(xy 229.87 82.55) (xy 234.95 82.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c96a5c3f-37ab-4f55-aa5b-4949b480c90f")
+	)
+	(polyline
+		(pts
+			(xy 187.96 46.99) (xy 198.12 46.99)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "d7c61141-5fa6-448d-82c5-2658031af46e")
+	)
+	(polyline
+		(pts
+			(xy 148.59 59.69) (xy 187.96 59.69)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "e644edf7-15d0-46b4-9b36-b8c934be9c96")
+	)
+	(polyline
+		(pts
+			(xy 187.96 59.69) (xy 187.96 46.99)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "e6cba828-fd8e-4ce4-819c-d035348cc478")
+	)
+	(polyline
+		(pts
+			(xy 148.59 101.6) (xy 148.59 59.69)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "f22ed459-ae57-4d72-a1e4-384df15248b6")
+	)
+	(polyline
+		(pts
+			(xy 223.52 41.91) (xy 251.46 41.91)
+		)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(uuid "fb26b37e-2a28-48ac-abf2-99d0a8c7fad2")
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 57.15 114.3 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "01025758-55db-479c-96c3-94f347761775")
+		(property "Reference" "H104"
+			(at 59.69 113.0299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole 3.5mm"
+			(at 59.69 115.5699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 57.15 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 57.15 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 57.15 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(reference "H104")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 57.15 105.41 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "03a93511-9085-4dbf-8f25-e9477ab2ff80")
+		(property "Reference" "H103"
+			(at 59.69 104.1399 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole 3.5mm"
+			(at 59.69 106.6799 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 57.15 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 57.15 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 57.15 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(reference "H103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 26.67 105.41 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7ff6a664-797a-4ee5-8792-8c4c5ce91886")
+		(property "Reference" "H101"
+			(at 29.21 104.1399 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole 3.5mm"
+			(at 29.21 106.6799 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 26.67 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 26.67 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 26.67 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project ""
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(reference "H101")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 26.67 114.3 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "bb8b5754-33ec-48b6-97a5-77fca75d67a9")
+		(property "Reference" "H102"
+			(at 29.21 113.0299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole 3.5mm"
+			(at 29.21 115.5699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.5mm"
+			(at 26.67 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 26.67 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 26.67 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(reference "H102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet
+		(at 191.77 63.5)
+		(size 38.1 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "688027c4-6d3d-464d-b364-684d75515e96")
+		(property "Sheetname" "ESP32-S3"
+			(at 202.438 62.484 0)
+			(effects
+				(font
+					(size 1.9 1.9)
+					(thickness 0.38)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "ESP32-S3-WROOM-1U.kicad_sch"
+			(at 192.278 89.662 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "{I2C}" bidirectional
+			(at 229.87 77.47 0)
+			(uuid "b48598d1-35c2-4777-8ec9-07b92a585c37")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "{SPI}" bidirectional
+			(at 229.87 82.55 0)
+			(uuid "aa800e2c-6a86-4167-80d7-ac3b48cad1a0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "{USB}" bidirectional
+			(at 191.77 72.39 180)
+			(uuid "8729a6a6-9bf4-493f-9253-842027015c90")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "SENSE[1..4]" bidirectional
+			(at 191.77 82.55 180)
+			(uuid "4a22f0cb-c5b9-4e09-8ebf-204463603cc1")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "MOD[1..4]" bidirectional
+			(at 191.77 77.47 180)
+			(uuid "1918eac4-bce0-4dcf-837e-50cfb00ed6d7")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 144.78 101.6)
+		(size 31.75 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "8cb1b373-89d4-44fe-a70d-44b57920bc78")
+		(property "Sheetname" "USB Input"
+			(at 152.146 101.092 0)
+			(effects
+				(font
+					(size 1.9 1.9)
+					(thickness 0.38)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "USB Input.kicad_sch"
+			(at 147.828 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "{USB}" bidirectional
+			(at 171.45 101.6 90)
+			(uuid "824750ee-718c-4dab-88aa-41b220fd7081")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 198.12 38.1)
+		(size 25.4 12.7)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "dfef5249-86a5-4dfb-9d24-df494b664611")
+		(property "Sheetname" "Power Conversion"
+			(at 197.866 37.338 0)
+			(effects
+				(font
+					(size 1.9 1.9)
+					(thickness 0.38)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "PowerConversion.kicad_sch"
+			(at 196.596 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 179.07 101.6)
+		(size 63.5 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "e545e3f6-a132-4c0d-bd47-766ce245e837")
+		(property "Sheetname" "Module Connectors"
+			(at 198.374 101.092 0)
+			(effects
+				(font
+					(size 1.9 1.9)
+					(thickness 0.38)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Module Connectors.kicad_sch"
+			(at 198.628 128.524 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "{I2C}" bidirectional
+			(at 238.76 101.6 90)
+			(uuid "86efb226-26a0-468d-88f5-b07178113070")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "{SPI}" bidirectional
+			(at 234.95 101.6 90)
+			(uuid "0e3a700a-63da-4e8f-8c07-1f0364e7889a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "SENSE[1..4]" bidirectional
+			(at 186.69 101.6 90)
+			(uuid "527fd5d7-6ca8-47e5-af79-9246f6743082")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MOD[1..4]" bidirectional
+			(at 182.88 101.6 90)
+			(uuid "ff3fa43a-a87b-44b6-9edf-0dba179d2c6f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 144.78 38.1)
+		(size 31.75 12.7)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "f1a8a151-cdd5-4787-bab2-ad42ef8449de")
+		(property "Sheetname" "Power Input"
+			(at 151.638 37.338 0)
+			(effects
+				(font
+					(size 1.9 1.9)
+					(thickness 0.38)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "PowerInput.kicad_sch"
+			(at 147.574 51.562 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

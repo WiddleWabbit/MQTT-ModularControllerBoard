@@ -1,0 +1,1715 @@
+{
+  "board": {
+    "3dviewports": [],
+    "design_settings": {
+      "defaults": {
+        "apply_defaults_to_fp_fields": false,
+        "apply_defaults_to_fp_shapes": false,
+        "apply_defaults_to_fp_text": false,
+        "board_outline_line_width": 0.05,
+        "copper_line_width": 0.2,
+        "copper_text_italic": false,
+        "copper_text_size_h": 1.5,
+        "copper_text_size_v": 1.5,
+        "copper_text_thickness": 0.3,
+        "copper_text_upright": false,
+        "courtyard_line_width": 0.05,
+        "dimension_precision": 4,
+        "dimension_units": 3,
+        "dimensions": {
+          "arrow_length": 1270000,
+          "extension_offset": 500000,
+          "keep_text_aligned": true,
+          "suppress_zeroes": true,
+          "text_position": 0,
+          "units_format": 0
+        },
+        "fab_line_width": 0.1,
+        "fab_text_italic": false,
+        "fab_text_size_h": 1.0,
+        "fab_text_size_v": 1.0,
+        "fab_text_thickness": 0.15,
+        "fab_text_upright": false,
+        "other_line_width": 0.1,
+        "other_text_italic": false,
+        "other_text_size_h": 1.0,
+        "other_text_size_v": 1.0,
+        "other_text_thickness": 0.15,
+        "other_text_upright": false,
+        "pads": {
+          "drill": 1.3,
+          "height": 1.95,
+          "width": 1.95
+        },
+        "silk_line_width": 0.1,
+        "silk_text_italic": false,
+        "silk_text_size_h": 1.0,
+        "silk_text_size_v": 1.0,
+        "silk_text_thickness": 0.2,
+        "silk_text_upright": false,
+        "zones": {
+          "min_clearance": 0.5
+        }
+      },
+      "diff_pair_dimensions": [
+        {
+          "gap": 0.0,
+          "via_gap": 0.0,
+          "width": 0.0
+        }
+      ],
+      "drc_exclusions": [
+        [
+          "clearance|101400000|106950000|6e499862-3d4f-45f5-9c24-64ba4fbce4f9|f3c6823e-83c2-4163-a698-e15e8c27d161",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|102650000|102650000|2b376f35-3aa7-42e5-80b3-2217d3129d87|3e1344fc-9788-45d8-96a7-119e6c70dfc6",
+          ""
+        ],
+        [
+          "clearance|103200000|102450000|2b376f35-3aa7-42e5-80b3-2217d3129d87|d8cf8952-b97b-42a0-b1a2-033c6826bb67",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|103400000|103000000|2b376f35-3aa7-42e5-80b3-2217d3129d87|43752610-9f8c-4aad-ab91-47afe41bd5f3",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|106200000|105100000|122fe56f-06c0-45ad-876b-8aa2583d1059|1bac247f-e7df-4d80-8aec-1b5e3d8b4504",
+          ""
+        ],
+        [
+          "clearance|106550000|104650000|122fe56f-06c0-45ad-876b-8aa2583d1059|1ca4a247-ead4-411e-9d04-b28d78c2afa1",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|106700000|101300000|1455d690-e70f-4e45-a0c2-89175f0b79d2|89b249e9-5f88-4d0c-9d14-99432f9a0e75",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|107000000|101800000|4ef62c02-3c1a-4caa-9906-8cfdcf94a24f|89b249e9-5f88-4d0c-9d14-99432f9a0e75",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|144400000|105800000|1aeb6545-ba4c-454d-a06d-55a911c02bcf|818eb834-b297-4ba3-aa82-0a468a570123",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|144700000|105300000|3a8f968b-578a-4295-a669-b99f0730e324|818eb834-b297-4ba3-aa82-0a468a570123",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|146400000|108100000|aa515be2-7830-4dac-bb8f-6d1e29862928|d6bb2e3f-e2a9-4fbe-866a-d308c4adacb9",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|146550000|107550000|8807c04d-99a9-4fa5-9020-126ead3fa3ec|aa515be2-7830-4dac-bb8f-6d1e29862928",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|147850000|103350000|cbcebfcc-7ea7-4491-abe5-aa0616dc2b1d|edd840d3-9c0d-479d-a069-25f3160d3b77",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|148100000|103600000|d928f054-e6bd-40e3-a90c-c327774ac38d|edd840d3-9c0d-479d-a069-25f3160d3b77",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|148350000|103100000|391f6847-987b-44c8-9e28-baafb806b082|edd840d3-9c0d-479d-a069-25f3160d3b77",
+          "Intentional, GND for High Speed to Couple To"
+        ],
+        [
+          "clearance|148600000|103600000|210f0ef3-0072-4e03-9209-39d0cb6ee0de|edd840d3-9c0d-479d-a069-25f3160d3b77",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|149900000|101150000|02a3a714-5f3f-4d24-919f-c117b9222466|d4822119-37df-4425-9201-1b70fc58797c",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|149900000|101700000|02a3a714-5f3f-4d24-919f-c117b9222466|7d8a96e3-f279-482e-8c5b-2f6d589fe1c3",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|149900000|101700000|02a3a714-5f3f-4d24-919f-c117b9222466|dd3e2551-81ed-4afc-ac7d-7b5da6e3aeba",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|149900000|101700000|02a3a714-5f3f-4d24-919f-c117b9222466|f01e21a0-e04d-4203-aa1e-726c563932ce",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|151800000|104700000|1835f68c-8e6a-417c-a77b-d97de1677f61|986adcd2-7f41-4633-bda0-c6362968604a",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|151900000|104150000|269753d1-47c1-4e3c-bf51-bc8bf1859100|986adcd2-7f41-4633-bda0-c6362968604a",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|152000000|104700000|1c489ec9-cad9-48d2-9f56-fc2d114a7256|986adcd2-7f41-4633-bda0-c6362968604a",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|152450000|104250000|10f4f1d6-b011-4419-80e6-877288b17de1|986adcd2-7f41-4633-bda0-c6362968604a",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|178821400|96250001|5189d815-0a24-444f-b2cb-b6d349fda921|89f61b19-89ec-4e5e-96d0-e0867d1d63ae",
+          ""
+        ],
+        [
+          "clearance|179278600|96250001|5189d815-0a24-444f-b2cb-b6d349fda921|7339b6a8-a582-4630-a5e5-fb5e3337e0e2",
+          ""
+        ],
+        [
+          "clearance|179471401|96250001|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|a603e60d-9239-48e4-bf67-0a20f2181429",
+          ""
+        ],
+        [
+          "clearance|179928601|95570744|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|fa883e58-525f-477e-b0c9-e768b0c33a1b",
+          ""
+        ],
+        [
+          "clearance|179928601|96250001|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|6a19f718-f08d-4946-ad51-19a1e8780e12",
+          ""
+        ],
+        [
+          "clearance|180121400|95568059|587ffd27-ff06-40bb-963e-ff4b34c28a62|6a19f718-f08d-4946-ad51-19a1e8780e12",
+          ""
+        ],
+        [
+          "clearance|180578600|96250001|6a19f718-f08d-4946-ad51-19a1e8780e12|8aa4af85-b91f-4918-b765-31ff47e0d87d",
+          ""
+        ],
+        [
+          "clearance|185200000|108600000|012e253a-3505-47ca-857f-4c0c67171780|8ae1923b-7de7-451d-ad3b-8ded1d4d0078",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|185550000|108150000|012e253a-3505-47ca-857f-4c0c67171780|9e040903-69a4-44de-bbf2-e1e4d6ee51ec",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|185800000|110600000|21159a1e-f7d2-478c-bc36-eeea061b8f0e|a4e3f4b9-196c-4c10-a9cf-1dacf0cf755e",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|186050000|111100000|21159a1e-f7d2-478c-bc36-eeea061b8f0e|c0e021fa-4f72-408c-a86f-93f51bb61f28",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|186300000|110600000|21159a1e-f7d2-478c-bc36-eeea061b8f0e|f79e511d-4b19-42db-b4a5-d1a3a79e65d5",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|186550000|110850000|21159a1e-f7d2-478c-bc36-eeea061b8f0e|9c2095f8-b18a-483a-af93-7a4af6d5cf31",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|191500000|105700000|418becdb-482a-45e9-a7a6-b05a3d616fc0|4bc35a0d-884d-4c97-b0b5-12880af6cfd2",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|191850000|105250000|2c1e34f2-3b8b-4245-a32e-ee9d24493d30|418becdb-482a-45e9-a7a6-b05a3d616fc0",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|193900000|103500000|1d6ced6b-5bdd-4b12-9943-9d858b178e9c|c569711d-665a-40f3-98bb-cf2bd01dc1a1",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|194250000|104050000|1d6ced6b-5bdd-4b12-9943-9d858b178e9c|473d1b34-2b35-4cad-955a-6d0fa292cad6",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|195000000|104500000|1d6ced6b-5bdd-4b12-9943-9d858b178e9c|9522d655-4cd7-4ae6-9e30-044e9230f989",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|197200000|106100000|55d3c29d-1fdf-42cb-9534-72bd5decb2cd|ad147384-bf04-49b9-8e11-2a09b9190140",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|197500000|106600000|6e4e441c-5c48-41d7-a190-9f73d9f4b939|ad147384-bf04-49b9-8e11-2a09b9190140",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|199900000|106600000|6e4e441c-5c48-41d7-a190-9f73d9f4b939|9870e757-e323-416b-a72d-d5958b180a9c",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|199900000|106600000|8dbfe753-d869-40db-9e4f-ae14f3ad22ff|9870e757-e323-416b-a72d-d5958b180a9c",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|200200000|106150000|9870e757-e323-416b-a72d-d5958b180a9c|9b46a37a-8c85-44ef-8fa6-785a6650188a",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|200230000|121905000|c6c4e6a7-a82a-497b-9de7-d896104d2777|d2346751-1a3d-4b96-b9eb-6e340d01595d",
+          ""
+        ],
+        [
+          "clearance|201800000|104600000|69b95503-ea63-42dc-b85d-61c7d4f4863d|c7606e8d-f8b0-43ac-8b2c-a3d8d6553465",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|201800000|104800000|69b95503-ea63-42dc-b85d-61c7d4f4863d|8b1357b0-0d3e-49d3-9892-b93ccf381a16",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|202350000|104700000|05efd284-2377-4ef9-8b1e-d6ab5adf3b3d|69b95503-ea63-42dc-b85d-61c7d4f4863d",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|204100000|103700000|8d72e3aa-556b-4d66-ba92-11eeb242ed78|9f287cde-3ddd-42a3-ae4e-037e50af88e3",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|204100000|104200000|7987da0f-4b58-4d8c-abbd-a1c5da25911a|8d72e3aa-556b-4d66-ba92-11eeb242ed78",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|204600000|103950000|158aefc0-928d-4434-b883-620ef7a0ae15|8d72e3aa-556b-4d66-ba92-11eeb242ed78",
+          "Intentional, GND Via for High Speed Via to couple to."
+        ],
+        [
+          "clearance|206210000|119575000|56926567-fef2-4e87-bf58-29de3fa5024b|518ea51d-99d9-45ad-b838-225c3140af0a",
+          ""
+        ],
+        [
+          "clearance|206210000|120845000|518ea51d-99d9-45ad-b838-225c3140af0a|629b5770-dc88-4257-a168-1fb154515821",
+          ""
+        ],
+        [
+          "clearance|206210000|122115000|629b5770-dc88-4257-a168-1fb154515821|d0b5fac3-e35f-454f-8358-eeb311501859",
+          ""
+        ],
+        [
+          "clearance|206210000|123385000|d0b5fac3-e35f-454f-8358-eeb311501859|64b919f4-6ffc-4920-a0f8-22681c07b600",
+          ""
+        ],
+        [
+          "clearance|219190000|114300000|66b96bde-6eee-46fd-bf5d-e549dc81cbdf|b95eed89-cd10-470e-8318-1fe7e01341b3",
+          ""
+        ],
+        [
+          "clearance|219700000|107300000|27e7fcf5-9b35-467f-9ab3-54e297c01a53|8d3e9b5f-c90b-496b-8f7b-816ee3f0e848",
+          "Intentional. Ground via to couple to."
+        ],
+        [
+          "clearance|219700000|107300000|27e7fcf5-9b35-467f-9ab3-54e297c01a53|f92aca3b-3769-4f5c-9bb3-5e4d27e9a0e1",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|219750000|106800000|175d17bc-2242-4fb6-bbc6-920bd4ff88d7|27e7fcf5-9b35-467f-9ab3-54e297c01a53",
+          "Intentional. GND via to couple to."
+        ],
+        [
+          "clearance|219800000|107300000|0c216d7d-3c56-4588-974e-38387216b21f|27e7fcf5-9b35-467f-9ab3-54e297c01a53",
+          "Intentional. GND via to couple to."
+        ],
+        [
+          "clearance|220250000|109550000|6accb0e9-ad3a-40e9-8101-8e157a12e27b|e9b0f621-2f6b-47e9-a9d3-5e28a17308bf",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|220460000|114300000|696b206c-1600-474a-b4c1-074cc2ebf497|66b96bde-6eee-46fd-bf5d-e549dc81cbdf",
+          ""
+        ],
+        [
+          "clearance|220910000|109800000|6accb0e9-ad3a-40e9-8101-8e157a12e27b|a9c0ee0f-5db7-4a8f-9f57-75b6d403f6e8",
+          "Intentional. Ground via to couple to."
+        ],
+        [
+          "clearance|220910000|109800000|6accb0e9-ad3a-40e9-8101-8e157a12e27b|bbb47638-adb7-4c7a-9b9d-d19305353925",
+          "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|220955000|109300000|1541f0ea-0073-4095-a3a9-62acf0d8816d|6accb0e9-ad3a-40e9-8101-8e157a12e27b",
+          "Intentional. Ground via to couple to."
+        ],
+        [
+          "clearance|221000000|109800000|6accb0e9-ad3a-40e9-8101-8e157a12e27b|abd0a93f-e372-48fd-bd48-7f53ee0b6992",
+          "Intentional. Ground via to couple to."
+        ],
+        [
+          "clearance|221730000|114300000|12aa7550-d2b6-46d7-a93a-5debd102132d|696b206c-1600-474a-b4c1-074cc2ebf497",
+          ""
+        ],
+        [
+          "clearance|57800000|101900000|3326b2be-7603-4f6c-b1dd-5ccefc04cb18|725786a0-b5ec-4555-a093-f0606b6358fa",
+          "Intentional, GND for high speed connection to couple to."
+        ],
+        [
+          "clearance|58300000|102200000|3326b2be-7603-4f6c-b1dd-5ccefc04cb18|dc9cf76f-2126-4362-92f7-f1c4fe6dde4d",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "clearance|59950000|100150000|03761293-ed9d-4f36-b88d-8dbd8a2eb1a7|aa862685-978b-4aa0-882f-35f23cc6a5c4",
+          ""
+        ],
+        [
+          "clearance|60000000|100689216|03761293-ed9d-4f36-b88d-8dbd8a2eb1a7|243f6915-6306-4822-9859-78cb7cd6b698",
+          ""
+        ],
+        [
+          "clearance|60189216|100500000|03761293-ed9d-4f36-b88d-8dbd8a2eb1a7|27e84219-d5be-491d-8326-6288b1293889",
+          ""
+        ],
+        [
+          "clearance|60189216|100500000|03761293-ed9d-4f36-b88d-8dbd8a2eb1a7|aa604405-f793-45a2-ac54-37cd163ff0bd",
+          ""
+        ],
+        [
+          "clearance|61450000|103400000|258e6ac1-4bc8-46fa-9404-89ac1df94d91|8651c5ed-1dd2-48e6-b85e-56818f07073b",
+          ""
+        ],
+        [
+          "clearance|61700000|103900000|258e6ac1-4bc8-46fa-9404-89ac1df94d91|9cfc5349-9f1f-443f-b6f5-0e937fe3d1e5",
+          ""
+        ],
+        [
+          "clearance|61950000|103650000|258e6ac1-4bc8-46fa-9404-89ac1df94d91|de0141e8-3fb5-4050-b072-73baaeed8420",
+          ""
+        ],
+        [
+          "clearance|99650000|104750000|40e24e28-35fc-4024-beea-5e468972a96d|79f56255-7ea2-4771-8aae-23ed9470e8fc",
+          "Intentional, High Speed Signal with via to couple to GND"
+        ],
+        [
+          "connection_width|121254000|118236000|3d8539e3-8cf1-4f4f-9ee3-7461a368ca68|85716a68-f025-4d3f-9cd5-c881a9a4f0a3",
+          ""
+        ],
+        [
+          "connection_width|121254000|118836000|0489d162-cba1-413c-a90e-3976d5b81055|a3e11527-a1e6-409d-afb0-c283d13c2d7e",
+          ""
+        ],
+        [
+          "connection_width|121254000|123636000|78efb7e8-1b9c-42d6-bead-424341795fe8|fa75a002-790c-4dff-93fc-33d2c582569d",
+          ""
+        ],
+        [
+          "connection_width|121254000|124236000|ca7cd268-15d7-43f1-9de2-1a6e8e5c9b4e|56c75c28-7444-494f-b088-63dd739984e5",
+          ""
+        ],
+        [
+          "connection_width|121554000|118536000|85716a68-f025-4d3f-9cd5-c881a9a4f0a3|a3e11527-a1e6-409d-afb0-c283d13c2d7e",
+          ""
+        ],
+        [
+          "connection_width|121554000|123936000|56c75c28-7444-494f-b088-63dd739984e5|78efb7e8-1b9c-42d6-bead-424341795fe8",
+          ""
+        ],
+        [
+          "copper_edge_clearance|177501900|93141311|b57c8e55-6d9f-45eb-a1f6-28e604814c3f|670231e3-35fa-4eb2-95e8-e33522ec068a",
+          ""
+        ],
+        [
+          "copper_edge_clearance|178718000|91947500|021c7c0b-4433-4c11-b91f-cf81d741f408|298e78e3-f56d-4674-b2ec-5ad016f664d3",
+          ""
+        ],
+        [
+          "copper_edge_clearance|182141025|93095551|ae2fccf0-8e78-4f65-9941-d5adada14790|64bd555f-ef70-493a-8cf7-2517731c6d2e",
+          ""
+        ],
+        [
+          "copper_edge_clearance|184300000|92557100|0332c800-bf92-46b8-a835-ea7b1cebaf8d|213e1ef9-fb38-4261-a2b3-b8909b26456b",
+          ""
+        ],
+        [
+          "silk_edge_clearance|176082800|91505045|a96d8b24-da14-4a53-8f45-a3b9961e2b62|76afabd5-d293-48cf-bb44-5b323609d24b",
+          ""
+        ],
+        [
+          "silk_edge_clearance|184617200|91495622|5ff149ff-2338-40c0-b2e0-c3301e4b23b4|ea510ae0-0796-430c-be1e-98743dcaca44",
+          ""
+        ]
+      ],
+      "meta": {
+        "version": 2
+      },
+      "rule_severities": {
+        "annular_width": "error",
+        "clearance": "error",
+        "connection_width": "warning",
+        "copper_edge_clearance": "error",
+        "copper_sliver": "warning",
+        "courtyards_overlap": "error",
+        "creepage": "error",
+        "diff_pair_gap_out_of_range": "error",
+        "diff_pair_uncoupled_length_too_long": "error",
+        "drill_out_of_range": "error",
+        "duplicate_footprints": "warning",
+        "extra_footprint": "warning",
+        "footprint": "error",
+        "footprint_filters_mismatch": "ignore",
+        "footprint_symbol_mismatch": "warning",
+        "footprint_type_mismatch": "ignore",
+        "hole_clearance": "error",
+        "hole_to_hole": "warning",
+        "holes_co_located": "warning",
+        "invalid_outline": "error",
+        "isolated_copper": "warning",
+        "item_on_disabled_layer": "error",
+        "items_not_allowed": "error",
+        "length_out_of_range": "error",
+        "lib_footprint_issues": "warning",
+        "lib_footprint_mismatch": "warning",
+        "malformed_courtyard": "error",
+        "microvia_drill_out_of_range": "error",
+        "mirrored_text_on_front_layer": "warning",
+        "missing_courtyard": "ignore",
+        "missing_footprint": "warning",
+        "net_conflict": "warning",
+        "nonmirrored_text_on_back_layer": "warning",
+        "npth_inside_courtyard": "ignore",
+        "padstack": "warning",
+        "pth_inside_courtyard": "ignore",
+        "shorting_items": "error",
+        "silk_edge_clearance": "warning",
+        "silk_over_copper": "warning",
+        "silk_overlap": "warning",
+        "skew_out_of_range": "error",
+        "solder_mask_bridge": "error",
+        "starved_thermal": "error",
+        "text_height": "warning",
+        "text_on_edge_cuts": "error",
+        "text_thickness": "warning",
+        "through_hole_pad_without_hole": "error",
+        "too_many_vias": "error",
+        "track_angle": "error",
+        "track_dangling": "warning",
+        "track_segment_length": "error",
+        "track_width": "error",
+        "tracks_crossing": "error",
+        "unconnected_items": "error",
+        "unresolved_variable": "error",
+        "via_dangling": "warning",
+        "zones_intersect": "error"
+      },
+      "rules": {
+        "max_error": 0.005,
+        "min_clearance": 0.1,
+        "min_connection": 0.1,
+        "min_copper_edge_clearance": 0.5,
+        "min_groove_width": 0.0,
+        "min_hole_clearance": 0.25,
+        "min_hole_to_hole": 0.25,
+        "min_microvia_diameter": 0.3,
+        "min_microvia_drill": 0.3,
+        "min_resolved_spokes": 2,
+        "min_silk_clearance": 0.0,
+        "min_text_height": 1.0,
+        "min_text_thickness": 0.1,
+        "min_through_hole_diameter": 0.3,
+        "min_track_width": 0.1,
+        "min_via_annular_width": 0.1,
+        "min_via_diameter": 0.5,
+        "solder_mask_to_copper_clearance": 0.1,
+        "use_height_for_length_calcs": true
+      },
+      "teardrop_options": [
+        {
+          "td_onpthpad": true,
+          "td_onroundshapesonly": false,
+          "td_onsmdpad": true,
+          "td_ontrackend": false,
+          "td_onvia": true
+        }
+      ],
+      "teardrop_parameters": [
+        {
+          "td_allow_use_two_tracks": true,
+          "td_curve_segcount": 0,
+          "td_height_ratio": 1.0,
+          "td_length_ratio": 0.5,
+          "td_maxheight": 2.0,
+          "td_maxlen": 1.0,
+          "td_on_pad_in_zone": false,
+          "td_target_name": "td_round_shape",
+          "td_width_to_size_filter_ratio": 0.9
+        },
+        {
+          "td_allow_use_two_tracks": true,
+          "td_curve_segcount": 0,
+          "td_height_ratio": 1.0,
+          "td_length_ratio": 0.5,
+          "td_maxheight": 2.0,
+          "td_maxlen": 1.0,
+          "td_on_pad_in_zone": false,
+          "td_target_name": "td_rect_shape",
+          "td_width_to_size_filter_ratio": 0.9
+        },
+        {
+          "td_allow_use_two_tracks": true,
+          "td_curve_segcount": 0,
+          "td_height_ratio": 1.0,
+          "td_length_ratio": 0.5,
+          "td_maxheight": 2.0,
+          "td_maxlen": 1.0,
+          "td_on_pad_in_zone": false,
+          "td_target_name": "td_track_end",
+          "td_width_to_size_filter_ratio": 0.9
+        }
+      ],
+      "track_widths": [
+        0.0,
+        0.2,
+        0.25,
+        0.4,
+        0.5,
+        0.6,
+        0.75,
+        1.0
+      ],
+      "tuning_pattern_settings": {
+        "diff_pair_defaults": {
+          "corner_radius_percentage": 80,
+          "corner_style": 1,
+          "max_amplitude": 1.0,
+          "min_amplitude": 0.2,
+          "single_sided": false,
+          "spacing": 1.0
+        },
+        "diff_pair_skew_defaults": {
+          "corner_radius_percentage": 80,
+          "corner_style": 1,
+          "max_amplitude": 1.0,
+          "min_amplitude": 0.2,
+          "single_sided": false,
+          "spacing": 0.6
+        },
+        "single_track_defaults": {
+          "corner_radius_percentage": 80,
+          "corner_style": 1,
+          "max_amplitude": 1.0,
+          "min_amplitude": 0.2,
+          "single_sided": false,
+          "spacing": 0.6
+        }
+      },
+      "via_dimensions": [
+        {
+          "diameter": 0.0,
+          "drill": 0.0
+        }
+      ],
+      "zones_allow_external_fillets": false
+    },
+    "ipc2581": {
+      "dist": "",
+      "distpn": "",
+      "internal_id": "",
+      "mfg": "",
+      "mpn": ""
+    },
+    "layer_pairs": [],
+    "layer_presets": [
+      {
+        "activeLayer": -2,
+        "flipBoard": false,
+        "layers": [
+          8,
+          10,
+          12,
+          14,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          34,
+          35,
+          36,
+          37,
+          38,
+          40,
+          42,
+          44,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ],
+        "name": "Fab Cleanup",
+        "renderLayers": [
+          "vias",
+          "footprint_text",
+          "footprint_anchors",
+          "ratsnest",
+          "grid",
+          "footprints_front",
+          "footprints_back",
+          "footprint_values",
+          "footprint_references",
+          "tracks",
+          "drc_errors",
+          "drawing_sheet",
+          "bitmaps",
+          "pads",
+          "zones",
+          "drc_warnings",
+          "drc_exclusions",
+          "locked_item_shadows",
+          "conflict_shadows",
+          "shapes"
+        ]
+      },
+      {
+        "activeLayer": -2,
+        "flipBoard": false,
+        "layers": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          6,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ],
+        "name": "Routing",
+        "renderLayers": [
+          "vias",
+          "footprint_text",
+          "footprint_anchors",
+          "ratsnest",
+          "grid",
+          "footprints_front",
+          "footprints_back",
+          "footprint_values",
+          "footprint_references",
+          "tracks",
+          "drc_errors",
+          "drawing_sheet",
+          "bitmaps",
+          "pads",
+          "zones",
+          "drc_warnings",
+          "drc_exclusions",
+          "locked_item_shadows",
+          "conflict_shadows",
+          "shapes"
+        ]
+      },
+      {
+        "activeLayer": -2,
+        "flipBoard": false,
+        "layers": [
+          5,
+          7,
+          8,
+          10,
+          12,
+          14,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          34,
+          36,
+          37,
+          38,
+          40,
+          42,
+          44,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ],
+        "name": "Silkscreen Cleanup",
+        "renderLayers": [
+          "vias",
+          "footprint_text",
+          "footprint_anchors",
+          "ratsnest",
+          "grid",
+          "footprints_front",
+          "footprints_back",
+          "footprint_values",
+          "footprint_references",
+          "tracks",
+          "drc_errors",
+          "drawing_sheet",
+          "bitmaps",
+          "pads",
+          "zones",
+          "drc_warnings",
+          "drc_exclusions",
+          "locked_item_shadows",
+          "conflict_shadows",
+          "shapes"
+        ]
+      }
+    ],
+    "viewports": []
+  },
+  "boards": [],
+  "cvpcb": {
+    "equivalence_files": []
+  },
+  "erc": {
+    "erc_exclusions": [
+      [
+        "pin_to_pin|1447800|1143000|888f7007-3a79-4292-8c2c-a453c91a392b|906097ef-5c60-4eae-afe8-6af925628c2f|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78",
+        "Expected, strapping pin for the ESP32. Pulled low."
+      ],
+      [
+        "pin_to_pin|1447800|1168400|3b458727-9eb0-419d-b638-d9f44905aa40|906097ef-5c60-4eae-afe8-6af925628c2f|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78",
+        ""
+      ],
+      [
+        "pin_to_pin|1447800|736600|e6201e00-6ac1-4a9c-93af-f62e8dbb00e8|906097ef-5c60-4eae-afe8-6af925628c2f|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/688027c4-6d3d-464d-b364-684d75515e96|/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78",
+        "Expected, strapping pin for the ESP32. Pulled to GND"
+      ]
+    ],
+    "meta": {
+      "version": 0
+    },
+    "pin_map": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        2,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        2
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        2,
+        1,
+        2,
+        0,
+        0,
+        1,
+        0,
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        2,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        2,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        2,
+        1,
+        1,
+        0,
+        0,
+        1,
+        0,
+        2,
+        0,
+        0,
+        2
+      ],
+      [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    ],
+    "rule_severities": {
+      "bus_definition_conflict": "error",
+      "bus_entry_needed": "error",
+      "bus_to_bus_conflict": "error",
+      "bus_to_net_conflict": "error",
+      "different_unit_footprint": "error",
+      "different_unit_net": "error",
+      "duplicate_reference": "error",
+      "duplicate_sheet_names": "error",
+      "endpoint_off_grid": "warning",
+      "extra_units": "error",
+      "footprint_filter": "ignore",
+      "footprint_link_issues": "warning",
+      "four_way_junction": "ignore",
+      "global_label_dangling": "warning",
+      "hier_label_mismatch": "error",
+      "label_dangling": "error",
+      "label_multiple_wires": "warning",
+      "lib_symbol_issues": "warning",
+      "lib_symbol_mismatch": "warning",
+      "missing_bidi_pin": "warning",
+      "missing_input_pin": "warning",
+      "missing_power_pin": "error",
+      "missing_unit": "warning",
+      "multiple_net_names": "warning",
+      "net_not_bus_member": "warning",
+      "no_connect_connected": "warning",
+      "no_connect_dangling": "warning",
+      "pin_not_connected": "error",
+      "pin_not_driven": "error",
+      "pin_to_pin": "error",
+      "power_pin_not_driven": "error",
+      "same_local_global_label": "warning",
+      "similar_label_and_power": "warning",
+      "similar_labels": "warning",
+      "similar_power": "warning",
+      "simulation_model_issue": "ignore",
+      "single_global_label": "ignore",
+      "unannotated": "error",
+      "unconnected_wire_endpoint": "warning",
+      "undefined_netclass": "error",
+      "unit_value_mismatch": "error",
+      "unresolved_variable": "error",
+      "wire_dangling": "error"
+    }
+  },
+  "libraries": {
+    "pinned_footprint_libs": [
+      "CJT Connectors"
+    ],
+    "pinned_symbol_libs": [
+      "CJT Connectors"
+    ]
+  },
+  "meta": {
+    "filename": "MQTT-ModularControllerBoard.kicad_pro",
+    "version": 3
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Default",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "clearance": 0.3,
+        "name": "12V",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 5,
+        "schematic_color": "rgb(255, 60, 0)",
+        "track_width": 1.5,
+        "via_diameter": 1.0,
+        "via_drill": 0.5
+      },
+      {
+        "clearance": 0.25,
+        "name": "3V3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 3,
+        "schematic_color": "rgb(197, 0, 255)",
+        "track_width": 0.8,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      },
+      {
+        "clearance": 0.25,
+        "name": "5V",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 4,
+        "schematic_color": "rgb(255, 141, 0)",
+        "track_width": 1.0,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      },
+      {
+        "clearance": 0.2,
+        "name": "GND",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 1,
+        "schematic_color": "rgb(0, 0, 0)",
+        "track_width": 1.0,
+        "via_diameter": 0.8,
+        "via_drill": 0.4
+      },
+      {
+        "clearance": 0.6,
+        "name": "Signals",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2,
+        "schematic_color": "rgb(0, 137, 255)",
+        "track_width": 0.25,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      },
+      {
+        "clearance": 0.2032,
+        "diff_pair_gap": 0.2032,
+        "diff_pair_width": 0.2672,
+        "name": "USB",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgb(0, 245, 255)",
+        "track_width": 0.2672,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      }
+    ],
+    "meta": {
+      "version": 4
+    },
+    "net_colors": null,
+    "netclass_assignments": {
+      "/ESP32-S3/BOOT": [
+        "3V3"
+      ],
+      "/ESP32-S3/D+_R": [
+        "Signals"
+      ],
+      "/ESP32-S3/D-_R": [
+        "Signals"
+      ],
+      "/ESP32-S3/D_R+": [
+        "Signals"
+      ],
+      "/ESP32-S3/D_R-": [
+        "Signals"
+      ],
+      "/ESP32-S3/EN": [
+        "3V3"
+      ],
+      "/ESP32-S3/MISO_R": [
+        "Signals"
+      ],
+      "/ESP32-S3/MOSI_R": [
+        "Signals"
+      ],
+      "/ESP32-S3/SCK_R": [
+        "Signals"
+      ],
+      "/ESP32-S3/VBUS_SNS": [
+        "3V3"
+      ],
+      "Net-(C202-Pad2)": [
+        "Signals"
+      ],
+      "Net-(C203-Pad2)": [
+        "Signals"
+      ],
+      "Net-(C205-Pad1)": [
+        "Signals"
+      ],
+      "Net-(D301-A1)": [
+        "12V"
+      ],
+      "Net-(D301-A2)": [
+        "12V"
+      ],
+      "Net-(D401-A)": [
+        "3V3"
+      ],
+      "Net-(D601-A)": [
+        "5V"
+      ],
+      "Net-(D603-A2)": [
+        "12V"
+      ],
+      "Net-(D604-A1)": [
+        "12V"
+      ],
+      "Net-(IC301-GATE)": [
+        "12V"
+      ],
+      "Net-(IC301-SW)": [
+        "5V"
+      ],
+      "Net-(IC301-VBST)": [
+        "5V"
+      ],
+      "Net-(IC301-VCAP)": [
+        "12V"
+      ],
+      "Net-(IC301-VFB)": [
+        "5V"
+      ],
+      "Net-(IC401-ANODE)": [
+        "5V"
+      ],
+      "Net-(IC401-GATE)": [
+        "5V"
+      ],
+      "Net-(IC401-SW)": [
+        "5V"
+      ],
+      "Net-(IC401-VBST)": [
+        "5V"
+      ],
+      "Net-(IC401-VCAP)": [
+        "5V"
+      ],
+      "Net-(IC401-VFB)": [
+        "5V"
+      ],
+      "Net-(IC402-ANODE)": [
+        "5V"
+      ],
+      "Net-(IC402-GATE)": [
+        "5V"
+      ],
+      "Net-(IC402-VCAP)": [
+        "5V"
+      ],
+      "Net-(IC601-GATE)": [
+        "12V"
+      ],
+      "Net-(IC601-VCAP)": [
+        "12V"
+      ],
+      "Net-(U301-*SHDN)": [
+        "5V"
+      ],
+      "Net-(U401-*SHDN)": [
+        "5V"
+      ],
+      "VBUS": [
+        "5V"
+      ],
+      "unconnected-(R204-Pad2)": [
+        "Signals"
+      ],
+      "unconnected-(R209-Pad2)": [
+        "Signals"
+      ]
+    },
+    "netclass_patterns": [
+      {
+        "netclass": "USB",
+        "pattern": "*D+*"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "*D-*"
+      },
+      {
+        "netclass": "3V3",
+        "pattern": "*3V3*"
+      },
+      {
+        "netclass": "5V",
+        "pattern": "*5V*"
+      },
+      {
+        "netclass": "12V",
+        "pattern": "*12V*"
+      },
+      {
+        "netclass": "GND",
+        "pattern": "*GND*"
+      },
+      {
+        "netclass": "Signals",
+        "pattern": "*SDA*"
+      },
+      {
+        "netclass": "Signals",
+        "pattern": "*SCL*"
+      },
+      {
+        "netclass": "Signals",
+        "pattern": "*MOSI*"
+      },
+      {
+        "netclass": "Signals",
+        "pattern": "*MISO*"
+      },
+      {
+        "netclass": "Signals",
+        "pattern": "*SCK*"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "*D_R+*"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "*D_R-*"
+      }
+    ]
+  },
+  "pcbnew": {
+    "last_paths": {
+      "gencad": "",
+      "idf": "",
+      "netlist": "",
+      "plot": "",
+      "pos_files": "",
+      "specctra_dsn": "",
+      "step": "",
+      "svg": "",
+      "vrml": ""
+    },
+    "page_layout_descr_file": ""
+  },
+  "schematic": {
+    "annotate_start_num": 0,
+    "bom_export_filename": "${PROJECTNAME}.csv",
+    "bom_fmt_presets": [],
+    "bom_fmt_settings": {
+      "field_delimiter": ",",
+      "keep_line_breaks": false,
+      "keep_tabs": false,
+      "name": "CSV",
+      "ref_delimiter": ",",
+      "ref_range_delimiter": "",
+      "string_delimiter": "\""
+    },
+    "bom_presets": [],
+    "bom_settings": {
+      "exclude_dnp": false,
+      "fields_ordered": [
+        {
+          "group_by": false,
+          "label": "Reference",
+          "name": "Reference",
+          "show": true
+        },
+        {
+          "group_by": false,
+          "label": "Qty",
+          "name": "${QUANTITY}",
+          "show": true
+        },
+        {
+          "group_by": true,
+          "label": "Value",
+          "name": "Value",
+          "show": true
+        },
+        {
+          "group_by": true,
+          "label": "DNP",
+          "name": "${DNP}",
+          "show": true
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from BOM",
+          "name": "${EXCLUDE_FROM_BOM}",
+          "show": true
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from Board",
+          "name": "${EXCLUDE_FROM_BOARD}",
+          "show": true
+        },
+        {
+          "group_by": true,
+          "label": "Footprint",
+          "name": "Footprint",
+          "show": true
+        },
+        {
+          "group_by": false,
+          "label": "Datasheet",
+          "name": "Datasheet",
+          "show": true
+        }
+      ],
+      "filter_string": "",
+      "group_symbols": true,
+      "include_excluded_from_bom": true,
+      "name": "Default Editing",
+      "sort_asc": true,
+      "sort_field": "Reference"
+    },
+    "connection_grid_size": 50.0,
+    "drawing": {
+      "dashed_lines_dash_length_ratio": 12.0,
+      "dashed_lines_gap_length_ratio": 3.0,
+      "default_line_thickness": 6.0,
+      "default_text_size": 50.0,
+      "field_names": [],
+      "intersheets_ref_own_page": false,
+      "intersheets_ref_prefix": "",
+      "intersheets_ref_short": false,
+      "intersheets_ref_show": false,
+      "intersheets_ref_suffix": "",
+      "junction_size_choice": 3,
+      "label_size_ratio": 0.375,
+      "operating_point_overlay_i_precision": 3,
+      "operating_point_overlay_i_range": "~A",
+      "operating_point_overlay_v_precision": 3,
+      "operating_point_overlay_v_range": "~V",
+      "overbar_offset_ratio": 1.23,
+      "pin_symbol_size": 25.0,
+      "text_offset_ratio": 0.15
+    },
+    "legacy_lib_dir": "",
+    "legacy_lib_list": [],
+    "meta": {
+      "version": 1
+    },
+    "net_format_name": "",
+    "page_layout_descr_file": "",
+    "plot_directory": "",
+    "space_save_all_events": true,
+    "spice_current_sheet_as_root": false,
+    "spice_external_command": "spice \"%I\"",
+    "spice_model_current_sheet_as_root": true,
+    "spice_save_all_currents": false,
+    "spice_save_all_dissipations": false,
+    "spice_save_all_voltages": false,
+    "subpart_first_id": 65,
+    "subpart_id_separator": 0
+  },
+  "sheets": [
+    [
+      "fb66fec7-a625-41b0-8b4b-639a0ec63be1",
+      "Root"
+    ],
+    [
+      "688027c4-6d3d-464d-b364-684d75515e96",
+      "ESP32-S3"
+    ],
+    [
+      "f1a8a151-cdd5-4787-bab2-ad42ef8449de",
+      "Power Input"
+    ],
+    [
+      "dfef5249-86a5-4dfb-9d24-df494b664611",
+      "Power Conversion"
+    ],
+    [
+      "e545e3f6-a132-4c0d-bd47-766ce245e837",
+      "Module Connectors"
+    ],
+    [
+      "8cb1b373-89d4-44fe-a70d-44b57920bc78",
+      "USB Input"
+    ]
+  ],
+  "text_variables": {}
+}
