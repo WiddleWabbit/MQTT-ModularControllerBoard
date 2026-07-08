@@ -42,14 +42,17 @@ Slot 1:
 - General Purpose: GPIO1
 - Module Detection: GPIO2
 - CS Pin: GPIO16
+  
 Slot 2:
 - General Purpose: GPIO43
 - Module Detection: GPIO44
 - CS Pin: GPIO15
+  
 Slot 3:
 - General Purpose: GPIO42
 - Module Detection: GPIO41
 - CS Pin: GPIO7
+  
 Slot 4:
 - General Purpose: GPIO40
 - Module Detection: GPIO39
