@@ -3656,7 +3656,7 @@
 		)
 		(uuid "9ddf1ab3-3acb-44ef-bf13-f977fd89a77a")
 	)
-	(text_box "- USB C connection for programming, USB VBUS SENSE on GPIO08\n- Manual backup writing, hold boot and press reset, then release boot to put in download mode.\n- SDA/SCL & SPI for communication with Modules. Module CS Pins, GPIO06, GPIO07, GPIO15, GPIO16\n- One General use pin per module, GPIO40, GPIO42, GPIO44, GPIO01\n- One Detection Pin, GPIO39, GPIO41, GPIO44, GPIO02"
+	(text_box "- USB connection for programming, USB VBUS SENSE on GPIO08\n- Manual backup writing, hold boot and press reset, then release boot to put in download mode.\n- SDA/SCL & SPI for communication with Modules. Module CS Pins, GPIO06, GPIO07, GPIO15, GPIO16\n- One General use pin per module, GPIO40, GPIO42, GPIO43, GPIO01\n- One Detection Pin, GPIO39, GPIO41, GPIO44, GPIO02"
 		(exclude_from_sim no)
 		(at 179.07 168.91 0)
 		(size 102.87 11.43)
