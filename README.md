@@ -67,6 +67,7 @@ Slot 4:
 ### PCB Stackup
 4-layer board:  
 Component/Routing → Ground plane → Ground plane → Routing
+Designed for JLCPCB Impedance Control Stackup of JLC04161H-7628, Finished thickness of 1.59mm.
 
 ## Setup and Build
 
