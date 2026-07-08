@@ -92,4 +92,9 @@ Board uses 2 x 10, 8.5mm Female Headers (A2541HWV-10P). Recommended 3A support.
 
 ## License
 
-This project is open source. See LICENSE file for details (add one if not present).
+This project is open source.
+Copyright 2026 / N.Wheat
+
+This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY, 
+INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE. 
+Please see the CERN-OHL-P v2 for applicable conditions.
