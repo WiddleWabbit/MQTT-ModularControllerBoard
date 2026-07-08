@@ -27122,7 +27122,7 @@
 	(footprint "LOGO"
 		(layer "B.Cu")
 		(uuid "ceaa37fb-e9d1-446c-9797-b613244fcfb7")
-		(at 164.9 102.3 180)
+		(at 163.9 101.3 180)
 		(property "Reference" "G***"
 			(at 0 0 0)
 			(layer "B.SilkS")
@@ -28759,13 +28759,26 @@
 			)
 		)
 	)
+	(gr_text "Licensed under CERN-OHL-P v2"
+		(at 158.8 104.3 0)
+		(layer "B.SilkS")
+		(uuid "31aae97a-6123-4d04-97e9-7d96ac77766c")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.3)
+				(bold yes)
+			)
+			(justify left bottom mirror)
+		)
+	)
 	(gr_text "github.com/WiddleWabbit/\nMQTT-ModularControllerBoard"
-		(at 158.5 104.3 0)
+		(at 159.1 101.5 0)
 		(layer "B.SilkS")
 		(uuid "d7838d52-4f52-4bfa-b7c3-6a5af7ad6fa9")
 		(effects
 			(font
-				(size 1.3 1.3)
+				(size 1.5 1.5)
 				(thickness 0.325)
 				(bold yes)
 			)
