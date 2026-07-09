@@ -92,9 +92,6 @@ Board uses 2 x 10, 8.5mm Female Headers (A2541HWV-10P). Recommended 3A support.
 
 ## License
 
-This project is open source.
-Copyright 2026 / N.Wheat
-
-This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY, 
-INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE. 
-Please see the CERN-OHL-P v2 for applicable conditions.
+This documentation is part of MQTT-ModularControllerBoard Project and is licensed under the CERN Open Hardware Licence Version 2 - Permissive (CERN-OHL-P-2.0). 
+You may redistribute and modify this documentation under the terms of the CERN-OHL-P-2.0. 
+This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY, INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE. See the CERN-OHL-P-2.0 for applicable conditions.
