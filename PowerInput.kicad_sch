@@ -648,7 +648,7 @@
 					(hide yes)
 				)
 			)
-			(property "Manufacturer_Name" "Samsung Electro-Mechanics"
+			(property "Manufacturer" "Samsung Electro-Mechanics"
 				(at 8.89 -696.19 0)
 				(effects
 					(font
@@ -658,7 +658,7 @@
 					(hide yes)
 				)
 			)
-			(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
+			(property "Manufacturer Part No" "CL31A106KBHNNNE"
 				(at 8.89 -796.19 0)
 				(effects
 					(font
@@ -3685,6 +3685,26 @@
 				(hide yes)
 			)
 		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 820.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 920.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
 		(pin "2"
 			(uuid "c7f2669b-77d5-45ee-aa0d-c968fb187a8c")
 		)
@@ -4009,7 +4029,7 @@
 		(at 148.59 162.56 270)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "466130fd-a777-4949-a232-41e299f0db51")
@@ -4084,7 +4104,7 @@
 		(at 121.92 162.56 90)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "4eff3fba-f6da-4a46-9892-87793c54fc9f")
@@ -4575,6 +4595,26 @@
 				(hide yes)
 			)
 		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 846.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 946.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
 		(pin "2"
 			(uuid "5c0990de-34a8-451b-af6c-a0a8df2b0f2f")
 		)
@@ -4732,7 +4772,7 @@
 		(at 148.59 77.47 90)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "644819b0-3ae4-4c01-8dd7-352da0667a62")
@@ -5060,6 +5100,26 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 833.35 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 933.35 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
 				(hide yes)
 			)
 		)
@@ -5568,6 +5628,26 @@
 				(hide yes)
 			)
 		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 827 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 927 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
 		(pin "2"
 			(uuid "9083fdb3-804d-410e-af44-6f7f87a04ad7")
 		)
@@ -5776,6 +5856,26 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 852.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 952.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
 				(hide yes)
 			)
 		)
@@ -6079,6 +6179,26 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 839.7 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KBHNNNE"
+			(at 147.32 939.7 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
 				(hide yes)
 			)
 		)

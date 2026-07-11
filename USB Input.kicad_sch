@@ -204,7 +204,7 @@
 					(hide yes)
 				)
 			)
-			(property "Manufacturer_Name" "UNI-ROYAL(Uniroyal Elec)"
+			(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
 				(at 13.97 -696.19 0)
 				(effects
 					(font
@@ -214,7 +214,7 @@
 					(hide yes)
 				)
 			)
-			(property "Manufacturer_Part_Number" "0805W8F1003T5E"
+			(property "Manufacturer Part No" "0805W8F1003T5E"
 				(at 13.97 -796.19 0)
 				(effects
 					(font
@@ -3101,7 +3101,7 @@
 		(at 168.91 76.2 0)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "69907411-5d56-414e-b5c7-7c6291afa244")
@@ -3369,6 +3369,26 @@
 				(hide yes)
 			)
 		)
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+			(at 241.3 757.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "0805W8F1003T5E"
+			(at 241.3 857.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
 		(pin "2"
 			(uuid "5bff5f49-1d4c-48f6-a0dd-bff281e4688f")
 		)
@@ -3513,6 +3533,26 @@
 				(font
 					(size 1.27 1.27)
 				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+			(at 214.63 757.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "0805W8F1003T5E"
+			(at 214.63 857.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
 				(hide yes)
 			)
 		)
