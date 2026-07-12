@@ -172,7 +172,15 @@
           ""
         ],
         [
+          "clearance|179928601|95652450|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|928c82ce-0561-4007-b340-a598ff76f1f7",
+          ""
+        ],
+        [
           "clearance|179928601|96250001|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|6a19f718-f08d-4946-ad51-19a1e8780e12",
+          ""
+        ],
+        [
+          "clearance|179928601|96250001|7339b6a8-a582-4630-a5e5-fb5e3337e0e2|af920c48-06d6-4ff6-b5da-63bdbc498c9f",
           ""
         ],
         [
@@ -180,7 +188,23 @@
           ""
         ],
         [
+          "clearance|180121400|95652451|6a19f718-f08d-4946-ad51-19a1e8780e12|9adaa0d6-21a1-4e80-b9a3-a20231991086",
+          ""
+        ],
+        [
+          "clearance|180121400|96250001|6a19f718-f08d-4946-ad51-19a1e8780e12|df4842b4-c1e4-44b0-b555-e02abed5e55e",
+          ""
+        ],
+        [
+          "clearance|180500000|103695655|acbfb4e1-374a-4219-b627-eb27c280468f|bdacc752-6158-4c89-a3c7-7eec28758ea6",
+          ""
+        ],
+        [
           "clearance|180578600|96250001|6a19f718-f08d-4946-ad51-19a1e8780e12|8aa4af85-b91f-4918-b765-31ff47e0d87d",
+          ""
+        ],
+        [
+          "clearance|181400000|102032855|71c89a10-f0ce-4708-aa7f-ec770c80f762|d0b3bd2f-381d-4dbe-b269-7c994f17c830",
           ""
         ],
         [
@@ -378,30 +402,6 @@
         [
           "clearance|99650000|104750000|40e24e28-35fc-4024-beea-5e468972a96d|79f56255-7ea2-4771-8aae-23ed9470e8fc",
           "Intentional, High Speed Signal with via to couple to GND"
-        ],
-        [
-          "connection_width|121254000|118236000|3d8539e3-8cf1-4f4f-9ee3-7461a368ca68|85716a68-f025-4d3f-9cd5-c881a9a4f0a3",
-          ""
-        ],
-        [
-          "connection_width|121254000|118836000|0489d162-cba1-413c-a90e-3976d5b81055|a3e11527-a1e6-409d-afb0-c283d13c2d7e",
-          ""
-        ],
-        [
-          "connection_width|121254000|123636000|78efb7e8-1b9c-42d6-bead-424341795fe8|fa75a002-790c-4dff-93fc-33d2c582569d",
-          ""
-        ],
-        [
-          "connection_width|121254000|124236000|ca7cd268-15d7-43f1-9de2-1a6e8e5c9b4e|56c75c28-7444-494f-b088-63dd739984e5",
-          ""
-        ],
-        [
-          "connection_width|121554000|118536000|85716a68-f025-4d3f-9cd5-c881a9a4f0a3|a3e11527-a1e6-409d-afb0-c283d13c2d7e",
-          ""
-        ],
-        [
-          "connection_width|121554000|123936000|56c75c28-7444-494f-b088-63dd739984e5|78efb7e8-1b9c-42d6-bead-424341795fe8",
-          ""
         ],
         [
           "copper_edge_clearance|177501900|93141311|b57c8e55-6d9f-45eb-a1f6-28e604814c3f|670231e3-35fa-4eb2-95e8-e33522ec068a",
@@ -1367,12 +1367,12 @@
       {
         "clearance": 0.2032,
         "diff_pair_gap": 0.2032,
-        "diff_pair_width": 0.2672,
+        "diff_pair_width": 0.2703,
         "name": "USB",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
         "schematic_color": "rgb(0, 245, 255)",
-        "track_width": 0.2672,
+        "track_width": 0.2703,
         "via_diameter": 0.6,
         "via_drill": 0.3
       }
@@ -1566,7 +1566,7 @@
       "plot": "",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "Model.step",
       "svg": "",
       "vrml": ""
     },

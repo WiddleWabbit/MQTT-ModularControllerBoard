@@ -905,6 +905,15 @@
 					(hide yes)
 				)
 			)
+			(property "Package" "SOD-123FL"
+				(at 3.81 -10.414 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
 			(symbol "SMF4L13AT1G_0_1"
 				(polyline
 					(pts
@@ -4752,6 +4761,15 @@
 				(hide yes)
 			)
 		)
+		(property "Package" "SOD-123FL"
+			(at 156.21 75.184 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
 		(pin "2"
 			(uuid "d258f675-53ba-4286-9135-0ca7e9839d19")
 		)
@@ -5475,6 +5493,15 @@
 		)
 		(property "Part Type" "Extended"
 			(at 185.166 56.388 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "SOD-123FL"
+			(at 185.42 54.356 0)
 			(effects
 				(font
 					(size 1.27 1.27)

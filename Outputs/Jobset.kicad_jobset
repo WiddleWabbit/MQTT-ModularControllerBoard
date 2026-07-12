@@ -156,11 +156,84 @@
         "include_excluded_from_bom": false,
         "keep_line_breaks": false,
         "keep_tabs": false,
-        "output_filename": "",
+        "output_filename": "BOM.csv",
         "ref_delimiter": ",",
         "ref_range_delimiter": "",
         "sort_asc": true,
         "sort_field": "${ITEM_NUMBER}",
+        "string_delimiter": "\""
+      },
+      "type": "sch_export_bom"
+    },
+    {
+      "description": "",
+      "id": "fe744e8d-257d-45cd-8fab-3bc7a61509dc",
+      "settings": {
+        "bom_format_preset_name": "CSV",
+        "bom_preset_name": "",
+        "description": "",
+        "exclude_dnp": false,
+        "field_delimiter": ",",
+        "fields_group_by": [
+          "Value"
+        ],
+        "fields_labels": [
+          "Value",
+          "Reference",
+          "Footprint",
+          "Datasheet",
+          "Description",
+          "Qty",
+          "#",
+          "Height",
+          "JLCPCB Part #",
+          "MAXIMUM_PACKAGE_HEIGHT",
+          "MF",
+          "Manufacturer",
+          "Manufacturer Part No",
+          "Manufacturer_Name",
+          "Manufacturer_Part_Number",
+          "Mouser Part Number",
+          "Mouser Price/Stock",
+          "PCB Hint",
+          "PCB_Hint",
+          "Package",
+          "Part Type",
+          "Sim.Pins"
+        ],
+        "fields_ordered": [
+          "Value",
+          "Reference",
+          "__Footprint",
+          "__Datasheet",
+          "__Description",
+          "__${QUANTITY}",
+          "__${ITEM_NUMBER}",
+          "__Height",
+          "JLCPCB Part #",
+          "__MAXIMUM_PACKAGE_HEIGHT",
+          "__MF",
+          "__Manufacturer",
+          "__Manufacturer Part No",
+          "__Manufacturer_Name",
+          "__Manufacturer_Part_Number",
+          "__Mouser Part Number",
+          "__Mouser Price/Stock",
+          "__PCB Hint",
+          "__PCB_Hint",
+          "Package",
+          "__Part Type",
+          "__Sim.Pins"
+        ],
+        "filter_string": "",
+        "include_excluded_from_bom": false,
+        "keep_line_breaks": false,
+        "keep_tabs": false,
+        "output_filename": "JLC_BOM.csv",
+        "ref_delimiter": ",",
+        "ref_range_delimiter": "",
+        "sort_asc": true,
+        "sort_field": "Reference",
         "string_delimiter": "\""
       },
       "type": "sch_export_bom"
@@ -207,7 +280,7 @@
         "include_unspecified": true,
         "occt_format": 0,
         "optimize_step": true,
-        "output_filename": ".step",
+        "output_filename": "Model.step",
         "overwrite": false,
         "subst_models": true,
         "use_defined_origin": false,
@@ -263,10 +336,11 @@
           "In5.Cu",
           "In4.Cu",
           "In3.Cu",
-          "F.Fab",
+          "F.Fab"
+        ],
+        "layers_to_include_on_all_layers": [
           "Edge.Cuts"
         ],
-        "layers_to_include_on_all_layers": [],
         "mirror": false,
         "negative": false,
         "output_filename": "",
@@ -297,7 +371,7 @@
         "3ff095ed-8d68-4f5d-96d2-ee638fd87626"
       ],
       "settings": {
-        "output_path": "$\\{KIPRJMOD\\}\\Outputs\\Gerbers"
+        "output_path": "${KIPRJMOD}\\Outputs\\Gerbers"
       },
       "type": "folder"
     },
@@ -306,10 +380,11 @@
       "id": "598a9bbe-4b0e-4dab-9c52-859b52777365",
       "only": [
         "ccb89609-c924-4fb9-8f5e-cf5a4e1d28d0",
+        "fe744e8d-257d-45cd-8fab-3bc7a61509dc",
         "03e5fc2a-1174-4ab7-b57f-f3c1b156a7af"
       ],
       "settings": {
-        "output_path": "$\\{KIPRJMOD\\}\\Outputs\\Assembly"
+        "output_path": "${KIPRJMOD}\\Outputs\\Assembly"
       },
       "type": "folder"
     },
@@ -320,7 +395,7 @@
         "3f67e122-68a6-4542-8c86-e8d9da8faec8"
       ],
       "settings": {
-        "output_path": "$\\{KIPRJMOD\\}\\Outputs\\Drawings"
+        "output_path": "${KIPRJMOD}\\Outputs\\Drawings"
       },
       "type": "folder"
     },
@@ -331,7 +406,7 @@
         "01488878-9654-47f3-aa3d-ed654f7b062c"
       ],
       "settings": {
-        "output_path": "$\\{KIPRJMOD\\}\\Outputs\\Models"
+        "output_path": "${KIPRJMOD}\\Outputs\\Models"
       },
       "type": "folder"
     }
