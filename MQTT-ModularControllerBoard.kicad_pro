@@ -204,10 +204,6 @@
           ""
         ],
         [
-          "clearance|181400000|102032855|71c89a10-f0ce-4708-aa7f-ec770c80f762|d0b3bd2f-381d-4dbe-b269-7c994f17c830",
-          ""
-        ],
-        [
           "clearance|185200000|108600000|012e253a-3505-47ca-857f-4c0c67171780|8ae1923b-7de7-451d-ad3b-8ded1d4d0078",
           "Intentional, GND for high speed connection to couple to."
         ],
@@ -1284,10 +1280,14 @@
   },
   "libraries": {
     "pinned_footprint_libs": [
-      "CJT Connectors"
+      "CJT Connectors",
+      "KOHERELEC Inductors"
     ],
     "pinned_symbol_libs": [
-      "CJT Connectors"
+      "CJT Connectors",
+      "KOHERELEC Inductors",
+      "SAMSUNGELECTROMECHANICS Resistors",
+      "SAMSUNGELECTROMECHANICS Capacitors"
     ]
   },
   "meta": {

@@ -357,6 +357,70 @@
         "use_drill_origin": false
       },
       "type": "pcb_export_pdf"
+    },
+    {
+      "description": "",
+      "id": "8c06b266-db97-462d-801c-96ff37950ecb",
+      "settings": {
+        "back_fp_property_popups": true,
+        "black_and_white": false,
+        "color_theme": "",
+        "crossout_dnp_footprints_on_fab_layers": true,
+        "description": "",
+        "drawing_sheet": "",
+        "drill_shape": "full",
+        "front_fp_property_popups": true,
+        "hide_dnp_footprints_on_fab_layers": false,
+        "layers": [
+          "In30.Cu",
+          "In29.Cu",
+          "In28.Cu",
+          "In27.Cu",
+          "In26.Cu",
+          "In25.Cu",
+          "In24.Cu",
+          "In23.Cu",
+          "In22.Cu",
+          "In21.Cu",
+          "In20.Cu",
+          "In19.Cu",
+          "In18.Cu",
+          "In17.Cu",
+          "In16.Cu",
+          "In15.Cu",
+          "In14.Cu",
+          "In13.Cu",
+          "In12.Cu",
+          "In11.Cu",
+          "In10.Cu",
+          "In9.Cu",
+          "In8.Cu",
+          "In7.Cu",
+          "In6.Cu",
+          "In5.Cu",
+          "In4.Cu",
+          "In3.Cu",
+          "F.SilkS"
+        ],
+        "layers_to_include_on_all_layers": [
+          "Edge.Cuts"
+        ],
+        "mirror": false,
+        "negative": false,
+        "output_filename": "",
+        "pdf_gen_mode": "all-layers-separate-files",
+        "pdf_metadata": true,
+        "plot_drawing_sheet": false,
+        "plot_footprint_values": true,
+        "plot_pad_numbers": false,
+        "plot_ref_des": true,
+        "single_document": false,
+        "sketch_dnp_footprints_on_fab_layers": true,
+        "sketch_pads_on_fab_layers": false,
+        "subtract_solder_mask_from_silk": false,
+        "use_drill_origin": false
+      },
+      "type": "pcb_export_pdf"
     }
   ],
   "meta": {
@@ -392,7 +456,8 @@
       "description": "Drawings",
       "id": "b2db26a1-c610-4e28-b619-4088093384eb",
       "only": [
-        "3f67e122-68a6-4542-8c86-e8d9da8faec8"
+        "3f67e122-68a6-4542-8c86-e8d9da8faec8",
+        "8c06b266-db97-462d-801c-96ff37950ecb"
       ],
       "settings": {
         "output_path": "${KIPRJMOD}\\Outputs\\Drawings"

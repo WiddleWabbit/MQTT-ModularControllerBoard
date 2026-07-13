@@ -561,228 +561,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "JLCPCB Basic:CL31A106KBHNNNE"
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "C"
-				(at -3.302 7.366 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Value" "10uF 10% 50V"
-				(at -3.302 5.334 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-				(at 8.89 -96.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-				(at 8.89 -196.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-				(at 3.81 -5.08 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Height" "1.8"
-				(at 8.89 -396.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-				(at 8.89 -496.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-				(at 8.89 -596.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer" "Samsung Electro-Mechanics"
-				(at 8.89 -696.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer Part No" "CL31A106KBHNNNE"
-				(at 8.89 -796.19 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "JLCPCB Part #" "C13585"
-				(at 4.064 -7.366 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Package" "1206"
-				(at 4.318 -9.398 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Part Type" "Basic"
-				(at 4.318 -11.43 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "CL31A106KBHNNNE_1_1"
-				(polyline
-					(pts
-						(xy 2.54 0) (xy 3.048 0)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 3.048 2.54) (xy 3.048 -2.54)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 4.572 2.54) (xy 4.572 -2.54)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 4.572 0) (xy 5.08 0)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin passive line
-					(at 0 0 0)
-					(length 2.54)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 7.62 0 180)
-					(length 2.54)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "LITTELFUSE Diodes:SMF4L13AT1G"
 			(pin_names
 				(hide yes)
@@ -1566,6 +1344,208 @@
 					(at 0 -2.54 0)
 					(length 3.81)
 					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "C"
+				(at -3.302 7.366 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "10uF 10% 25V"
+				(at -3.302 5.334 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
+				(at 8.89 -96.19 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 8.89 -196.19 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+				(at 3.81 -5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Height" "1.8"
+				(at 8.89 -396.19 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer" "Samsung Electro-Mechanics"
+				(at 8.89 -696.19 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer Part No" "CL31A106KAHNNNE"
+				(at 8.89 -796.19 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "JLCPCB Part #" "C9807"
+				(at 4.064 -7.366 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Package" "1206"
+				(at 4.318 -9.398 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Part Type" "Basic"
+				(at 4.318 -11.43 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "CL31A106KAHNNNE_1_1"
+				(polyline
+					(pts
+						(xy 2.54 0) (xy 3.048 0)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 3.048 2.54) (xy 3.048 -2.54)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 4.572 2.54) (xy 4.572 -2.54)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 4.572 0) (xy 5.08 0)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 2.54)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 7.62 0 180)
+					(length 2.54)
+					(name "2"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3564,24 +3544,24 @@
 		)
 	)
 	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
-		(at 138.43 124.46 0)
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
+		(at 138.43 143.51 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "296b62ba-6bed-4c96-92a9-d9da9f383f2a")
-		(property "Reference" "C302"
-			(at 137.668 126.492 0)
+		(uuid "0a52da71-574e-43ac-bf2a-c4aad3e8bf97")
+		(property "Reference" "C305"
+			(at 137.922 141.986 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.35 122.682 0)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 145.288 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3589,7 +3569,7 @@
 			)
 		)
 		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-			(at 147.32 220.65 0)
+			(at 147.32 239.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3598,8 +3578,8 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-			(at 147.32 320.65 0)
+		(property "Datasheet" ""
+			(at 147.32 339.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3608,8 +3588,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-			(at 142.24 129.54 0)
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+			(at 142.24 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3618,7 +3598,7 @@
 			)
 		)
 		(property "Height" "1.8"
-			(at 147.32 520.65 0)
+			(at 147.32 539.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3627,8 +3607,8 @@
 				(hide yes)
 			)
 		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 620.65 0)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 839.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3637,8 +3617,8 @@
 				(hide yes)
 			)
 		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 720.65 0)
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
+			(at 147.32 939.7 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3647,28 +3627,8 @@
 				(hide yes)
 			)
 		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
-			(at 147.32 820.65 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
-			(at 147.32 920.65 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "JLCPCB Part #" "C13585"
-			(at 142.494 131.826 0)
+		(property "JLCPCB Part #" "C9807"
+			(at 142.494 150.876 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3677,7 +3637,7 @@
 			)
 		)
 		(property "Package" "1206"
-			(at 142.748 133.858 0)
+			(at 142.748 152.908 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3686,44 +3646,150 @@
 			)
 		)
 		(property "Part Type" "Basic"
-			(at 142.748 135.89 0)
+			(at 142.748 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(hide yes)
 			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 820.65 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 920.65 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "c7f2669b-77d5-45ee-aa0d-c968fb187a8c")
 		)
 		(pin "1"
-			(uuid "b765df12-d6c8-4cf2-9fb2-1d6b6967ab3d")
+			(uuid "8a597c11-ffa8-47ee-bd37-1ddf246c02a0")
+		)
+		(pin "2"
+			(uuid "e1e0557c-0a57-4277-94e9-e9c78d6a9826")
 		)
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
-					(reference "C302")
+					(reference "C305")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
+		(at 138.43 130.81 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2ec8e06a-9bc4-4252-b1c4-4638f851a457")
+		(property "Reference" "C303"
+			(at 137.922 129.286 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 132.588 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
+			(at 147.32 227 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 147.32 327 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+			(at 142.24 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Height" "1.8"
+			(at 147.32 527 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 827 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
+			(at 147.32 927 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "JLCPCB Part #" "C9807"
+			(at 142.494 138.176 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "1206"
+			(at 142.748 140.208 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part Type" "Basic"
+			(at 142.748 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "6147c8b6-3a56-410d-8b51-e2bdde2c36a8")
+		)
+		(pin "2"
+			(uuid "8b0c792a-9266-447d-ad41-51c8301306de")
+		)
+		(instances
+			(project ""
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
+					(reference "C303")
 					(unit 1)
 				)
 			)
@@ -4109,6 +4175,132 @@
 		)
 	)
 	(symbol
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
+		(at 138.43 149.86 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "4e3fe9a8-d302-4c53-9ff1-ce2a184dcf6b")
+		(property "Reference" "C306"
+			(at 137.922 148.336 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 151.638 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
+			(at 147.32 246.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 147.32 346.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+			(at 142.24 154.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Height" "1.8"
+			(at 147.32 546.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 846.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
+			(at 147.32 946.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "JLCPCB Part #" "C9807"
+			(at 142.494 157.226 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "1206"
+			(at 142.748 159.258 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part Type" "Basic"
+			(at 142.748 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "a7960e58-b5ef-4fd6-9ee9-4011e2ce4197")
+		)
+		(pin "2"
+			(uuid "471ea9f0-0b6f-4297-b29b-8744e8cccc97")
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
+					(reference "C306")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector:TestPoint")
 		(at 121.92 162.56 90)
 		(unit 1)
@@ -4474,172 +4666,6 @@
 		)
 	)
 	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
-		(at 138.43 149.86 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "5e277a1e-7c2e-4fba-8da5-f7b84f338210")
-		(property "Reference" "C306"
-			(at 137.668 151.892 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.35 148.082 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-			(at 147.32 246.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-			(at 147.32 346.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-			(at 142.24 154.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Height" "1.8"
-			(at 147.32 546.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 646.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 746.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
-			(at 147.32 846.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
-			(at 147.32 946.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "JLCPCB Part #" "C13585"
-			(at 142.494 157.226 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Package" "1206"
-			(at 142.748 159.258 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Part Type" "Basic"
-			(at 142.748 161.29 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 846.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 946.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "5c0990de-34a8-451b-af6c-a0a8df2b0f2f")
-		)
-		(pin "1"
-			(uuid "c23a5d98-70f9-4cf2-84b0-1acde22c1991")
-		)
-		(instances
-			(project "MQTT-ModularControllerBoard"
-				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
-					(reference "C306")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "LITTELFUSE Diodes:SMF4L13AT1G")
 		(at 152.4 64.77 0)
 		(unit 1)
@@ -4991,24 +5017,24 @@
 		)
 	)
 	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
 		(at 138.43 137.16 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "873b76b7-96b7-48e6-92a6-0995e311b797")
+		(uuid "a1ff675f-e041-465e-8923-abe0f691cfe6")
 		(property "Reference" "C304"
-			(at 137.668 139.192 0)
+			(at 137.922 135.636 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.35 135.382 0)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 138.938 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5025,7 +5051,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
+		(property "Datasheet" ""
 			(at 147.32 333.35 0)
 			(effects
 				(font
@@ -5035,7 +5061,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
 			(at 142.24 142.24 0)
 			(effects
 				(font
@@ -5054,27 +5080,7 @@
 				(hide yes)
 			)
 		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 633.35 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 733.35 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
+		(property "Manufacturer" "Samsung Electro-Mechanics"
 			(at 147.32 833.35 0)
 			(effects
 				(font
@@ -5084,7 +5090,7 @@
 				(hide yes)
 			)
 		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
 			(at 147.32 933.35 0)
 			(effects
 				(font
@@ -5094,7 +5100,7 @@
 				(hide yes)
 			)
 		)
-		(property "JLCPCB Part #" "C13585"
+		(property "JLCPCB Part #" "C9807"
 			(at 142.494 144.526 0)
 			(effects
 				(font
@@ -5121,31 +5127,11 @@
 				(hide yes)
 			)
 		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 833.35 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 933.35 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
+		(pin "1"
+			(uuid "1ce180a3-2a60-4e5f-9342-fec35c56825c")
 		)
 		(pin "2"
-			(uuid "c8d389d8-26f2-477f-ae22-512a7c0125c1")
-		)
-		(pin "1"
-			(uuid "30fc36a8-598c-4e84-b45e-a43c3113e91b")
+			(uuid "1367cc24-1527-4b62-9318-a6d315fe1fc3")
 		)
 		(instances
 			(project "MQTT-ModularControllerBoard"
@@ -5218,6 +5204,132 @@
 			(project ""
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
 					(reference "#FLG0301")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
+		(at 138.43 156.21 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "b86b047d-16ed-48aa-a459-b264c31c971b")
+		(property "Reference" "C307"
+			(at 137.922 154.686 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 157.988 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
+			(at 147.32 252.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 147.32 352.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+			(at 142.24 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Height" "1.8"
+			(at 147.32 552.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 852.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
+			(at 147.32 952.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "JLCPCB Part #" "C9807"
+			(at 142.494 163.576 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Package" "1206"
+			(at 142.748 165.608 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part Type" "Basic"
+			(at 142.748 167.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b681f8af-83e0-4fde-a324-2362c4af8f02")
+		)
+		(pin "2"
+			(uuid "054ff3ce-4fb2-47b0-9588-97567338a0da")
+		)
+		(instances
+			(project "MQTT-ModularControllerBoard"
+				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
+					(reference "C307")
 					(unit 1)
 				)
 			)
@@ -5525,24 +5637,24 @@
 		)
 	)
 	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
-		(at 138.43 130.81 0)
+		(lib_id "SAMSUNGELECTROMECHANICS Resistors:CL31A106KAHNNNE")
+		(at 138.43 124.46 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "d2d8500b-dc68-4d4d-987f-3e0f57793ab2")
-		(property "Reference" "C303"
-			(at 137.668 129.286 0)
+		(uuid "d04a58ce-ac8b-4b89-9138-fb9ddef72f52")
+		(property "Reference" "C302"
+			(at 137.922 122.936 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.096 132.842 0)
+		(property "Value" "10uF 10% 25V"
+			(at 133.096 126.238 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5550,7 +5662,7 @@
 			)
 		)
 		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-			(at 147.32 227 0)
+			(at 147.32 220.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5559,8 +5671,8 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-			(at 147.32 327 0)
+		(property "Datasheet" ""
+			(at 147.32 320.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5569,8 +5681,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-			(at 142.24 135.89 0)
+		(property "Description" "Capacitor Ceramic, 10uF, 25V, 1206, 10%, X5R"
+			(at 142.24 129.54 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5579,7 +5691,7 @@
 			)
 		)
 		(property "Height" "1.8"
-			(at 147.32 527 0)
+			(at 147.32 520.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5588,8 +5700,8 @@
 				(hide yes)
 			)
 		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 627 0)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 147.32 820.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5598,8 +5710,8 @@
 				(hide yes)
 			)
 		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 727 0)
+		(property "Manufacturer Part No" "CL31A106KAHNNNE"
+			(at 147.32 920.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5608,28 +5720,8 @@
 				(hide yes)
 			)
 		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
-			(at 147.32 827 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
-			(at 147.32 927 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "JLCPCB Part #" "C13585"
-			(at 142.494 138.176 0)
+		(property "JLCPCB Part #" "C9807"
+			(at 142.494 131.826 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5638,7 +5730,7 @@
 			)
 		)
 		(property "Package" "1206"
-			(at 142.748 140.208 0)
+			(at 142.748 133.858 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5647,44 +5739,24 @@
 			)
 		)
 		(property "Part Type" "Basic"
-			(at 142.748 142.24 0)
+			(at 142.748 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(hide yes)
 			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 827 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 927 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "9083fdb3-804d-410e-af44-6f7f87a04ad7")
 		)
 		(pin "1"
-			(uuid "872ef2aa-a4ec-47cc-9f86-9faae7e62c0e")
+			(uuid "2aef33c0-293b-4faa-9ba5-7b03509aa835")
+		)
+		(pin "2"
+			(uuid "a38e86a8-f96c-4344-bd76-50a49f63777d")
 		)
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
-					(reference "C303")
+					(reference "C302")
 					(unit 1)
 				)
 			)
@@ -5750,172 +5822,6 @@
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
 					(reference "#PWR0301")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
-		(at 138.43 156.21 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "d7aede2b-cc4f-4fb3-beec-50fb908e92a2")
-		(property "Reference" "C307"
-			(at 137.668 154.686 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.096 158.242 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-			(at 147.32 252.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-			(at 147.32 352.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-			(at 142.24 161.29 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Height" "1.8"
-			(at 147.32 552.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 652.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 752.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
-			(at 147.32 852.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
-			(at 147.32 952.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "JLCPCB Part #" "C13585"
-			(at 142.494 163.576 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Package" "1206"
-			(at 142.748 165.608 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Part Type" "Basic"
-			(at 142.748 167.64 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 852.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 952.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "4d6b8fce-7e5b-4146-aff0-775a7acc3b8e")
-		)
-		(pin "1"
-			(uuid "79c89c0b-ce58-4ee3-91a4-0430eb09a2cf")
-		)
-		(instances
-			(project "MQTT-ModularControllerBoard"
-				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
-					(reference "C307")
 					(unit 1)
 				)
 			)
@@ -6073,172 +5979,6 @@
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
 					(reference "C301")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "JLCPCB Basic:CL31A106KBHNNNE")
-		(at 138.43 143.51 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "f673ebe7-0fee-49ef-ae19-a6424c095cc9")
-		(property "Reference" "C305"
-			(at 137.668 141.986 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10uF 10% 50V"
-			(at 133.096 145.542 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "JLCPCB Basic:CAPC3216X180N"
-			(at 147.32 239.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/Datasheets_SAMA/08745f6325ae1679773301b11fb0567f.pdf"
-			(at 147.32 339.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Description" "Capacitor Ceramic, 10uF, 50V, 1206, 10%, X5R"
-			(at 142.24 148.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Height" "1.8"
-			(at 147.32 539.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Part Number" "187-CL31A106KBHNNNE"
-			(at 147.32 639.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Price/Stock" "https://au.mouser.com/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
-			(at 147.32 739.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Name" "Samsung Electro-Mechanics"
-			(at 147.32 839.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "CL31A106KBHNNNE"
-			(at 147.32 939.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "JLCPCB Part #" "C13585"
-			(at 142.494 150.876 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Package" "1206"
-			(at 142.748 152.908 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Part Type" "Basic"
-			(at 142.748 154.94 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 147.32 839.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer Part No" "CL31A106KBHNNNE"
-			(at 147.32 939.7 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "4dd4a08f-00c1-4116-893e-fba8527a1af0")
-		)
-		(pin "1"
-			(uuid "02e2fe1a-2f82-43ab-a619-9ea37641fcbe")
-		)
-		(instances
-			(project "MQTT-ModularControllerBoard"
-				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/f1a8a151-cdd5-4787-bab2-ad42ef8449de"
-					(reference "C305")
 					(unit 1)
 				)
 			)

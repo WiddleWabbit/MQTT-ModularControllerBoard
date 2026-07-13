@@ -1,4 +1,4 @@
-26576571127285109
+26581913670918627
 3PEAK OpAmps
 S5TSOT23-5-A_TPK
 
@@ -2855,6 +2855,13 @@ Through hole pin header THT 1x10 2.54mm single row
 0
 10
 10
+CJT Connectors
+PinHeader_2x03_P2.54mm_Vertical
+Through hole straight pin header, 2x03, 2.54mm pitch, double rows
+Through hole pin header THT 2x03 2.54mm double row
+0
+6
+6
 CJT Connectors
 PinSocket_1x10_P2.54mm_Vertical_Female
 Through hole straight socket strip, 1x10, 2.54mm pitch, single row (from Kicad 4.0.7), script generated
@@ -67864,6 +67871,13 @@ RESC3225X70N
 0
 2
 2
+KOHERELEC Inductors
+SMD57x52mm
+XAL40XX
+Inductor
+0
+2
+2
 LED_SMD
 LED-APA102-2020
 http://www.led-color.com/upload/201604/APA102-2020%20SMD%20LED.pdf
@@ -73912,6 +73926,13 @@ Connector
 0
 2
 2
+PHOENIX CONTACT Terminals
+1715747
+1715747
+Connector
+0
+4
+4
 PHOENIX CONTACT Terminals
 1984659
 1984659-3

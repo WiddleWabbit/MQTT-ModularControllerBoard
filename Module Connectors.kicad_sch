@@ -3581,7 +3581,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "08d5aad0-a620-4516-a2d6-b68013d21185")
-		(property "Reference" "#PWR0531"
+		(property "Reference" "#PWR0528"
 			(at 231.14 76.2 0)
 			(effects
 				(font
@@ -3632,7 +3632,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0531")
+					(reference "#PWR0528")
 					(unit 1)
 				)
 			)
@@ -3647,7 +3647,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "10b96264-bf29-4cbd-b62b-778b370d3b9e")
-		(property "Reference" "#PWR0526"
+		(property "Reference" "#PWR0532"
 			(at 243.84 115.57 0)
 			(effects
 				(font
@@ -3698,7 +3698,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0526")
+					(reference "#PWR0532")
 					(unit 1)
 				)
 			)
@@ -3713,7 +3713,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "14783eb7-6472-4f62-aed0-fb8c68c04e71")
-		(property "Reference" "#PWR0527"
+		(property "Reference" "#PWR0526"
 			(at 226.06 66.04 0)
 			(effects
 				(font
@@ -3764,7 +3764,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0527")
+					(reference "#PWR0526")
 					(unit 1)
 				)
 			)
@@ -3779,7 +3779,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "15eff403-2163-41c9-a2a3-1158f1c68c5f")
-		(property "Reference" "#PWR0529"
+		(property "Reference" "#PWR0527"
 			(at 228.6 71.12 0)
 			(effects
 				(font
@@ -3830,7 +3830,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0529")
+					(reference "#PWR0527")
 					(unit 1)
 				)
 			)
@@ -3845,7 +3845,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "1b906179-fa7e-4067-aed9-897aa20df0ec")
-		(property "Reference" "#PWR0513"
+		(property "Reference" "#PWR0511"
 			(at 127 71.12 0)
 			(effects
 				(font
@@ -3896,7 +3896,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0513")
+					(reference "#PWR0511")
 					(unit 1)
 				)
 			)
@@ -3911,7 +3911,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "226e6a1a-07e4-4a6d-b545-18e27c490d95")
-		(property "Reference" "#PWR0520"
+		(property "Reference" "#PWR0523"
 			(at 187.96 116.84 0)
 			(effects
 				(font
@@ -3962,7 +3962,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0520")
+					(reference "#PWR0523")
 					(unit 1)
 				)
 			)
@@ -3977,7 +3977,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "22d3dded-e9f2-4a90-bec4-d2f46c360aa2")
-		(property "Reference" "#PWR0528"
+		(property "Reference" "#PWR0531"
 			(at 238.76 115.57 0)
 			(effects
 				(font
@@ -4028,7 +4028,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0528")
+					(reference "#PWR0531")
 					(unit 1)
 				)
 			)
@@ -4043,7 +4043,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "27fb349a-ea1e-49bf-b0bf-d34f9c720c5c")
-		(property "Reference" "#PWR0518"
+		(property "Reference" "#PWR0524"
 			(at 193.04 115.57 0)
 			(effects
 				(font
@@ -4094,7 +4094,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0518")
+					(reference "#PWR0524")
 					(unit 1)
 				)
 			)
@@ -4109,7 +4109,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "2c7f166d-fe49-4f50-bbf7-6acf2de973ef")
-		(property "Reference" "#PWR0508"
+		(property "Reference" "#PWR0505"
 			(at 78.74 105.41 0)
 			(effects
 				(font
@@ -4160,7 +4160,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0508")
+					(reference "#PWR0505")
 					(unit 1)
 				)
 			)
@@ -4175,7 +4175,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "3287bd88-ea53-4efd-ae32-5b3038c06928")
-		(property "Reference" "#PWR0512"
+		(property "Reference" "#PWR0515"
 			(at 137.16 115.57 0)
 			(effects
 				(font
@@ -4226,7 +4226,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0512")
+					(reference "#PWR0515")
 					(unit 1)
 				)
 			)
@@ -4509,7 +4509,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "4c873626-4b05-42e2-b4d8-f5b71b9f1cc4")
-		(property "Reference" "#PWR0516"
+		(property "Reference" "#PWR0513"
 			(at 129.54 105.41 0)
 			(effects
 				(font
@@ -4560,7 +4560,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0516")
+					(reference "#PWR0513")
 					(unit 1)
 				)
 			)
@@ -4979,7 +4979,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "76be50e7-9dc2-4cfa-9c60-b792a501c981")
-		(property "Reference" "#PWR0505"
+		(property "Reference" "#PWR0503"
 			(at 76.2 71.12 0)
 			(effects
 				(font
@@ -5030,7 +5030,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0505")
+					(reference "#PWR0503")
 					(unit 1)
 				)
 			)
@@ -5247,7 +5247,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "7a3bba48-a6f7-4b8d-9038-4289941dd54b")
-		(property "Reference" "#PWR0515"
+		(property "Reference" "#PWR0512"
 			(at 129.54 76.2 0)
 			(effects
 				(font
@@ -5298,7 +5298,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0515")
+					(reference "#PWR0512")
 					(unit 1)
 				)
 			)
@@ -5449,7 +5449,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "8d0b251e-1e20-4205-9f3b-58ba840052c2")
-		(property "Reference" "#PWR0524"
+		(property "Reference" "#PWR0521"
 			(at 180.34 105.41 0)
 			(effects
 				(font
@@ -5500,7 +5500,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0524")
+					(reference "#PWR0521")
 					(unit 1)
 				)
 			)
@@ -5515,7 +5515,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "93b6b320-cf0e-4a56-a343-f9e8b706b0a3")
-		(property "Reference" "#PWR0519"
+		(property "Reference" "#PWR0518"
 			(at 175.26 66.04 0)
 			(effects
 				(font
@@ -5566,7 +5566,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0519")
+					(reference "#PWR0518")
 					(unit 1)
 				)
 			)
@@ -5581,7 +5581,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "98ba4ac4-1ffa-46c7-a2ed-f712df2e834a")
-		(property "Reference" "#PWR0510"
+		(property "Reference" "#PWR0516"
 			(at 142.24 115.57 0)
 			(effects
 				(font
@@ -5632,7 +5632,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0510")
+					(reference "#PWR0516")
 					(unit 1)
 				)
 			)
@@ -5647,7 +5647,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a1b1dbc7-3202-40f4-8ff8-2b7134ae83f0")
-		(property "Reference" "#PWR0521"
+		(property "Reference" "#PWR0519"
 			(at 177.8 71.12 0)
 			(effects
 				(font
@@ -5698,7 +5698,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0521")
+					(reference "#PWR0519")
 					(unit 1)
 				)
 			)
@@ -5713,7 +5713,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a3756c8b-96b5-493a-9399-05aeedc56a69")
-		(property "Reference" "#PWR0504"
+		(property "Reference" "#PWR0507"
 			(at 86.36 115.57 0)
 			(effects
 				(font
@@ -5764,7 +5764,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0504")
+					(reference "#PWR0507")
 					(unit 1)
 				)
 			)
@@ -5845,7 +5845,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "b110b1f8-ede2-457d-a3a8-a72fcaa7a43e")
-		(property "Reference" "#PWR0502"
+		(property "Reference" "#PWR0508"
 			(at 91.44 115.57 0)
 			(effects
 				(font
@@ -5896,7 +5896,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0502")
+					(reference "#PWR0508")
 					(unit 1)
 				)
 			)
@@ -6047,7 +6047,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "bd0b85d2-2832-43c2-90b5-2d160bef9287")
-		(property "Reference" "#PWR0523"
+		(property "Reference" "#PWR0520"
 			(at 180.34 76.2 0)
 			(effects
 				(font
@@ -6098,7 +6098,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0523")
+					(reference "#PWR0520")
 					(unit 1)
 				)
 			)
@@ -6113,7 +6113,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "bed496d2-1c5a-4ae2-a29e-f83434c8aad5")
-		(property "Reference" "#PWR0532"
+		(property "Reference" "#PWR0529"
 			(at 231.14 105.41 0)
 			(effects
 				(font
@@ -6164,7 +6164,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0532")
+					(reference "#PWR0529")
 					(unit 1)
 				)
 			)
@@ -6179,7 +6179,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "c99788d6-43f0-4b8c-bee4-e70dfb9fb135")
-		(property "Reference" "#PWR0511"
+		(property "Reference" "#PWR0510"
 			(at 124.46 66.04 0)
 			(effects
 				(font
@@ -6230,7 +6230,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0511")
+					(reference "#PWR0510")
 					(unit 1)
 				)
 			)
@@ -6245,7 +6245,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "cb202589-d13a-4980-ad7f-6af1ef9e047e")
-		(property "Reference" "#PWR0503"
+		(property "Reference" "#PWR0502"
 			(at 73.66 66.04 0)
 			(effects
 				(font
@@ -6296,7 +6296,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0503")
+					(reference "#PWR0502")
 					(unit 1)
 				)
 			)
@@ -6311,7 +6311,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "ce0f0d1b-1c96-4617-819e-dc223da04d8c")
-		(property "Reference" "#PWR0507"
+		(property "Reference" "#PWR0504"
 			(at 78.74 76.2 0)
 			(effects
 				(font
@@ -6362,7 +6362,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/e545e3f6-a132-4c0d-bd47-766ce245e837"
-					(reference "#PWR0507")
+					(reference "#PWR0504")
 					(unit 1)
 				)
 			)

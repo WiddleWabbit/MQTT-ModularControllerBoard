@@ -3247,7 +3247,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bc3599f8-abc5-425e-a81b-0d22a7e58147")
-		(property "Reference" "R604"
+		(property "Reference" "R602"
 			(at 232.41 54.61 0)
 			(effects
 				(font
@@ -3398,7 +3398,7 @@
 		(instances
 			(project ""
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78"
-					(reference "R604")
+					(reference "R602")
 					(unit 1)
 				)
 			)
@@ -3414,7 +3414,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "bcc446c4-757a-4412-ab36-27ee4a37f34b")
-		(property "Reference" "R603"
+		(property "Reference" "R601"
 			(at 205.74 54.61 0)
 			(effects
 				(font
@@ -3565,7 +3565,7 @@
 		(instances
 			(project "MQTT-ModularControllerBoard"
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78"
-					(reference "R603")
+					(reference "R601")
 					(unit 1)
 				)
 			)
@@ -3581,7 +3581,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ea04626c-4fc9-431d-9c0b-b2bf3e99b972")
-		(property "Reference" "J602"
+		(property "Reference" "J601"
 			(at 75.5332 87.63 0)
 			(effects
 				(font
@@ -3692,7 +3692,7 @@
 		(instances
 			(project ""
 				(path "/fb66fec7-a625-41b0-8b4b-639a0ec63be1/8cb1b373-89d4-44fe-a70d-44b57920bc78"
-					(reference "J602")
+					(reference "J601")
 					(unit 1)
 				)
 			)
