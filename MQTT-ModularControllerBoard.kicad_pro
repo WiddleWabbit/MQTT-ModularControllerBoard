@@ -1287,7 +1287,8 @@
       "CJT Connectors",
       "KOHERELEC Inductors",
       "SAMSUNGELECTROMECHANICS Resistors",
-      "SAMSUNGELECTROMECHANICS Capacitors"
+      "SAMSUNGELECTROMECHANICS Capacitors",
+      "PANJIT INTERNATIONAL Diodes"
     ]
   },
   "meta": {
@@ -1425,6 +1426,9 @@
         "12V"
       ],
       "Net-(D301-A2)": [
+        "12V"
+      ],
+      "Net-(D303-A1)": [
         "12V"
       ],
       "Net-(D401-A)": [

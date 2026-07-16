@@ -2110,6 +2110,28 @@
 		)
 		(uuid "4fa5bcbe-fbaa-4b8d-a4ce-d4580479e103")
 	)
+	(text_box "Summary:"
+		(exclude_from_sim no)
+		(at 177.8 166.37 0)
+		(size 20.32 3.81)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.254)
+				(bold yes)
+			)
+			(justify left top)
+		)
+		(uuid "5d21f6b1-b592-4304-b605-90d96411526c")
+	)
 	(text_box "Voltage divider to add VBUS SENSE Support."
 		(exclude_from_sim no)
 		(at 198.12 46.99 0)
@@ -2129,6 +2151,26 @@
 			(justify left top)
 		)
 		(uuid "61a447c0-f6bc-4139-a8cd-c64a7935a70e")
+	)
+	(text_box "- VBUS_SNS in place for USB connection while connected to 12V. Requires detection of being self powered on startup in software."
+		(exclude_from_sim no)
+		(at 177.8 168.91 0)
+		(size 102.87 11.43)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width -0.0001)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left top)
+		)
+		(uuid "8a792e5e-10a3-4294-83a7-7a524b7c9b96")
 	)
 	(text_box "Schottky Diode to prevent power backfeeding from board VIN to USB"
 		(exclude_from_sim no)
