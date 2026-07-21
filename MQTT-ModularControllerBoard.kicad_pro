@@ -1288,7 +1288,8 @@
       "KOHERELEC Inductors",
       "SAMSUNGELECTROMECHANICS Resistors",
       "SAMSUNGELECTROMECHANICS Capacitors",
-      "PANJIT INTERNATIONAL Diodes"
+      "PANJIT INTERNATIONAL Diodes",
+      "SXN Inductors"
     ]
   },
   "meta": {
@@ -1485,11 +1486,29 @@
       "Net-(IC402-VCAP)": [
         "5V"
       ],
+      "Net-(IC403-ANODE)": [
+        "5V"
+      ],
+      "Net-(IC403-GATE)": [
+        "5V"
+      ],
+      "Net-(IC403-VCAP)": [
+        "5V"
+      ],
       "Net-(IC601-GATE)": [
         "12V"
       ],
       "Net-(IC601-VCAP)": [
         "12V"
+      ],
+      "Net-(PS401-BOOT)": [
+        "5V"
+      ],
+      "Net-(PS401-FB)": [
+        "5V"
+      ],
+      "Net-(PS401-SW)": [
+        "5V"
       ],
       "Net-(U301-*SHDN)": [
         "5V"
