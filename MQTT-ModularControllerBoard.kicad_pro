@@ -117,7 +117,7 @@
         ],
         [
           "clearance|148350000|103100000|391f6847-987b-44c8-9e28-baafb806b082|edd840d3-9c0d-479d-a069-25f3160d3b77",
-          "Intentional, GND for High Speed to Couple To"
+          ""
         ],
         [
           "clearance|148600000|103600000|210f0ef3-0072-4e03-9209-39d0cb6ee0de|edd840d3-9c0d-479d-a069-25f3160d3b77",
@@ -154,6 +154,22 @@
         [
           "clearance|152450000|104250000|10f4f1d6-b011-4419-80e6-877288b17de1|986adcd2-7f41-4633-bda0-c6362968604a",
           "Intentional, GND via for high speed signal to couple to."
+        ],
+        [
+          "clearance|161150000|120651843|4483ba89-f03b-4337-ab91-d34c334b2f84|7769f038-f81d-4f7f-9d08-8d24f14d7c1a",
+          ""
+        ],
+        [
+          "clearance|161150000|121951843|4e3bc3f3-07fc-4bbc-9b7e-486636eb1bec|7769f038-f81d-4f7f-9d08-8d24f14d7c1a",
+          ""
+        ],
+        [
+          "clearance|162650000|120951843|38a438b5-8c26-4dfc-adf9-d46a95bce8eb|7769f038-f81d-4f7f-9d08-8d24f14d7c1a",
+          ""
+        ],
+        [
+          "clearance|162650000|121601843|e12ef054-b3d0-4e80-abee-d7c4e8e9a140|7769f038-f81d-4f7f-9d08-8d24f14d7c1a",
+          ""
         ],
         [
           "clearance|178821400|96250001|5189d815-0a24-444f-b2cb-b6d349fda921|89f61b19-89ec-4e5e-96d0-e0867d1d63ae",
@@ -201,6 +217,10 @@
         ],
         [
           "clearance|180578600|96250001|6a19f718-f08d-4946-ad51-19a1e8780e12|8aa4af85-b91f-4918-b765-31ff47e0d87d",
+          ""
+        ],
+        [
+          "clearance|181400000|102032855|59bc6db2-5205-4508-8696-1a19023b04e7|71c89a10-f0ce-4708-aa7f-ec770c80f762",
           ""
         ],
         [
@@ -421,6 +441,10 @@
         ],
         [
           "silk_edge_clearance|184617200|91495622|5ff149ff-2338-40c0-b2e0-c3301e4b23b4|ea510ae0-0796-430c-be1e-98743dcaca44",
+          ""
+        ],
+        [
+          "track_dangling|126600000|124900000|b95203ac-4535-4aa2-8d11-c7974376db1d|00000000-0000-0000-0000-000000000000",
           ""
         ]
       ],
