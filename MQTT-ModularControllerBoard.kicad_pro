@@ -1313,7 +1313,8 @@
   "libraries": {
     "pinned_footprint_libs": [
       "CJT Connectors",
-      "KOHERELEC Inductors"
+      "KOHERELEC Inductors",
+      "JIANGSU Transistors"
     ],
     "pinned_symbol_libs": [
       "CJT Connectors",
@@ -1321,7 +1322,8 @@
       "SAMSUNGELECTROMECHANICS Resistors",
       "SAMSUNGELECTROMECHANICS Capacitors",
       "PANJIT INTERNATIONAL Diodes",
-      "SXN Inductors"
+      "SXN Inductors",
+      "JIANGSU Transistors"
     ]
   },
   "meta": {
