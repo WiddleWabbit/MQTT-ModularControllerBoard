@@ -85,7 +85,7 @@
         ],
         [
           "clearance|106700000|101300000|1455d690-e70f-4e45-a0c2-89175f0b79d2|89b249e9-5f88-4d0c-9d14-99432f9a0e75",
-          "Intentional, GND for high speed connection to couple to."
+          ""
         ],
         [
           "clearance|107000000|101800000|4ef62c02-3c1a-4caa-9906-8cfdcf94a24f|89b249e9-5f88-4d0c-9d14-99432f9a0e75",
@@ -97,7 +97,7 @@
         ],
         [
           "clearance|144700000|105300000|3a8f968b-578a-4295-a669-b99f0730e324|818eb834-b297-4ba3-aa82-0a468a570123",
-          "Intentional, GND for high speed connection to couple to."
+          ""
         ],
         [
           "clearance|146400000|108100000|aa515be2-7830-4dac-bb8f-6d1e29862928|d6bb2e3f-e2a9-4fbe-866a-d308c4adacb9",
@@ -145,7 +145,7 @@
         ],
         [
           "clearance|151900000|104150000|269753d1-47c1-4e3c-bf51-bc8bf1859100|986adcd2-7f41-4633-bda0-c6362968604a",
-          "Intentional, High Speed Signal with via to couple to GND"
+          ""
         ],
         [
           "clearance|152000000|104700000|1c489ec9-cad9-48d2-9f56-fc2d114a7256|986adcd2-7f41-4633-bda0-c6362968604a",
@@ -253,7 +253,7 @@
         ],
         [
           "clearance|191850000|105250000|2c1e34f2-3b8b-4245-a32e-ee9d24493d30|418becdb-482a-45e9-a7a6-b05a3d616fc0",
-          "Intentional, GND via for high speed signal to couple to."
+          ""
         ],
         [
           "clearance|193900000|103500000|1d6ced6b-5bdd-4b12-9943-9d858b178e9c|c569711d-665a-40f3-98bb-cf2bd01dc1a1",
