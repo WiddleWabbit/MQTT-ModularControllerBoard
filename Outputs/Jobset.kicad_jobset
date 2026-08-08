@@ -93,7 +93,19 @@
       "type": "pcb_export_drill"
     },
     {
-      "description": "",
+      "description": "Zip Gerbers",
+      "id": "f9996d6f-b474-47ab-b3c7-da601945c633",
+      "settings": {
+        "command": "powershell.exe -Command \"\n\n$tmp_location = '${JOBSET_OUTPUT_WORK_PATH}'\n$project_file = Get-ChildItem -Path '${KIPRJMOD}' -Filter '*.kicad_pro' | Select-Object -First 1\n$project_name = $project_file.BaseName\n\nCompress-Archive -Path ($tmp_location + '\\*') -DestinationPath ($tmp_location + $project_name + '-Gerbers.zip')\n\n\"",
+        "description": "",
+        "ignore_exit_code": false,
+        "output_filename": "",
+        "record_output": false
+      },
+      "type": "special_execute"
+    },
+    {
+      "description": "Generate Full Bill of Materials",
       "id": "ccb89609-c924-4fb9-8f5e-cf5a4e1d28d0",
       "settings": {
         "bom_format_preset_name": "CSV",
@@ -166,77 +178,16 @@
       "type": "sch_export_bom"
     },
     {
-      "description": "",
-      "id": "fe744e8d-257d-45cd-8fab-3bc7a61509dc",
+      "description": "Create JLCPCB BOM",
+      "id": "c895861f-76c0-4de1-99df-4d562233c447",
       "settings": {
-        "bom_format_preset_name": "CSV",
-        "bom_preset_name": "",
+        "command": "powershell.exe -Command \"\n\n$tmp_location = '${JOBSET_OUTPUT_WORK_PATH}'\n\n$project_file = Get-ChildItem -Path '${KIPRJMOD}' -Filter '*.kicad_pro' | Select-Object -First 1\n$project_name = $project_file.BaseName\n\n$inputFile = \\\"${tmp_location}\\\" + 'BOM.csv'\n$outputFile = \\\"${tmp_location}\\\" + 'JLCPCB_BOM.csv'\n\nImport-Csv -Path $inputFile | \n    Select-Object @{Name='Comment'; Expression={$_.Value}}, \n                  @{Name='Designator'; Expression={$_.Reference}}, \n                  @{Name='Footprint'; Expression={$_.Package}}, \n                  'JLCPCB Part #' | \n    Export-Csv -Path $outputFile -NoTypeInformation\n\n\"",
         "description": "",
-        "exclude_dnp": false,
-        "field_delimiter": ",",
-        "fields_group_by": [
-          "Value"
-        ],
-        "fields_labels": [
-          "Value",
-          "Reference",
-          "Footprint",
-          "Datasheet",
-          "Description",
-          "Qty",
-          "#",
-          "Height",
-          "JLCPCB Part #",
-          "MAXIMUM_PACKAGE_HEIGHT",
-          "MF",
-          "Manufacturer",
-          "Manufacturer Part No",
-          "Manufacturer_Name",
-          "Manufacturer_Part_Number",
-          "Mouser Part Number",
-          "Mouser Price/Stock",
-          "PCB Hint",
-          "PCB_Hint",
-          "Package",
-          "Part Type",
-          "Sim.Pins"
-        ],
-        "fields_ordered": [
-          "Value",
-          "Reference",
-          "__Footprint",
-          "__Datasheet",
-          "__Description",
-          "__${QUANTITY}",
-          "__${ITEM_NUMBER}",
-          "__Height",
-          "JLCPCB Part #",
-          "__MAXIMUM_PACKAGE_HEIGHT",
-          "__MF",
-          "__Manufacturer",
-          "__Manufacturer Part No",
-          "__Manufacturer_Name",
-          "__Manufacturer_Part_Number",
-          "__Mouser Part Number",
-          "__Mouser Price/Stock",
-          "__PCB Hint",
-          "__PCB_Hint",
-          "Package",
-          "__Part Type",
-          "__Sim.Pins"
-        ],
-        "filter_string": "",
-        "include_excluded_from_bom": false,
-        "keep_line_breaks": false,
-        "keep_tabs": false,
-        "output_filename": "JLC_BOM.csv",
-        "ref_delimiter": ",",
-        "ref_range_delimiter": "",
-        "sort_asc": true,
-        "sort_field": "Reference",
-        "string_delimiter": "\""
+        "ignore_exit_code": false,
+        "output_filename": "",
+        "record_output": false
       },
-      "type": "sch_export_bom"
+      "type": "special_execute"
     },
     {
       "description": "",
@@ -258,44 +209,19 @@
       "type": "pcb_export_pos"
     },
     {
-      "description": "",
-      "id": "01488878-9654-47f3-aa3d-ed654f7b062c",
+      "description": "Generate JLCPCB Position Files",
+      "id": "534389d0-2e0c-4d33-bd64-098d5f1f562f",
       "settings": {
-        "board_only": false,
-        "board_outlines_chaining_epsilon": 0.01,
-        "cut_vias_in_body": false,
+        "command": "powershell.exe -Command \"\n\n$tmp_location = '${JOBSET_OUTPUT_WORK_PATH}'\n\n$project_file = Get-ChildItem -Path '${KIPRJMOD}' -Filter '*.kicad_pro' | Select-Object -First 1\n$project_name = $project_file.BaseName\n\n$topFile = \\\"${tmp_location}\\\" + \\\"${project_name}\\\"+ '-top-pos.csv'\n$bottomFile = \\\"${tmp_location}\\\" + \\\"${project_name}\\\"+ '-bottom-pos.csv'\n$outputFile = \\\"${tmp_location}\\\" + 'JLCPCB_POS.csv'\n\n$posData = @(Import-Csv -Path $topFile -ErrorAction SilentlyContinue) + @(Import-Csv -Path $bottomFile -ErrorAction SilentlyContinue)\n\n$posData | \n    Select-Object @{Name='Designator'; Expression={$_.Ref}}, \n                  @{Name='Mid X'; Expression={$_.PosX}}, \n                  @{Name='Mid Y'; Expression={$_.PosY}}, \n                  @{Name='Layer'; Expression={$_.Side}}, \n                  @{Name='Rotation'; Expression={$_.Rot}} |\n    Export-Csv -Path $outputFile -NoTypeInformation\n\n\"",
         "description": "",
-        "export_board_body": true,
-        "export_components": true,
-        "export_inner_copper": false,
-        "export_pads": true,
-        "export_silkscreen": true,
-        "export_soldermask": false,
-        "export_tracks": true,
-        "export_zones": true,
-        "fill_all_vias": false,
-        "format": "step",
-        "fuse_shapes": false,
-        "include_dnp": true,
-        "include_unspecified": true,
-        "occt_format": 0,
-        "optimize_step": true,
-        "output_filename": "Model.step",
-        "overwrite": false,
-        "subst_models": true,
-        "use_defined_origin": false,
-        "use_drill_origin": false,
-        "use_grid_origin": false,
-        "use_pcb_center_origin": true,
-        "user_origin.x": 147.5,
-        "user_origin.y": 113.997775,
-        "vrml_model_dir": "",
-        "vrml_relative_paths": false
+        "ignore_exit_code": false,
+        "output_filename": "",
+        "record_output": false
       },
-      "type": "pcb_export_3d"
+      "type": "special_execute"
     },
     {
-      "description": "",
+      "description": "Export Fab Drawing - Front",
       "id": "3f67e122-68a6-4542-8c86-e8d9da8faec8",
       "settings": {
         "back_fp_property_popups": true,
@@ -359,7 +285,71 @@
       "type": "pcb_export_pdf"
     },
     {
-      "description": "",
+      "description": "Export Fab Drawing - Back",
+      "id": "d4cc7ebd-8146-4c9f-85fc-1b7f856b7a14",
+      "settings": {
+        "back_fp_property_popups": true,
+        "black_and_white": false,
+        "color_theme": "",
+        "crossout_dnp_footprints_on_fab_layers": true,
+        "description": "",
+        "drawing_sheet": "",
+        "drill_shape": "full",
+        "front_fp_property_popups": true,
+        "hide_dnp_footprints_on_fab_layers": false,
+        "layers": [
+          "B.Fab",
+          "In30.Cu",
+          "In29.Cu",
+          "In28.Cu",
+          "In27.Cu",
+          "In26.Cu",
+          "In25.Cu",
+          "In24.Cu",
+          "In23.Cu",
+          "In22.Cu",
+          "In21.Cu",
+          "In20.Cu",
+          "In19.Cu",
+          "In18.Cu",
+          "In17.Cu",
+          "In16.Cu",
+          "In15.Cu",
+          "In14.Cu",
+          "In13.Cu",
+          "In12.Cu",
+          "In11.Cu",
+          "In10.Cu",
+          "In9.Cu",
+          "In8.Cu",
+          "In7.Cu",
+          "In6.Cu",
+          "In5.Cu",
+          "In4.Cu",
+          "In3.Cu"
+        ],
+        "layers_to_include_on_all_layers": [
+          "Edge.Cuts"
+        ],
+        "mirror": false,
+        "negative": false,
+        "output_filename": "",
+        "pdf_gen_mode": "all-layers-separate-files",
+        "pdf_metadata": true,
+        "plot_drawing_sheet": true,
+        "plot_footprint_values": true,
+        "plot_pad_numbers": false,
+        "plot_ref_des": true,
+        "single_document": false,
+        "sketch_dnp_footprints_on_fab_layers": true,
+        "sketch_pads_on_fab_layers": false,
+        "subtract_solder_mask_from_silk": false,
+        "use_drill_origin": false
+      },
+      "type": "pcb_export_pdf"
+    },
+    {
+      "description": "Export Silkscreen - Front",
       "id": "8c06b266-db97-462d-801c-96ff37950ecb",
       "settings": {
         "back_fp_property_popups": true,
@@ -410,7 +400,7 @@
         "output_filename": "",
         "pdf_gen_mode": "all-layers-separate-files",
         "pdf_metadata": true,
-        "plot_drawing_sheet": false,
+        "plot_drawing_sheet": true,
         "plot_footprint_values": true,
         "plot_pad_numbers": false,
         "plot_ref_des": true,
@@ -421,6 +411,261 @@
         "use_drill_origin": false
       },
       "type": "pcb_export_pdf"
+    },
+    {
+      "description": "Export Silkscreen - Back",
+      "id": "2aa820a1-7913-4d45-9fef-2af2a69a2cfe",
+      "settings": {
+        "back_fp_property_popups": true,
+        "black_and_white": false,
+        "color_theme": "",
+        "crossout_dnp_footprints_on_fab_layers": true,
+        "description": "",
+        "drawing_sheet": "",
+        "drill_shape": "full",
+        "front_fp_property_popups": true,
+        "hide_dnp_footprints_on_fab_layers": false,
+        "layers": [
+          "B.SilkS",
+          "In30.Cu",
+          "In29.Cu",
+          "In28.Cu",
+          "In27.Cu",
+          "In26.Cu",
+          "In25.Cu",
+          "In24.Cu",
+          "In23.Cu",
+          "In22.Cu",
+          "In21.Cu",
+          "In20.Cu",
+          "In19.Cu",
+          "In18.Cu",
+          "In17.Cu",
+          "In16.Cu",
+          "In15.Cu",
+          "In14.Cu",
+          "In13.Cu",
+          "In12.Cu",
+          "In11.Cu",
+          "In10.Cu",
+          "In9.Cu",
+          "In8.Cu",
+          "In7.Cu",
+          "In6.Cu",
+          "In5.Cu",
+          "In4.Cu",
+          "In3.Cu"
+        ],
+        "layers_to_include_on_all_layers": [
+          "Edge.Cuts"
+        ],
+        "mirror": false,
+        "negative": false,
+        "output_filename": "",
+        "pdf_gen_mode": "all-layers-separate-files",
+        "pdf_metadata": true,
+        "plot_drawing_sheet": true,
+        "plot_footprint_values": true,
+        "plot_pad_numbers": false,
+        "plot_ref_des": true,
+        "single_document": false,
+        "sketch_dnp_footprints_on_fab_layers": true,
+        "sketch_pads_on_fab_layers": false,
+        "subtract_solder_mask_from_silk": false,
+        "use_drill_origin": false
+      },
+      "type": "pcb_export_pdf"
+    },
+    {
+      "description": "Export Schematic PDF",
+      "id": "23eb6022-57f0-453d-bfef-dee7f8c98735",
+      "settings": {
+        "black_and_white": false,
+        "color_theme": "KiCad Classic",
+        "description": "",
+        "drawing_sheet": "",
+        "format": "pdf",
+        "hpgl_page_size": "default",
+        "hpgl_pen_size": 1.0,
+        "hpgl_plot_origin": "A3",
+        "min_pen_width": 847,
+        "output_dir": ".",
+        "page_size": "A4",
+        "pdf_hierarchical_links": true,
+        "pdf_metadata": true,
+        "pdf_property_popups": true,
+        "plot_all": true,
+        "plot_drawing_sheet": true,
+        "use_background_color": false
+      },
+      "type": "sch_export_plot_pdf"
+    },
+    {
+      "description": "Rename Drawings",
+      "id": "c4d53ff8-277a-447f-a0e6-9a65db793e6a",
+      "settings": {
+        "command": "powershell.exe -Command \"\n\n$tmp_location = '${JOBSET_OUTPUT_WORK_PATH}'\n\n$project_file = Get-ChildItem -Path '${KIPRJMOD}' -Filter '*.kicad_pro' | Select-Object -First 1\n$project_name = $project_file.BaseName\n\n$renameMatrix = @(\n    @(\\\"${tmp_location}\\\", ($project_name + '.pdf'), ($project_name + '-Schematic.pdf')),\n    @(\\\"${tmp_location}\\\", ($project_name + '-F_Fab.pdf'), ($project_name + '-Front-Fabrication.pdf')),\n    @(\\\"${tmp_location}\\\", ($project_name + '-B_Fab.pdf'), ($project_name + '-Back-Fabrication.pdf')),\n    @(\\\"${tmp_location}\\\", ($project_name + '-F_Silkscreen.pdf'), ($project_name + '-Front-Silkscreen.pdf')),\n    @(\\\"${tmp_location}\\\", ($project_name + '-B_Silkscreen.pdf'), ($project_name + '-Back-Silkscreen.pdf'))\n)\n\nforeach ($row in $renameMatrix) {\n    $folder   = $row[0]\n    $oldName  = $row[1]\n    $newName  = $row[2]\n    \n    $fullOldPath = Join-Path -Path $folder -ChildPath $oldName\n\n    if (Test-Path -Path $fullOldPath) {\n        Rename-Item -Path $fullOldPath -NewName $newName -Force\n        Write-Host ('SUCCESS: Renamed ' + $oldName + ' -> ' + $newName)\n    } else {\n        Write-Warning ('SKIP: File not found at ' + $fullOldPath)\n    }\n}\n\n\"",
+        "description": "",
+        "ignore_exit_code": false,
+        "output_filename": "c4d53ff8-277a-447f-a0e6-9a65db793e6a.log",
+        "record_output": false
+      },
+      "type": "special_execute"
+    },
+    {
+      "description": "",
+      "id": "01488878-9654-47f3-aa3d-ed654f7b062c",
+      "settings": {
+        "board_only": false,
+        "board_outlines_chaining_epsilon": 0.01,
+        "cut_vias_in_body": false,
+        "description": "",
+        "export_board_body": true,
+        "export_components": true,
+        "export_inner_copper": false,
+        "export_pads": true,
+        "export_silkscreen": true,
+        "export_soldermask": false,
+        "export_tracks": true,
+        "export_zones": true,
+        "fill_all_vias": false,
+        "format": "step",
+        "fuse_shapes": false,
+        "include_dnp": true,
+        "include_unspecified": true,
+        "occt_format": 0,
+        "optimize_step": true,
+        "output_filename": "Model.step",
+        "overwrite": false,
+        "subst_models": true,
+        "use_defined_origin": false,
+        "use_drill_origin": false,
+        "use_grid_origin": false,
+        "use_pcb_center_origin": true,
+        "user_origin.x": 147.5,
+        "user_origin.y": 113.997775,
+        "vrml_model_dir": "",
+        "vrml_relative_paths": false
+      },
+      "type": "pcb_export_3d"
+    },
+    {
+      "description": "Render Front - PNG",
+      "id": "4e06b1fd-43c7-46ed-b003-c9ff49e8499b",
+      "settings": {
+        "anti_alias": true,
+        "bg_style": "default",
+        "description": "",
+        "floor": false,
+        "format": "png",
+        "height": 2160,
+        "light_bottom_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "light_camera_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "light_side_elevation": 60,
+        "light_side_intensity": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "light_top_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "output_filename": "",
+        "pan_x": 0.0,
+        "pan_y": 0.0,
+        "pan_z": 0.0,
+        "perspective": false,
+        "pivot_x": 0.0,
+        "pivot_y": 0.0,
+        "pivot_z": 0.0,
+        "post_process": false,
+        "preset": "",
+        "procedural_textures": false,
+        "quality": "basic",
+        "rotation_x": 0.0,
+        "rotation_y": 0.0,
+        "rotation_z": 0.0,
+        "side": "top",
+        "use_board_stackup_colors": true,
+        "width": 3840,
+        "zoom": 1.0
+      },
+      "type": "pcb_render"
+    },
+    {
+      "description": "Render Back - PNG",
+      "id": "d265ddb2-ca9a-45aa-be85-11cf62f01eb0",
+      "settings": {
+        "anti_alias": true,
+        "bg_style": "default",
+        "description": "",
+        "floor": false,
+        "format": "png",
+        "height": 2160,
+        "light_bottom_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "light_camera_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "light_side_elevation": 60,
+        "light_side_intensity": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "light_top_intensity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "output_filename": "",
+        "pan_x": 0.0,
+        "pan_y": 0.0,
+        "pan_z": 0.0,
+        "perspective": false,
+        "pivot_x": 0.0,
+        "pivot_y": 0.0,
+        "pivot_z": 0.0,
+        "post_process": false,
+        "preset": "",
+        "procedural_textures": false,
+        "quality": "basic",
+        "rotation_x": 0.0,
+        "rotation_y": 0.0,
+        "rotation_z": 0.0,
+        "side": "bottom",
+        "use_board_stackup_colors": true,
+        "width": 3840,
+        "zoom": 1.0
+      },
+      "type": "pcb_render"
+    },
+    {
+      "description": "Rename Renders",
+      "id": "7b30078c-f2aa-4f31-892e-659cf9ddd234",
+      "settings": {
+        "command": "powershell.exe -Command \"\n\n$tmp_location = '${JOBSET_OUTPUT_WORK_PATH}'\n\n$project_file = Get-ChildItem -Path '${KIPRJMOD}' -Filter '*.kicad_pro' | Select-Object -First 1\n$project_name = $project_file.BaseName\n\n$renameMatrix = @(\n    @(\\\"${tmp_location}\\\", ($project_name + '-0.png'), ($project_name + '-Front.png')),\n    @(\\\"${tmp_location}\\\", ($project_name + '-1.png'), ($project_name + '-Back.png'))\n)\n\nforeach ($row in $renameMatrix) {\n    $folder   = $row[0]\n    $oldName  = $row[1]\n    $newName  = $row[2]\n    \n    $fullOldPath = Join-Path -Path $folder -ChildPath $oldName\n\n    if (Test-Path -Path $fullOldPath) {\n        Rename-Item -Path $fullOldPath -NewName $newName -Force\n        Write-Host ('SUCCESS: Renamed ' + $oldName + ' -> ' + $newName)\n    } else {\n        Write-Warning ('SKIP: File not found at ' + $fullOldPath)\n    }\n}\n\n\"",
+        "description": "",
+        "ignore_exit_code": false,
+        "output_filename": "",
+        "record_output": false
+      },
+      "type": "special_execute"
     }
   ],
   "meta": {
@@ -432,7 +677,8 @@
       "id": "0ecdc16f-03a8-45f0-8556-bb7c926bd6a8",
       "only": [
         "af9204ec-d5e8-44c6-8ba6-46d187593516",
-        "3ff095ed-8d68-4f5d-96d2-ee638fd87626"
+        "3ff095ed-8d68-4f5d-96d2-ee638fd87626",
+        "f9996d6f-b474-47ab-b3c7-da601945c633"
       ],
       "settings": {
         "output_path": "${KIPRJMOD}\\Outputs\\Gerbers"
@@ -444,8 +690,9 @@
       "id": "598a9bbe-4b0e-4dab-9c52-859b52777365",
       "only": [
         "ccb89609-c924-4fb9-8f5e-cf5a4e1d28d0",
-        "fe744e8d-257d-45cd-8fab-3bc7a61509dc",
-        "03e5fc2a-1174-4ab7-b57f-f3c1b156a7af"
+        "c895861f-76c0-4de1-99df-4d562233c447",
+        "03e5fc2a-1174-4ab7-b57f-f3c1b156a7af",
+        "534389d0-2e0c-4d33-bd64-098d5f1f562f"
       ],
       "settings": {
         "output_path": "${KIPRJMOD}\\Outputs\\Assembly"
@@ -457,7 +704,11 @@
       "id": "b2db26a1-c610-4e28-b619-4088093384eb",
       "only": [
         "3f67e122-68a6-4542-8c86-e8d9da8faec8",
-        "8c06b266-db97-462d-801c-96ff37950ecb"
+        "d4cc7ebd-8146-4c9f-85fc-1b7f856b7a14",
+        "8c06b266-db97-462d-801c-96ff37950ecb",
+        "2aa820a1-7913-4d45-9fef-2af2a69a2cfe",
+        "23eb6022-57f0-453d-bfef-dee7f8c98735",
+        "c4d53ff8-277a-447f-a0e6-9a65db793e6a"
       ],
       "settings": {
         "output_path": "${KIPRJMOD}\\Outputs\\Drawings"
@@ -465,10 +716,13 @@
       "type": "folder"
     },
     {
-      "description": "Models",
+      "description": "Model Renders",
       "id": "cf2b4877-15a0-4475-a2ad-4cb8e1c87790",
       "only": [
-        "01488878-9654-47f3-aa3d-ed654f7b062c"
+        "01488878-9654-47f3-aa3d-ed654f7b062c",
+        "4e06b1fd-43c7-46ed-b003-c9ff49e8499b",
+        "d265ddb2-ca9a-45aa-be85-11cf62f01eb0",
+        "7b30078c-f2aa-4f31-892e-659cf9ddd234"
       ],
       "settings": {
         "output_path": "${KIPRJMOD}\\Outputs\\Models"
