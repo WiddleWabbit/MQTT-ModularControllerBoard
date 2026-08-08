@@ -1,5 +1,7 @@
 # MQTT Modular Controller Board
 
+*Currently In Testing - Not Yet Tested*
+
 ESP32-S3-WROOM-1U based motherboard designed to communicate externally via MQTT, and read sensors, control interfaces and other hardware through purpose built modules. For example, actuator control (pumps, solenoids, etc.), and water sensor readings etc.
 
 ## Features
