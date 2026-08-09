@@ -1314,7 +1314,8 @@
     "pinned_footprint_libs": [
       "CJT Connectors",
       "KOHERELEC Inductors",
-      "JIANGSU Transistors"
+      "JIANGSU Transistors",
+      "ESPRESSIF Microcontrollers"
     ],
     "pinned_symbol_libs": [
       "CJT Connectors",

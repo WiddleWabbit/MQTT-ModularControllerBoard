@@ -35,7 +35,7 @@
 					(justify left)
 				)
 			)
-			(property "Footprint" "PCM_Espressif:ESP32-S3-WROOM-1U"
+			(property "Footprint" "ESPRESSIF Microcontrollers:ESP32-S3-WROOM-1U"
 				(at 0 -56.642 0)
 				(effects
 					(font
@@ -9997,7 +9997,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "PCM_Espressif:ESP32-S3-WROOM-1U"
+		(property "Footprint" "ESPRESSIF Microcontrollers:ESP32-S3-WROOM-1U"
 			(at 99.06 143.002 0)
 			(effects
 				(font
