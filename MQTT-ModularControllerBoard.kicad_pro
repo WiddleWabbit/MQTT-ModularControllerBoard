@@ -172,10 +172,6 @@
           ""
         ],
         [
-          "clearance|178821400|96250001|5189d815-0a24-444f-b2cb-b6d349fda921|89f61b19-89ec-4e5e-96d0-e0867d1d63ae",
-          ""
-        ],
-        [
           "clearance|179278600|96250001|5189d815-0a24-444f-b2cb-b6d349fda921|7339b6a8-a582-4630-a5e5-fb5e3337e0e2",
           ""
         ],
@@ -418,30 +414,6 @@
         [
           "clearance|99650000|104750000|40e24e28-35fc-4024-beea-5e468972a96d|79f56255-7ea2-4771-8aae-23ed9470e8fc",
           "Intentional, High Speed Signal with via to couple to GND"
-        ],
-        [
-          "copper_edge_clearance|177501900|93141311|b57c8e55-6d9f-45eb-a1f6-28e604814c3f|670231e3-35fa-4eb2-95e8-e33522ec068a",
-          ""
-        ],
-        [
-          "copper_edge_clearance|178718000|91947500|021c7c0b-4433-4c11-b91f-cf81d741f408|298e78e3-f56d-4674-b2ec-5ad016f664d3",
-          ""
-        ],
-        [
-          "copper_edge_clearance|182141025|93095551|ae2fccf0-8e78-4f65-9941-d5adada14790|64bd555f-ef70-493a-8cf7-2517731c6d2e",
-          ""
-        ],
-        [
-          "copper_edge_clearance|184300000|92557100|0332c800-bf92-46b8-a835-ea7b1cebaf8d|213e1ef9-fb38-4261-a2b3-b8909b26456b",
-          ""
-        ],
-        [
-          "silk_edge_clearance|176082800|91505045|a96d8b24-da14-4a53-8f45-a3b9961e2b62|76afabd5-d293-48cf-bb44-5b323609d24b",
-          ""
-        ],
-        [
-          "silk_edge_clearance|184617200|91495622|5ff149ff-2338-40c0-b2e0-c3301e4b23b4|ea510ae0-0796-430c-be1e-98743dcaca44",
-          ""
         ],
         [
           "track_dangling|126600000|124900000|b95203ac-4535-4aa2-8d11-c7974376db1d|00000000-0000-0000-0000-000000000000",
