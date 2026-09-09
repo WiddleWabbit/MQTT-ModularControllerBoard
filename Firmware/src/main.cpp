@@ -2,7 +2,7 @@
 #include <WiFi.h> // Library for Controlling Wifi
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 #include <PubSubClient.h> // Library to handle MQTT
-#include "wifihandler.h" // Custom Handler for Wifi
+#include "class\wifihandler.h" // Custom Handler for Wifi
 #include "mqtthandler.h" // Custom handling and functions for MQTT
 #include "jsonhandler.h" // Custom handling and functions for JSON
 #include "timehandler.h" // Custom handling and functions for time & ntp sync
@@ -32,6 +32,9 @@ const uint8_t MOD3_PIN = 43;
 const uint8_t MOD4_PIN = 1;
 // Specify USB Vbus Sense Pin
 const uint8_t VBUS_SNS_PIN = 8;
+
+// WiFi Initial Setup
+WiFiHandler wifi("MQTTController-Setup", "mqttcs");
 
 // PSRAM Buffering
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
@@ -64,7 +67,7 @@ void setup()
     return;
   }
   
-  initWiFi(); // Connect to the wifi network
+  wifi.begin();
 
   initNTP(); // Setup NTP Sync
 
@@ -76,8 +79,8 @@ void setup()
 void loop()
 {
 
-  checkWiFi(); // Check the wifi connection status and reconnect if necessary
-  reportWiFiStatus(); // Print wifi information for debugging
+  wifi.update(); // Check the wifi connection status and reconnect if necessary
+  wifi.reportStatus(); // Print wifi information for debugging
 
   checkNTP(); // Check NTP Status, print time to serial every so often
 
