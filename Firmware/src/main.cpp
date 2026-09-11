@@ -3,10 +3,6 @@
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 #include <PubSubClient.h> // Library to handle MQTT
 #include "class\wifihandler.h" // Custom Handler for Wifi
-#include "mqtthandler.h" // Custom handling and functions for MQTT
-#include "jsonhandler.h" // Custom handling and functions for JSON
-#include "timehandler.h" // Custom handling and functions for time & ntp sync
-#include "class\PSRAM_Buffer.h" // Custom Class to create and maintain a PSRAM Buffer
 
 // Specify Pins to use for I2C
 const uint8_t SDA_PIN = 4;
@@ -41,11 +37,10 @@ const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
 const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
 unsigned long psramlastSend = 0;
 
-// Construct global instance of psram buffer
-PSRAM_BUFFER* psram_buffer = nullptr;
-
 void setup()
 {
+
+  // ---------- Begin Serial ----------
 
   Serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
@@ -53,23 +48,19 @@ void setup()
   Serial.println();
   Serial.println("Powered on, Initialising..");
 
-  if (psramInit()) { // Initialise PSRAM
+  // ---------- PSRAM Initialisation ----------
+  if (psramInit()) { 
     Serial.println("PSRAM initialized");
     Serial.println((String)"Memory available in PSRAM : " +ESP.getFreePsram());
-
-    // Construct PSRAM Buffer to save readings to
-    Serial.println("Creating PSRAM Buffer");
-    Serial.print("Buffer Size of: ");
-    Serial.println(PSRAM_BUFFER_OBJECTS);
-    psram_buffer = new PSRAM_BUFFER(PSRAM_BUFFER_OBJECTS);
   } else {
     Serial.println("PSRAM not found or initialization failed");
     return;
   }
   
+  // ---------- Begin WiFi Setup ----------
   wifi.begin();
 
-  initNTP(); // Setup NTP Sync
+  // ---------- Begin I2C ----------
 
   Serial.println("Beginning I2C Communication.");
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
@@ -81,20 +72,6 @@ void loop()
 
   wifi.update(); // Check the wifi connection status and reconnect if necessary
   wifi.reportStatus(); // Print wifi information for debugging
-
-  checkNTP(); // Check NTP Status, print time to serial every so often
-
-  if (millis() - psramlastSend >= PSRAM_SEND_FREQUENCY) { // Send readings per interval set
-
-    psramlastSend = millis();
-    psram_buffer->sendSingleAndClear();
-
-  }
-  
-  checkMQTT(); // Check the MQTT Status / Reconnect if needed
-  if (mqttClient.connected()) {
-    mqttClient.loop(); // Process the MQTT Client Tasks
-  }
 
   // Debug printing
   Serial.print("Free Heap Memory: ");
