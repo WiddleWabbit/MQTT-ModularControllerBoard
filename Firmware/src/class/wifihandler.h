@@ -5,14 +5,25 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 
+#include "IClock.h"
+#include "ISystemControl.h"
+#include "IWifiStation.h"
+#include "WifiConnectionManager.h"
+
 class WiFiHandler {
 public:
   /**
    * @param hostname   Used as hostname in STA mode and as the AP SSID for the captive portal.
    * @param apPassword Optional password for the captive-portal AP (nullptr or "" = open network).
+   * @param wifi Optional station driver; the ESP32 driver is used when omitted.
+   * @param clock Optional monotonic clock; the ESP32 clock is used when omitted.
+   * @param system Optional system control; the ESP32 control is used when omitted.
    */
   WiFiHandler(const char* hostname = "MQTTController-Setup",
-              const char* apPassword = nullptr);
+              const char* apPassword = nullptr,
+              IWifiStation* wifi = nullptr,
+              IClock* clock = nullptr,
+              ISystemControl* system = nullptr);
 
   // Call once in setup()
   void begin();
@@ -38,6 +49,10 @@ public:
 private:
   const char* _hostname;
   const char* _apPassword;
+  IWifiStation& _wifiStation;
+  IClock& _clock;
+  ISystemControl& _system;
+  WifiConnectionManager _connectionManager;
 
   // Runtime state
   bool _portalActive   = false;
@@ -45,14 +60,7 @@ private:
   String _ssid;
   String _password;
 
-  // Station reconnect settings / state
-  unsigned long _connectingMillis   = 0;
-  unsigned long _connectionTimeout  = 30000;   // 30s per attempt
-  unsigned long _timeouts           = 0;
-  unsigned long _maxTimeouts        = 100;     // configurable
-  bool          _restartOnFailure   = false;    // configurable
   bool          _firstConnect       = true;
-  bool          _wasConnected       = false;
 
   // Captive portal objects
   DNSServer   _dnsServer;

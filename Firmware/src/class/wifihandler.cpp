@@ -1,5 +1,15 @@
 #include "wifihandler.h"
 
+#include "Esp32Clock.h"
+#include "Esp32SystemControl.h"
+#include "Esp32WifiStation.h"
+
+namespace {
+Esp32WifiStation defaultWifiStation;
+Esp32Clock defaultClock;
+Esp32SystemControl defaultSystemControl;
+}
+
 // Simple clean captive-portal page
 static const char PORTAL_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -27,8 +37,15 @@ static const char PORTAL_HTML[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-WiFiHandler::WiFiHandler(const char* hostname, const char* apPassword)
-  : _hostname(hostname), _apPassword(apPassword) {}
+WiFiHandler::WiFiHandler(const char* hostname, const char* apPassword,
+                         IWifiStation* wifi, IClock* clock,
+                         ISystemControl* system)
+  : _hostname(hostname),
+    _apPassword(apPassword),
+    _wifiStation(wifi == nullptr ? defaultWifiStation : *wifi),
+    _clock(clock == nullptr ? defaultClock : *clock),
+    _system(system == nullptr ? defaultSystemControl : *system),
+    _connectionManager(_wifiStation, _clock, _system) {}
 
 void WiFiHandler::begin() {
   _prefs.begin("wifi", false);
@@ -71,9 +88,7 @@ void WiFiHandler::resetCredentials() {
 
 void WiFiHandler::startStation() {
   Serial.printf("Connecting to \"%s\"...\n", _ssid.c_str());
-  WiFi.disconnect(true);
-  WiFi.begin(_ssid.c_str(), _password.c_str());
-  _connectingMillis = millis();
+  _connectionManager.start(_ssid.c_str(), _password.c_str());
   _firstConnect = true;
   _portalActive = false;
 }
@@ -140,61 +155,39 @@ void WiFiHandler::update() {
   }
 
   // ----- Normal Station mode -----
-  const bool connected = (WiFi.status() == WL_CONNECTED);
+  const bool wasConnected = _connectionManager.isConnected();
+  _connectionManager.update();
+  const bool connected = _connectionManager.isConnected();
 
   if (connected) {
     if (_firstConnect) {
       Serial.print("WiFi connected – IP: ");
       Serial.println(WiFi.localIP());
-      _timeouts = 0;
       _firstConnect = false;
     }
-    _wasConnected = true;
     return;
   }
 
   // Lost connection
-  if (_wasConnected) {
+  if (wasConnected) {
     Serial.println("Lost WiFi connection – reconnecting...");
-    _wasConnected = false;
-    startStation();
-    return;
-  }
-
-  // Connection attempt timed out
-  if (millis() - _connectingMillis >= _connectionTimeout) {
-    _timeouts++;
-
-    if (_restartOnFailure && _timeouts >= _maxTimeouts) {
-      Serial.println("Too many failures – restarting...");
-      ESP.restart();
-    }
-
-    // If we are not restarting, just keep trying (reset the counter optionally)
-    if (!_restartOnFailure && _timeouts >= _maxTimeouts) {
-      _timeouts = 0;   // prevent the counter from growing forever
-    }
-
-    Serial.printf("Timeout (attempt %lu/%lu) – retrying...\n",
-                  _timeouts, _maxTimeouts);
-    startStation();
   }
 }
 
-// ---------- Configuration Methods ----------
+// ========== Configuration Methods ==========
 
 void WiFiHandler::setMaxTimeouts(unsigned long maxTimeouts) {
-  _maxTimeouts = maxTimeouts;
+  _connectionManager.setMaxTimeouts(maxTimeouts);
 }
 
 void WiFiHandler::setRestartOnFailure(bool enable) {
-  _restartOnFailure = enable;
+  _connectionManager.setRestartOnFailure(enable);
 }
 
-// ---------- Helper Functions ----------
+// ========== Helper Functions ==========
 
 bool WiFiHandler::isConnected() const {
-  return !_portalActive && (WiFi.status() == WL_CONNECTED);
+  return !_portalActive && _connectionManager.isConnected();
 }
 
 bool WiFiHandler::isPortalActive() const {
