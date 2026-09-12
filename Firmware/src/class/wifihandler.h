@@ -3,12 +3,15 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
-#include <Preferences.h>
 
 #include "IClock.h"
 #include "ISystemControl.h"
 #include "IWifiStation.h"
+#include "IWifiCredentialsStore.h"
+#include "IWifiScanner.h"
 #include "WifiConnectionManager.h"
+#include "WifiSetupController.h"
+#include "WifiSetupPortalView.h"
 
 class WiFiHandler {
 public:
@@ -18,12 +21,16 @@ public:
    * @param wifi Optional station driver; the ESP32 driver is used when omitted.
    * @param clock Optional monotonic clock; the ESP32 clock is used when omitted.
    * @param system Optional system control; the ESP32 control is used when omitted.
+   * @param scanner Optional network scanner; the ESP32 scanner is used when omitted.
+   * @param store Optional credential store; ESP32 Preferences are used when omitted.
    */
   WiFiHandler(const char* hostname = "MQTTController-Setup",
-              const char* apPassword = nullptr,
-              IWifiStation* wifi = nullptr,
-              IClock* clock = nullptr,
-              ISystemControl* system = nullptr);
+             const char* apPassword = nullptr,
+             IWifiStation* wifi = nullptr,
+             IClock* clock = nullptr,
+             ISystemControl* system = nullptr,
+             IWifiScanner* scanner = nullptr,
+             IWifiCredentialsStore* store = nullptr);
 
   // Call once in setup()
   void begin();
@@ -52,11 +59,14 @@ private:
   IWifiStation& _wifiStation;
   IClock& _clock;
   ISystemControl& _system;
+  IWifiScanner& _wifiScanner;
+  IWifiCredentialsStore& _credentialsStore;
   WifiConnectionManager _connectionManager;
+  WifiSetupController _setupController;
+  WifiSetupPortalView _portalView;
 
   // Runtime state
-  bool _portalActive   = false;
-  bool _hasCredentials = false;
+  bool _portalActive = false;
   String _ssid;
   String _password;
 
@@ -65,11 +75,8 @@ private:
   // Captive portal objects
   DNSServer   _dnsServer;
   WebServer   _server{80};
-  Preferences _prefs;
 
   // Internal helpers
-  bool loadCredentials();
-  void saveCredentials(const String& ssid, const String& pass);
   void startStation();
   void startPortal();
   void handlePortal();

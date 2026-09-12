@@ -59,7 +59,7 @@ void setup()
   
   // ---------- Begin WiFi Setup ----------
   wifi.begin();
-
+  
   // ---------- Begin I2C ----------
 
   Serial.println("Beginning I2C Communication.");

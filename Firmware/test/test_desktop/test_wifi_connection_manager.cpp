@@ -10,6 +10,28 @@ constexpr unsigned long connectionTimeout = 1000;
 constexpr unsigned long maxTimeouts = 2;
 }
 
+void test_begin_with_stored_credentials_skips_scan_and_enters_station_state();
+void test_begin_without_credentials_scans_and_enters_portal_state();
+void test_store_initialization_failure_falls_back_to_manual_portal();
+void test_scan_failure_keeps_portal_available_for_manual_configuration();
+void test_scan_filters_hidden_networks_and_keeps_strongest_duplicate();
+void test_scan_limits_visible_networks_without_overflowing_controller_storage();
+void test_network_at_out_of_range_returns_empty_network();
+void test_manual_ssid_takes_precedence_over_selected_network();
+void test_selected_ssid_is_used_when_manual_ssid_is_blank();
+void test_selected_ssid_is_used_when_manual_ssid_is_whitespace();
+void test_open_network_can_be_saved_without_a_password();
+void test_blank_ssids_are_rejected_without_saving();
+void test_whitespace_only_ssids_are_rejected_without_saving();
+void test_null_inputs_are_rejected_without_saving();
+void test_submission_before_begin_is_rejected();
+void test_oversized_credentials_are_rejected_without_truncation();
+void test_save_failure_keeps_portal_state_and_reports_failure();
+void test_successful_submission_is_loaded_on_the_next_begin();
+void test_clear_credentials_returns_controller_to_idle();
+void test_portal_view_lists_networks_and_manual_entry();
+void test_portal_view_escapes_ssid_markup();
+
 // Verifies that an unstarted manager remains inert.
 void test_update_before_start_is_a_noop()
 {
@@ -264,6 +286,27 @@ int main()
   RUN_TEST(test_updates_failure_limit_when_reconfigured);
   RUN_TEST(test_resets_failure_count_when_restart_is_disabled);
   RUN_TEST(test_zero_failure_limit_allows_unlimited_retries);
+  RUN_TEST(test_begin_with_stored_credentials_skips_scan_and_enters_station_state);
+  RUN_TEST(test_begin_without_credentials_scans_and_enters_portal_state);
+  RUN_TEST(test_store_initialization_failure_falls_back_to_manual_portal);
+  RUN_TEST(test_scan_failure_keeps_portal_available_for_manual_configuration);
+  RUN_TEST(test_scan_filters_hidden_networks_and_keeps_strongest_duplicate);
+  RUN_TEST(test_scan_limits_visible_networks_without_overflowing_controller_storage);
+  RUN_TEST(test_network_at_out_of_range_returns_empty_network);
+  RUN_TEST(test_manual_ssid_takes_precedence_over_selected_network);
+  RUN_TEST(test_selected_ssid_is_used_when_manual_ssid_is_blank);
+  RUN_TEST(test_selected_ssid_is_used_when_manual_ssid_is_whitespace);
+  RUN_TEST(test_open_network_can_be_saved_without_a_password);
+  RUN_TEST(test_blank_ssids_are_rejected_without_saving);
+  RUN_TEST(test_whitespace_only_ssids_are_rejected_without_saving);
+  RUN_TEST(test_null_inputs_are_rejected_without_saving);
+  RUN_TEST(test_submission_before_begin_is_rejected);
+  RUN_TEST(test_oversized_credentials_are_rejected_without_truncation);
+  RUN_TEST(test_save_failure_keeps_portal_state_and_reports_failure);
+  RUN_TEST(test_successful_submission_is_loaded_on_the_next_begin);
+  RUN_TEST(test_clear_credentials_returns_controller_to_idle);
+  RUN_TEST(test_portal_view_lists_networks_and_manual_entry);
+  RUN_TEST(test_portal_view_escapes_ssid_markup);
 
   return UNITY_END();
 }

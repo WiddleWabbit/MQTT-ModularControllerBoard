@@ -3,54 +3,38 @@
 #include "Esp32Clock.h"
 #include "Esp32SystemControl.h"
 #include "Esp32WifiStation.h"
+#include "Esp32WifiCredentialsStore.h"
+#include "Esp32WifiScanner.h"
 
 namespace {
 Esp32WifiStation defaultWifiStation;
 Esp32Clock defaultClock;
 Esp32SystemControl defaultSystemControl;
+Esp32WifiScanner defaultWifiScanner;
+Esp32WifiCredentialsStore defaultCredentialsStore;
 }
-
-// Simple clean captive-portal page
-static const char PORTAL_HTML[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WiFi Setup</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 400px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.4rem; }
-    input { width: 100%; padding: 0.6rem; margin: 0.4rem 0 1rem; box-sizing: border-box; }
-    button { width: 100%; padding: 0.8rem; background: #007aff; color: white; border: none; border-radius: 6px; font-size: 1rem; }
-  </style>
-</head>
-<body>
-  <h1>WiFi Configuration</h1>
-  <form action="/save" method="POST">
-    <label>Network name (SSID)</label>
-    <input type="text" name="ssid" required>
-    <label>Password</label>
-    <input type="password" name="pass">
-    <button type="submit">Save & Connect</button>
-  </form>
-</body>
-</html>
-)rawliteral";
 
 WiFiHandler::WiFiHandler(const char* hostname, const char* apPassword,
                          IWifiStation* wifi, IClock* clock,
-                         ISystemControl* system)
+                         ISystemControl* system, IWifiScanner* scanner,
+                         IWifiCredentialsStore* store)
   : _hostname(hostname),
     _apPassword(apPassword),
     _wifiStation(wifi == nullptr ? defaultWifiStation : *wifi),
     _clock(clock == nullptr ? defaultClock : *clock),
     _system(system == nullptr ? defaultSystemControl : *system),
-    _connectionManager(_wifiStation, _clock, _system) {}
+    _wifiScanner(scanner == nullptr ? defaultWifiScanner : *scanner),
+    _credentialsStore(store == nullptr ? defaultCredentialsStore : *store),
+    _connectionManager(_wifiStation, _clock, _system),
+    _setupController(_wifiScanner, _credentialsStore) {}
 
 void WiFiHandler::begin() {
-  _prefs.begin("wifi", false);
+  _setupController.begin();
 
-  if (loadCredentials()) {
+  if (_setupController.state() == WifiSetupState::StationReady) {
+    const WifiCredentials& credentials = _setupController.credentials();
+    _ssid = credentials.ssid;
+    _password = credentials.password;
     Serial.println("Found saved credentials – trying Station mode");
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(_hostname);
@@ -63,26 +47,10 @@ void WiFiHandler::begin() {
   }
 }
 
-bool WiFiHandler::loadCredentials() {
-  _ssid     = _prefs.getString("ssid", "");
-  _password = _prefs.getString("pass", "");
-  _hasCredentials = (_ssid.length() > 0);
-  return _hasCredentials;
-}
-
-void WiFiHandler::saveCredentials(const String& ssid, const String& pass) {
-  _prefs.putString("ssid", ssid);
-  _prefs.putString("pass", pass);
-  _ssid = ssid;
-  _password = pass;
-  _hasCredentials = true;
-}
-
 void WiFiHandler::resetCredentials() {
-  _prefs.clear();
+  _setupController.clearCredentials();
   _ssid = "";
   _password = "";
-  _hasCredentials = false;
   Serial.println("Credentials cleared");
 }
 
@@ -115,19 +83,25 @@ void WiFiHandler::startPortal() {
 
 void WiFiHandler::setupPortalRoutes() {
   _server.on("/", HTTP_GET, [this]() {
-    _server.send_P(200, "text/html", PORTAL_HTML);
+    const std::string html = _portalView.render(_setupController);
+    _server.send(200, "text/html", html.c_str());
   });
 
   _server.on("/save", HTTP_POST, [this]() {
-    if (!_server.hasArg("ssid") || _server.arg("ssid").isEmpty()) {
-      _server.send(400, "text/plain", "SSID is required");
+    const String selectedSsid =
+        _server.hasArg("ssid") ? _server.arg("ssid") : "";
+    const String manualSsid =
+        _server.hasArg("manualSsid") ? _server.arg("manualSsid") : "";
+    const String password =
+        _server.hasArg("pass") ? _server.arg("pass") : "";
+
+    if (!_setupController.submitCredentials(selectedSsid.c_str(),
+                                            manualSsid.c_str(),
+                                            password.c_str())) {
+      _server.send(400, "text/plain",
+                   "A valid SSID and password are required");
       return;
     }
-
-    String newSsid = _server.arg("ssid");
-    String newPass = _server.hasArg("pass") ? _server.arg("pass") : "";
-
-    saveCredentials(newSsid, newPass);
 
     _server.send(200, "text/html",
       "<html><body style='font-family:sans-serif;text-align:center;margin-top:3rem'>"
@@ -139,7 +113,8 @@ void WiFiHandler::setupPortalRoutes() {
 
   // Catch-all - always show the form (important for captive portal)
   _server.onNotFound([this]() {
-    _server.send_P(200, "text/html", PORTAL_HTML);
+    const std::string html = _portalView.render(_setupController);
+    _server.send(200, "text/html", html.c_str());
   });
 }
 

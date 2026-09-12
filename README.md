@@ -75,7 +75,9 @@ Designed for JLCPCB Impedance Control Stackup of JLC04161H-7628, Finished thickn
 
 ## Setup and Build
 
-**Firmware**: Not yet implemented (TBA).
+**Firmware**: The PlatformIO firmware includes non-blocking WiFi station
+reconnection and a captive-portal setup flow. On first boot, the portal scans
+nearby networks and offers a selectable SSID list plus manual SSID entry.
 
 **Programming**:
 - Connect via USB micro-B.
