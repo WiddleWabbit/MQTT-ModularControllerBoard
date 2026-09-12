@@ -238,8 +238,18 @@ void test_zero_failure_limit_allows_unlimited_retries()
   TEST_ASSERT_EQUAL_UINT(4, wifi.beginCallCount);
 }
 
+// Prepares the shared Unity fixture before each test.
+void setUp()
+{
+}
+
+// Cleans up the shared Unity fixture after each test.
+void tearDown()
+{
+}
+
 // Runs all desktop Unity test cases once.
-void setup()
+int main()
 {
   UNITY_BEGIN();
   RUN_TEST(test_update_before_start_is_a_noop);
@@ -254,10 +264,6 @@ void setup()
   RUN_TEST(test_updates_failure_limit_when_reconfigured);
   RUN_TEST(test_resets_failure_count_when_restart_is_disabled);
   RUN_TEST(test_zero_failure_limit_allows_unlimited_retries);
-  UNITY_END();
-}
 
-// Keeps the desktop test runner from performing repeated work.
-void loop()
-{
+  return UNITY_END();
 }
