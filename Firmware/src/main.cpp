@@ -3,6 +3,10 @@
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 #include <PubSubClient.h> // Library to handle MQTT
 #include "class\wifihandler.h" // Custom Handler for Wifi
+#include "Esp32Clock.h"
+#include "Esp32WifiStation.h"
+#include "Esp32NtpClient.h"
+#include "NtpHandler.h"
 
 // Specify Pins to use for I2C
 const uint8_t SDA_PIN = 4;
@@ -31,6 +35,10 @@ const uint8_t VBUS_SNS_PIN = 8;
 
 // WiFi Initial Setup
 WiFiHandler wifi("MQTTController-Setup", "mqttcs");
+Esp32WifiStation ntpWifi;
+Esp32Clock ntpClock;
+Esp32NtpClient ntpClient;
+NtpHandler ntpHandler(ntpWifi, ntpClock, ntpClient);
 
 // PSRAM Buffering
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
@@ -71,8 +79,9 @@ void loop()
 {
 
   wifi.update(); // Check the wifi connection status and reconnect if necessary
+  ntpHandler.update(); // Synchronize network time without blocking
   wifi.reportStatus(); // Print wifi information for debugging
-
+  
   // Debug printing
   Serial.print("Free Heap Memory: ");
   Serial.println(ESP.getFreeHeap());

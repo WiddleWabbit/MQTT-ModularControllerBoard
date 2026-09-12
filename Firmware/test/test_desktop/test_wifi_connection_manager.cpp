@@ -32,6 +32,17 @@ void test_clear_credentials_returns_controller_to_idle();
 void test_portal_view_lists_networks_and_manual_entry();
 void test_portal_view_escapes_ssid_markup();
 
+void test_defaultsToPoolServerAndThirtyMinuteFrequency();
+void test_requestsSynchronizationOnceWhenWifiFirstConnects();
+void test_doesNotRepeatRequestBeforeFrequencyExpires();
+void test_requestsAgainWhenFrequencyExpires();
+void test_reconnectionTriggersAnImmediateSynchronization();
+void test_updateIsNonblockingAndContinuesDrivingNtpClient();
+void test_configurationCanBeChanged();
+void test_emptyServerIsRejected();
+void test_zeroFrequencyIsRejected();
+void test_reportsSynchronizationState();
+
 // Verifies that an unstarted manager remains inert.
 void test_update_before_start_is_a_noop()
 {
@@ -307,6 +318,16 @@ int main()
   RUN_TEST(test_clear_credentials_returns_controller_to_idle);
   RUN_TEST(test_portal_view_lists_networks_and_manual_entry);
   RUN_TEST(test_portal_view_escapes_ssid_markup);
+  RUN_TEST(test_defaultsToPoolServerAndThirtyMinuteFrequency);
+  RUN_TEST(test_requestsSynchronizationOnceWhenWifiFirstConnects);
+  RUN_TEST(test_doesNotRepeatRequestBeforeFrequencyExpires);
+  RUN_TEST(test_requestsAgainWhenFrequencyExpires);
+  RUN_TEST(test_reconnectionTriggersAnImmediateSynchronization);
+  RUN_TEST(test_updateIsNonblockingAndContinuesDrivingNtpClient);
+  RUN_TEST(test_configurationCanBeChanged);
+  RUN_TEST(test_emptyServerIsRejected);
+  RUN_TEST(test_zeroFrequencyIsRejected);
+  RUN_TEST(test_reportsSynchronizationState);
 
   return UNITY_END();
 }
