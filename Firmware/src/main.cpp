@@ -8,47 +8,56 @@
 #include "Esp32NtpClient.h"
 #include "NtpHandler.h"
 
-// Specify Pins to use for I2C
+// ========== Pin Configuration ==========
+
+// Specify pins to use for I2C.
 const uint8_t SDA_PIN = 4;
 const uint8_t SCL_PIN = 5;
-// Specify Pins for SPI
+// Specify pins for SPI.
 const uint8_t MOSI_PIN = 11;
 const uint8_t MISO_PIN = 12;
 const uint8_t SCK_PIN = 13;
-// Specify Pins for CS Pins
+// Specify chip-select pins.
 const uint8_t CS1_PIN = 6;
 const uint8_t CS2_PIN = 7;
 const uint8_t CS3_PIN = 15;
 const uint8_t CS4_PIN = 16;
-// Specify Sense Pins
+// Specify sense pins.
 const uint8_t SNS1_PIN = 39;
 const uint8_t SNS2_PIN = 41;
 const uint8_t SNS3_PIN = 44;
 const uint8_t SNS4_PIN = 2;
-// Specify General Use Pins
+// Specify general-use pins.
 const uint8_t MOD1_PIN = 40;
 const uint8_t MOD2_PIN = 42;
 const uint8_t MOD3_PIN = 43;
 const uint8_t MOD4_PIN = 1;
-// Specify USB Vbus Sense Pin
+// Specify the USB Vbus sense pin.
 const uint8_t VBUS_SNS_PIN = 8;
 
-// WiFi Initial Setup
+// ========== Service Construction ==========
+
 WiFiHandler wifi("MQTTController-Setup", "mqttcs");
 Esp32WifiStation ntpWifi;
 Esp32Clock ntpClock;
 Esp32NtpClient ntpClient;
 NtpHandler ntpHandler(ntpWifi, ntpClock, ntpClient);
 
-// PSRAM Buffering
+// ========== PSRAM Buffering ==========
+
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
 const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
 unsigned long psramlastSend = 0;
 
+/**
+ * Initializes serial output, PSRAM, WiFi setup, and I2C.
+ *
+ * @return Nothing.
+ */
 void setup()
 {
 
-  // ---------- Begin Serial ----------
+  // ========== Serial ==========
 
   Serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
@@ -56,7 +65,7 @@ void setup()
   Serial.println();
   Serial.println("Powered on, Initialising..");
 
-  // ---------- PSRAM Initialisation ----------
+  // ========== PSRAM Initialization ==========
   if (psramInit()) { 
     Serial.println("PSRAM initialized");
     Serial.println((String)"Memory available in PSRAM : " +ESP.getFreePsram());
@@ -65,16 +74,21 @@ void setup()
     return;
   }
   
-  // ---------- Begin WiFi Setup ----------
+  // ========== WiFi Setup ==========
   wifi.begin();
   
-  // ---------- Begin I2C ----------
+  // ========== I2C ==========
 
   Serial.println("Beginning I2C Communication.");
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
 
 }
 
+/**
+ * Services WiFi and NTP, then reports runtime memory and connection status.
+ *
+ * @return Nothing.
+ */
 void loop()
 {
 

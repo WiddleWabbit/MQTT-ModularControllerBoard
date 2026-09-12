@@ -2,6 +2,11 @@
 
 class INtpClient {
 public:
+  /**
+   * Releases the interface without owning a concrete NTP client.
+   *
+   * @return Nothing.
+   */
   virtual ~INtpClient() = default;
 
   /**

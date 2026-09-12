@@ -2,6 +2,11 @@
 
 class IWifiStation {
 public:
+  /**
+   * Releases the interface without owning the concrete station driver.
+   *
+   * @return Nothing.
+   */
   virtual ~IWifiStation() = default;
 
   /**

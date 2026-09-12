@@ -12,6 +12,11 @@ struct WifiNetworkInfo {
 
 class IWifiScanner {
 public:
+  /**
+   * Releases the interface without owning the concrete scanner.
+   *
+   * @return Nothing.
+   */
   virtual ~IWifiScanner() = default;
 
   /**

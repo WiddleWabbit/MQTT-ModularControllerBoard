@@ -2,6 +2,11 @@
 
 class IClock {
 public:
+  /**
+   * Releases the interface without owning a concrete clock.
+   *
+   * @return Nothing.
+   */
   virtual ~IClock() = default;
 
   /**

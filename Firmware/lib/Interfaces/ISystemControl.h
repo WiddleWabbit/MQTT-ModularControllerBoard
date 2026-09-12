@@ -2,6 +2,11 @@
 
 class ISystemControl {
 public:
+  /**
+   * Releases the interface without owning system-control resources.
+   *
+   * @return Nothing.
+   */
   virtual ~ISystemControl() = default;
 
   /**

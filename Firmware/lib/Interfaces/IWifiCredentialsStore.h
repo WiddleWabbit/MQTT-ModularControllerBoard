@@ -12,6 +12,11 @@ struct WifiCredentials {
 
 class IWifiCredentialsStore {
 public:
+  /**
+   * Releases the interface without owning the concrete storage driver.
+   *
+   * @return Nothing.
+   */
   virtual ~IWifiCredentialsStore() = default;
 
   /**
