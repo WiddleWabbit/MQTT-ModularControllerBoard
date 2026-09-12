@@ -14,6 +14,11 @@ connection edge so reconnection triggers an immediate request.
 * `setUpdateFrequencyMs()` accepts a non-zero interval.
 * `server()`, `updateFrequencyMs()`, and `isSynchronized()` expose current
   configuration and status.
+* `getCurrentTime()` returns the current Unix timestamp only when WiFi and NTP
+  synchronization are available. The timestamp is in UTC seconds since the Unix
+  epoch and can be converted with standard C/C++ time functions.
+* `setTimezone()` accepts a POSIX timezone string, such as `AWST-8`.
+  `getCurrentLocalTime()` returns a broken-down local time after synchronization.
 * `INtpClient` abstracts the asynchronous NTP implementation.
 * `Esp32NtpClient` adapts the ESP32 SNTP APIs; `Esp32Clock` supplies elapsed
   milliseconds.
@@ -27,4 +32,3 @@ but never waits for synchronization.
 `FakeWifiStation`, `FakeClock`, and `FakeNtpClient` verify initial requests,
 periodic requests, reconnection behavior, invalid configuration, update
 forwarding, and synchronized status on the native desktop environment.
-

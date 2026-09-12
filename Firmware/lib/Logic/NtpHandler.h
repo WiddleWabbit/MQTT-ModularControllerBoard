@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctime>
 #include <string>
 
 #include "IClock.h"
@@ -67,6 +68,37 @@ public:
    */
   bool isSynchronized() const;
 
+  /**
+   * Copies the current synchronized Unix timestamp to the caller.
+   *
+   * @param currentTime Destination for seconds since 1970-01-01 UTC.
+   * @return True when WiFi and NTP synchronization are available.
+   */
+  bool getCurrentTime(time_t& currentTime) const;
+
+  /**
+   * Configures the POSIX timezone used for local-time conversion.
+   *
+   * @param timezone POSIX timezone specification.
+   * @return True when accepted.
+   */
+  bool setTimezone(const char* timezone);
+
+  /**
+   * Returns the configured POSIX timezone.
+   *
+   * @return Null-terminated timezone, or empty before configuration.
+   */
+  const char* timezone() const;
+
+  /**
+   * Returns the current synchronized time in the configured timezone.
+   *
+   * @param localTime Destination structure for local time fields.
+   * @return True when synchronized and timezone conversion succeeds.
+   */
+  bool getCurrentLocalTime(struct tm& localTime) const;
+
 private:
   IWifiStation& _wifi;
   IClock& _clock;
@@ -76,4 +108,5 @@ private:
   unsigned long _lastRequestAt = 0;
   bool _hasRequested = false;
   bool _wasConnected = false;
+  std::string _timezoneName;
 };

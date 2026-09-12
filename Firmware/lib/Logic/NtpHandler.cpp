@@ -73,3 +73,38 @@ bool NtpHandler::isSynchronized() const
 {
   return _wifi.isConnected() && _ntp.isSynchronized();
 }
+
+bool NtpHandler::getCurrentTime(time_t& currentTime) const
+{
+  if (!isSynchronized()) {
+    return false;
+  }
+
+  currentTime = _ntp.currentTime();
+  return true;
+}
+
+bool NtpHandler::setTimezone(const char* timezone)
+{
+  if (timezone == nullptr || timezone[0] == '\0') {
+    return false;
+  }
+
+  if (!_ntp.setTimezone(timezone)) {
+    return false;
+  }
+
+  _timezoneName = timezone;
+  return true;
+}
+
+const char* NtpHandler::timezone() const
+{
+  return _timezoneName.c_str();
+}
+
+bool NtpHandler::getCurrentLocalTime(struct tm& localTime) const
+{
+  return isSynchronized() && !_timezoneName.empty() &&
+         _ntp.getLocalTime(localTime);
+}

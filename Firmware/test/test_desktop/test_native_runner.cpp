@@ -44,6 +44,11 @@ extern void test_configurationCanBeChanged();
 extern void test_emptyServerIsRejected();
 extern void test_zeroFrequencyIsRejected();
 extern void test_reportsSynchronizationState();
+extern void test_returnsCurrentTimeWhenSynchronized();
+extern void test_rejectsCurrentTimeWhenNotSynchronized();
+extern void test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady();
+extern void test_setsTimezoneAndReturnsLocalTime();
+extern void test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid();
 
 void setUp()
 {
@@ -101,6 +106,11 @@ int main()
   RUN_TEST(test_emptyServerIsRejected);
   RUN_TEST(test_zeroFrequencyIsRejected);
   RUN_TEST(test_reportsSynchronizationState);
+  RUN_TEST(test_returnsCurrentTimeWhenSynchronized);
+  RUN_TEST(test_rejectsCurrentTimeWhenNotSynchronized);
+  RUN_TEST(test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady);
+  RUN_TEST(test_setsTimezoneAndReturnsLocalTime);
+  RUN_TEST(test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid);
 
   return UNITY_END();
 }

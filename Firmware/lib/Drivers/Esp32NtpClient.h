@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctime>
 #include "INtpClient.h"
 
 class Esp32NtpClient : public INtpClient {
@@ -25,4 +26,15 @@ public:
    * @return True when a synchronized time is available.
    */
   bool isSynchronized() const override;
+
+  /**
+   * Reads the ESP32 system Unix timestamp.
+   *
+   * @return Current time in seconds since 1970-01-01 UTC.
+   */
+  time_t currentTime() const override;
+
+  bool setTimezone(const char* timezone) override;
+
+  bool getLocalTime(struct tm& localTime) const override;
 };

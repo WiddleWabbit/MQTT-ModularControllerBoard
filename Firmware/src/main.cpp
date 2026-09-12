@@ -65,6 +65,9 @@ void setup()
   Serial.println();
   Serial.println("Powered on, Initialising..");
 
+  // Configure local-time conversion before asynchronous NTP synchronization.
+  ntpHandler.setTimezone("AWST-8");
+
   // ========== PSRAM Initialization ==========
   if (psramInit()) { 
     Serial.println("PSRAM initialized");
