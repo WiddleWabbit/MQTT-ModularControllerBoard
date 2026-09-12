@@ -5,7 +5,7 @@
 The firmware is organized as three layers:
 
 * **Interfaces** (`lib/Interfaces/`) define the smallest contracts for time,
-  WiFi, credential storage, scanning, NTP, and system control.
+  serial output, WiFi, credential storage, scanning, NTP, and system control.
 * **Drivers** (`lib/Drivers/`) adapt those contracts to ESP32/Arduino APIs.
 * **Logic** (`lib/Logic/` and `src/class/`) implements state machines and
   application workflows without directly owning hardware APIs where a driver
@@ -13,6 +13,11 @@ The firmware is organized as three layers:
 
 `src/main.cpp` composes the production drivers and calls the non-blocking
 services from Arduino `setup()` and `loop()`.
+
+Serial output follows the same boundary: `ISerial` is injected into
+`WiFiHandler`, while `Esp32Serial` is the only implementation that touches the
+Arduino `Serial` singleton.  This keeps application output ordering testable
+without an ESP32.
 
 ## Dependency direction
 
@@ -38,4 +43,3 @@ pio test -e native
 
 Production builds use `custom-esp32`; desktop fakes and tests are not included
 in that environment.
-

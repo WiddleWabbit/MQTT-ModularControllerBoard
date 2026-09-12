@@ -6,6 +6,7 @@
 #include "Esp32Clock.h"
 #include "Esp32WifiStation.h"
 #include "Esp32NtpClient.h"
+#include "Esp32Serial.h"
 #include "NtpHandler.h"
 
 // ========== Pin Configuration ==========
@@ -37,7 +38,9 @@ const uint8_t VBUS_SNS_PIN = 8;
 
 // ========== Service Construction ==========
 
-WiFiHandler wifi("MQTTController-Setup", "mqttcs");
+Esp32Serial serial;
+WiFiHandler wifi("MQTTController-Setup", "mqttcs", nullptr, nullptr,
+                 nullptr, nullptr, nullptr, &serial);
 Esp32WifiStation ntpWifi;
 Esp32Clock ntpClock;
 Esp32NtpClient ntpClient;
@@ -59,21 +62,22 @@ void setup()
 
   // ========== Serial ==========
 
-  Serial.begin(115200); // Initialize serial communication
+  serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
 
-  Serial.println();
-  Serial.println("Powered on, Initialising..");
+  serial.println();
+  serial.println("Powered on, Initialising..");
 
   // Configure local-time conversion before asynchronous NTP synchronization.
   ntpHandler.setTimezone("AWST-8");
 
   // ========== PSRAM Initialization ==========
   if (psramInit()) { 
-    Serial.println("PSRAM initialized");
-    Serial.println((String)"Memory available in PSRAM : " +ESP.getFreePsram());
+    serial.println("PSRAM initialized");
+    serial.print("Memory available in PSRAM : ");
+    serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
   } else {
-    Serial.println("PSRAM not found or initialization failed");
+    serial.println("PSRAM not found or initialization failed");
     return;
   }
   
@@ -82,7 +86,7 @@ void setup()
   
   // ========== I2C ==========
 
-  Serial.println("Beginning I2C Communication.");
+  serial.println("Beginning I2C Communication.");
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
 
 }
@@ -100,10 +104,10 @@ void loop()
   wifi.reportStatus(); // Print wifi information for debugging
   
   // Debug printing
-  Serial.print("Free Heap Memory: ");
-  Serial.println(ESP.getFreeHeap());
-  Serial.print("Free PSRAM: ");
-  Serial.println(ESP.getFreePsram());
+  serial.print("Free Heap Memory: ");
+  serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
+  serial.print("Free PSRAM: ");
+  serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
 
   delay(1000); // Set a delay so we don't loop too quickly
 

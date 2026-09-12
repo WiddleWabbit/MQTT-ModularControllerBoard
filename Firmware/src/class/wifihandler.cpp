@@ -4,6 +4,7 @@
 #include "Esp32WifiStation.h"
 #include "Esp32WifiCredentialsStore.h"
 #include "Esp32WifiScanner.h"
+#include "Esp32Serial.h"
 
 namespace {
 Esp32WifiStation defaultWifiStation;
@@ -11,12 +12,13 @@ Esp32Clock defaultClock;
 Esp32SystemControl defaultSystemControl;
 Esp32WifiScanner defaultWifiScanner;
 Esp32WifiCredentialsStore defaultCredentialsStore;
+Esp32Serial defaultSerial;
 }
 
 WiFiHandler::WiFiHandler(const char* hostname, const char* apPassword,
                          IWifiStation* wifi, IClock* clock,
                          ISystemControl* system, IWifiScanner* scanner,
-                         IWifiCredentialsStore* store)
+                         IWifiCredentialsStore* store, ISerial* serial)
   : _hostname(hostname),
     _apPassword(apPassword),
     _wifiStation(wifi == nullptr ? defaultWifiStation : *wifi),
@@ -24,6 +26,7 @@ WiFiHandler::WiFiHandler(const char* hostname, const char* apPassword,
     _system(system == nullptr ? defaultSystemControl : *system),
     _wifiScanner(scanner == nullptr ? defaultWifiScanner : *scanner),
     _credentialsStore(store == nullptr ? defaultCredentialsStore : *store),
+    _serial(serial == nullptr ? defaultSerial : *serial),
     _connectionManager(_wifiStation, _clock, _system),
     _setupController(_wifiScanner, _credentialsStore) {}
 
@@ -34,14 +37,14 @@ void WiFiHandler::begin() {
     const WifiCredentials& credentials = _setupController.credentials();
     _ssid = credentials.ssid;
     _password = credentials.password;
-    Serial.println("Found saved credentials – trying Station mode");
+    _serial.println("Found saved credentials – trying Station mode");
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(_hostname);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     startStation();
   } else {
-    Serial.println("No saved credentials – starting captive portal");
+    _serial.println("No saved credentials – starting captive portal");
     startPortal();
   }
 }
@@ -50,11 +53,11 @@ void WiFiHandler::resetCredentials() {
   _setupController.clearCredentials();
   _ssid = "";
   _password = "";
-  Serial.println("Credentials cleared");
+  _serial.println("Credentials cleared");
 }
 
 void WiFiHandler::startStation() {
-  Serial.printf("Connecting to \"%s\"...\n", _ssid.c_str());
+  _serial.printf("Connecting to \"%s\"...\n", _ssid.c_str());
   _connectionManager.start(_ssid.c_str(), _password.c_str());
   _firstConnect = true;
   _portalActive = false;
@@ -67,11 +70,11 @@ void WiFiHandler::startPortal() {
   WiFi.softAP(_hostname, (_apPassword && _apPassword[0]) ? _apPassword : nullptr);
 
   IPAddress apIP = WiFi.softAPIP();
-  Serial.println("Captive portal started");
-  Serial.printf("  SSID    : %s\n", _hostname);
-  Serial.printf("  Password: %s\n", (_apPassword && _apPassword[0]) ? _apPassword : "(open)");
-  Serial.print  ("  IP      : ");
-  Serial.println(apIP);
+  _serial.println("Captive portal started");
+  _serial.printf("  SSID    : %s\n", _hostname);
+  _serial.printf("  Password: %s\n", (_apPassword && _apPassword[0]) ? _apPassword : "(open)");
+  _serial.print("  IP      : ");
+  _serial.println(apIP.toString().c_str());
 
   // Redirect every DNS request to ourselves → triggers captive portal detection
   _dnsServer.start(53, "*", apIP);
@@ -135,8 +138,8 @@ void WiFiHandler::update() {
 
   if (connected) {
     if (_firstConnect) {
-      Serial.print("WiFi connected – IP: ");
-      Serial.println(WiFi.localIP());
+      _serial.print("WiFi connected – IP: ");
+      _serial.println(WiFi.localIP().toString().c_str());
       _firstConnect = false;
     }
     return;
@@ -144,7 +147,7 @@ void WiFiHandler::update() {
 
   // Lost connection
   if (wasConnected) {
-    Serial.println("Lost WiFi connection – reconnecting...");
+    _serial.println("Lost WiFi connection – reconnecting...");
   }
 }
 
@@ -182,13 +185,13 @@ int8_t WiFiHandler::rssi() const {
 
 void WiFiHandler::reportStatus() const {
   if (_portalActive) {
-    Serial.printf("[Portal] Active – %d client(s)  IP: %s\n",
-                  WiFi.softAPgetStationNum(),
-                  WiFi.softAPIP().toString().c_str());
+    _serial.printf("[Portal] Active – %d client(s)  IP: %s\n",
+                   WiFi.softAPgetStationNum(),
+                   WiFi.softAPIP().toString().c_str());
   } else if (isConnected()) {
-    Serial.printf("[STA] %s  RSSI: %d dBm\n",
-                  WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    _serial.printf("[STA] %s  RSSI: %d dBm\n",
+                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
   } else {
-    Serial.println("[STA] Not connected");
+    _serial.println("[STA] Not connected");
   }
 }

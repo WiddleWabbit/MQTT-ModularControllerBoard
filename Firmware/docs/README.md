@@ -11,6 +11,7 @@ desktop test strategy.
   station reconnection workflows.
 * [NTP synchronization](NTP.md) - connection-aware time synchronization and
   scheduling.
+* [Serial console](SERIAL.md) - injected console output and its desktop fake.
 
 The public C++ APIs are documented at their declarations in
 `lib/Interfaces/`, `lib/Drivers/`, `lib/Logic/`, and `src/class/`. Desktop

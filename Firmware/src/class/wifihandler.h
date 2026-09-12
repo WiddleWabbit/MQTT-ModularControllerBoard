@@ -9,6 +9,7 @@
 #include "IWifiStation.h"
 #include "IWifiCredentialsStore.h"
 #include "IWifiScanner.h"
+#include "ISerial.h"
 #include "WifiConnectionManager.h"
 #include "WifiSetupController.h"
 #include "WifiSetupPortalView.h"
@@ -25,6 +26,7 @@ public:
    * @param system Optional system control; the ESP32 control is used when omitted.
    * @param scanner Optional network scanner; the ESP32 scanner is used when omitted.
    * @param store Optional credential store; ESP32 Preferences are used when omitted.
+   * @param serial Optional serial console; the ESP32 serial console is used when omitted.
    */
   WiFiHandler(const char* hostname = "MQTTController-Setup",
              const char* apPassword = nullptr,
@@ -32,7 +34,8 @@ public:
              IClock* clock = nullptr,
              ISystemControl* system = nullptr,
              IWifiScanner* scanner = nullptr,
-             IWifiCredentialsStore* store = nullptr);
+             IWifiCredentialsStore* store = nullptr,
+             ISerial* serial = nullptr);
 
   /**
    * Initializes WiFi setup and starts station or captive-portal mode.
@@ -130,6 +133,7 @@ private:
   ISystemControl& _system;
   IWifiScanner& _wifiScanner;
   IWifiCredentialsStore& _credentialsStore;
+  ISerial& _serial;
   WifiConnectionManager _connectionManager;
   WifiSetupController _setupController;
   WifiSetupPortalView _portalView;

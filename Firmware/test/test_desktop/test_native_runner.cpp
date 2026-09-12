@@ -50,6 +50,18 @@ extern void test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady();
 extern void test_setsTimezoneAndReturnsLocalTime();
 extern void test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid();
 
+extern void test_serial_begin_records_baud_rate();
+extern void test_serial_disconnected_does_not_block_or_record_output();
+extern void test_serial_reconnects_after_starting_disconnected();
+extern void test_serial_disconnect_and_reconnect_preserve_state_safely();
+extern void test_serial_print_and_println_preserve_output_order();
+extern void test_serial_printf_preserves_formatting_and_order();
+extern void test_serial_print_numeric_values();
+extern void test_serial_println_numeric_values_add_one_line_ending();
+extern void test_serial_string_edge_cases_are_safe();
+extern void test_serial_printf_null_format_is_ignored();
+extern void test_serial_printf_empty_format_is_ordered();
+
 void setUp()
 {
 }
@@ -111,6 +123,18 @@ int main()
   RUN_TEST(test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady);
   RUN_TEST(test_setsTimezoneAndReturnsLocalTime);
   RUN_TEST(test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid);
+
+  RUN_TEST(test_serial_begin_records_baud_rate);
+  RUN_TEST(test_serial_disconnected_does_not_block_or_record_output);
+  RUN_TEST(test_serial_reconnects_after_starting_disconnected);
+  RUN_TEST(test_serial_disconnect_and_reconnect_preserve_state_safely);
+  RUN_TEST(test_serial_print_and_println_preserve_output_order);
+  RUN_TEST(test_serial_printf_preserves_formatting_and_order);
+  RUN_TEST(test_serial_print_numeric_values);
+  RUN_TEST(test_serial_println_numeric_values_add_one_line_ending);
+  RUN_TEST(test_serial_string_edge_cases_are_safe);
+  RUN_TEST(test_serial_printf_null_format_is_ignored);
+  RUN_TEST(test_serial_printf_empty_format_is_ordered);
 
   return UNITY_END();
 }
