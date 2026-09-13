@@ -1,6 +1,48 @@
 #include <Arduino.h> // Arduino Code Library
-#include <WiFi.h> // Library for Controlling Wifi
+#include <PubSubClient.h>
+#include <WiFi.h>
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
+
+#include "Esp32Clock.h"
+#include "Esp32NtpAdapter.h"
+#include "Esp32Wifi.h"
+#include "MqttService.h"
+#include "NtpService.h"
+#include "PubSubClientAdapter.h"
+#include "WifiManager.h"
+
+
+// ========== Network Configuration ==========
+
+const char* wifiSsid = "";
+const char* wifiPassword = "";
+const char* mqttHost = "";
+const uint16_t mqttPort = 1883;
+const char* mqttClientId = "watering-controller";
+const char* mqttUsername = nullptr;
+const char* mqttPassword = nullptr;
+
+const MqttSubscription mqttSubscriptions[] = {
+  {"watering-controller/command", 1},
+};
+
+Esp32Clock systemClock;
+Esp32Wifi wifiDriver;
+Esp32NtpAdapter ntpDriver;
+WiFiClient mqttTransport;
+PubSubClient pubSubClient(mqttTransport);
+PubSubClientAdapter mqttDriver(pubSubClient);
+
+WifiManager wifiManager(
+  wifiDriver, systemClock,
+  {wifiSsid, wifiPassword, 15000, 1000, 30000});
+NtpService ntpService(
+  ntpDriver, systemClock,
+  {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 60000});
+MqttService mqttService(
+  mqttDriver, systemClock,
+  {mqttClientId, mqttUsername, mqttPassword, mqttSubscriptions,
+   sizeof(mqttSubscriptions) / sizeof(mqttSubscriptions[0]), 1000, 30000});
 
 // ========== Pin Configuration ==========
 
@@ -28,12 +70,6 @@ const uint8_t MOD3_PIN = 43;
 const uint8_t MOD4_PIN = 1;
 // Specify the USB Vbus sense pin.
 const uint8_t VBUS_SNS_PIN = 8;
-
-// ========== PSRAM Buffering ==========
-
-const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
-const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
-unsigned long psramlastSend = 0;
 
 /**
  * Initializes the ESP32 and all functions.
@@ -66,6 +102,12 @@ void setup()
   Serial.println("Beginning I2C Communication.");
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
 
+  // ========== Networking ==========
+
+  mqttDriver.setServer(mqttHost, mqttPort);
+  wifiManager.begin();
+  ntpService.begin();
+  mqttService.begin();
 }
 
 /**
@@ -75,13 +117,21 @@ void setup()
  */
 void loop()
 {
-  
-  // Debug printing
-  Serial.print("Free Heap Memory: ");
-  Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
-  Serial.print("Free PSRAM: ");
-  Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+  wifiManager.update();
+  ntpService.update();
+  mqttService.update(wifiManager.isConnected());
 
-  delay(1000); // Set a delay so we don't loop too quickly
+  static uint32_t lastReportAt = 0;
+  const uint32_t now = systemClock.millis();
+  if (static_cast<uint32_t>(now - lastReportAt) >= 1000)
+  {
+    lastReportAt = now;
+    Serial.print("Free Heap Memory: ");
+    Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
+    Serial.print("Free PSRAM: ");
+    Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+  }
+
+  delay(10);
 
 }
