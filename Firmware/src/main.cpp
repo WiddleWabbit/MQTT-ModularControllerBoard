@@ -1,14 +1,18 @@
 #include <Arduino.h> // Arduino Code Library
 #include <WiFi.h> // Library for Controlling Wifi
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
-#include "class\wifihandler.h" // Custom Handler for Wifi
 #include "Esp32Clock.h"
+#include "Esp32WifiCredentialsStore.h"
+#include "Esp32SystemControl.h"
 #include "Esp32WifiStation.h"
+#include "Esp32WifiScanner.h"
 #include "Esp32NtpClient.h"
 #include "Esp32MqttClient.h"
 #include "Esp32Serial.h"
+#include "WiFiHandler.h"
 #include "NtpHandler.h"
 #include "MqttManager.h"
+#include "RuntimeCoordinator.h"
 
 // ========== Pin Configuration ==========
 
@@ -40,49 +44,51 @@ const uint8_t VBUS_SNS_PIN = 8;
 // ========== Service Construction ==========
 
 Esp32Serial serial;
-WiFiHandler wifi("MQTTController-Setup", "mqttcs", nullptr, nullptr,
-                 nullptr, nullptr, nullptr, &serial);
-Esp32WifiStation ntpWifi;
-Esp32Clock ntpClock;
+Esp32WifiStation wifiStation;
+Esp32Clock systemClock;
+Esp32SystemControl systemControl;
+Esp32WifiScanner wifiScanner;
+Esp32WifiCredentialsStore credentialsStore;
+WiFiHandler wifi("MQTTController-Setup", "mqttcs", wifiStation, systemClock,
+                 systemControl, wifiScanner, credentialsStore, serial);
 Esp32NtpClient ntpClient;
-NtpHandler ntpHandler(ntpWifi, ntpClock, ntpClient);
-MqttManager* mqttManager = nullptr;
+NtpHandler ntpHandler(wifiStation, systemClock, ntpClient);
 
 // ========== Application Configuration ==========
 
 // Broker values should be loaded from deployment configuration in production.
-const char* MQTT_HOST = "mqtt.local";
-const unsigned int MQTT_PORT = 1883;
-const char* MQTT_CLIENT_ID = "watering-controller";
-const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
+constexpr char mqttHost[] = "mqtt.local";
+constexpr unsigned int mqttPort = 1883;
+constexpr char mqttClientId[] = "watering-controller";
+constexpr unsigned long mqttReconnectIntervalMs = 5000;
+
+/**
+ * Builds the MQTT configuration used for the lifetime of the application.
+ *
+ * @return Complete broker and client configuration.
+ */
+MqttConfig createMqttConfig()
+{
+  MqttConfig config;
+  config.host = mqttHost;
+  config.port = mqttPort;
+  config.clientId = mqttClientId;
+  config.reconnectIntervalMs = mqttReconnectIntervalMs;
+  return config;
+}
+
+MqttConfig mqttConfig = createMqttConfig();
+WiFiClient mqttTransportClient;
+Esp32MqttClient mqttClient(mqttTransportClient, mqttConfig.host.c_str(),
+                           mqttConfig.port);
+MqttManager mqttManager(wifiStation, systemClock, mqttClient, mqttConfig);
+RuntimeCoordinator runtimeCoordinator(ntpHandler, mqttManager);
 
 // ========== PSRAM Buffering ==========
 
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
 const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
 unsigned long psramlastSend = 0;
-
-/**
- * Creates and wires the MQTT services used for the lifetime of the application.
- *
- * Static local objects keep the services alive without exposing their
- * construction details as global state.
- *
- * @return Nothing.
- */
-void setupMqtt()
-{
-  static MqttConfig mqttConfig;
-  mqttConfig.host = MQTT_HOST;
-  mqttConfig.port = MQTT_PORT;
-  mqttConfig.clientId = MQTT_CLIENT_ID;
-  mqttConfig.reconnectIntervalMs = MQTT_RECONNECT_INTERVAL_MS;
-
-  static WiFiClient mqttNetworkClient;
-  static Esp32MqttClient mqttClient(mqttNetworkClient, MQTT_HOST, MQTT_PORT);
-  static MqttManager manager(ntpWifi, ntpClock, mqttClient, mqttConfig);
-  mqttManager = &manager;
-}
 
 /**
  * Initializes serial output, PSRAM, WiFi setup, and I2C.
@@ -115,7 +121,6 @@ void setup()
   
   // ========== WiFi Setup ==========
   wifi.begin();
-  setupMqtt();
   
   // ========== I2C ==========
 
@@ -133,10 +138,7 @@ void loop()
 {
 
   wifi.update(); // Check the wifi connection status and reconnect if necessary
-  ntpHandler.update(); // Synchronize network time without blocking
-  if (mqttManager != nullptr) {
-    mqttManager->update(); // Maintain MQTT and dispatch incoming messages
-  }
+  runtimeCoordinator.update(); // Synchronize NTP and maintain MQTT
   wifi.reportStatus(); // Print wifi information for debugging
   
   // Debug printing

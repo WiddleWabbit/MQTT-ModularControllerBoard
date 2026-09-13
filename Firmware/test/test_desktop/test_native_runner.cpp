@@ -66,6 +66,9 @@ extern void test_mqtt_rejectsSubscriptionFailureAndRetries();
 extern void test_mqtt_subscribesTopicAddedWhileConnected();
 extern void test_mqtt_fakeSupportsSequencedConnectionResults();
 
+extern void test_runtime_updates_ntp_and_mqtt_services();
+extern void test_runtime_does_not_attempt_network_services_without_wifi();
+
 extern void test_serial_begin_records_baud_rate();
 extern void test_serial_disconnected_does_not_block_or_record_output();
 extern void test_serial_reconnects_after_starting_disconnected();
@@ -155,6 +158,9 @@ int main()
   RUN_TEST(test_mqtt_rejectsSubscriptionFailureAndRetries);
   RUN_TEST(test_mqtt_subscribesTopicAddedWhileConnected);
   RUN_TEST(test_mqtt_fakeSupportsSequencedConnectionResults);
+
+  RUN_TEST(test_runtime_updates_ntp_and_mqtt_services);
+  RUN_TEST(test_runtime_does_not_attempt_network_services_without_wifi);
 
   RUN_TEST(test_serial_begin_records_baud_rate);
   RUN_TEST(test_serial_disconnected_does_not_block_or_record_output);
