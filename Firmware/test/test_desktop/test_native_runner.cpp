@@ -50,6 +50,22 @@ extern void test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady();
 extern void test_setsTimezoneAndReturnsLocalTime();
 extern void test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid();
 
+extern void test_mqtt_defaultsToDisconnectedWaitingForWifi();
+extern void test_mqtt_connectsWhenWifiIsAvailable();
+extern void test_mqtt_subscribesConfiguredTopicsAfterConnecting();
+extern void test_mqtt_retriesAfterFailedConnectionAtConfiguredInterval();
+extern void test_mqtt_reconnectsImmediatelyAfterDisconnect();
+extern void test_mqtt_disconnectsWhenWifiIsLost();
+extern void test_mqtt_loopRunsOnlyWhileConnected();
+extern void test_mqtt_publishRequiresConnection();
+extern void test_mqtt_publishFailureIsReturned();
+extern void test_mqtt_routesIncomingMessages();
+extern void test_mqtt_preservesBinaryPayloadLength();
+extern void test_mqtt_rejectsInvalidConfigurationAndTopics();
+extern void test_mqtt_rejectsSubscriptionFailureAndRetries();
+extern void test_mqtt_subscribesTopicAddedWhileConnected();
+extern void test_mqtt_fakeSupportsSequencedConnectionResults();
+
 extern void test_serial_begin_records_baud_rate();
 extern void test_serial_disconnected_does_not_block_or_record_output();
 extern void test_serial_reconnects_after_starting_disconnected();
@@ -123,6 +139,22 @@ int main()
   RUN_TEST(test_reportsSynchronizationOnlyWhenWifiAndNtpAreReady);
   RUN_TEST(test_setsTimezoneAndReturnsLocalTime);
   RUN_TEST(test_rejectsLocalTimeWhenNotSynchronizedOrTimezoneInvalid);
+
+  RUN_TEST(test_mqtt_defaultsToDisconnectedWaitingForWifi);
+  RUN_TEST(test_mqtt_connectsWhenWifiIsAvailable);
+  RUN_TEST(test_mqtt_subscribesConfiguredTopicsAfterConnecting);
+  RUN_TEST(test_mqtt_retriesAfterFailedConnectionAtConfiguredInterval);
+  RUN_TEST(test_mqtt_reconnectsImmediatelyAfterDisconnect);
+  RUN_TEST(test_mqtt_disconnectsWhenWifiIsLost);
+  RUN_TEST(test_mqtt_loopRunsOnlyWhileConnected);
+  RUN_TEST(test_mqtt_publishRequiresConnection);
+  RUN_TEST(test_mqtt_publishFailureIsReturned);
+  RUN_TEST(test_mqtt_routesIncomingMessages);
+  RUN_TEST(test_mqtt_preservesBinaryPayloadLength);
+  RUN_TEST(test_mqtt_rejectsInvalidConfigurationAndTopics);
+  RUN_TEST(test_mqtt_rejectsSubscriptionFailureAndRetries);
+  RUN_TEST(test_mqtt_subscribesTopicAddedWhileConnected);
+  RUN_TEST(test_mqtt_fakeSupportsSequencedConnectionResults);
 
   RUN_TEST(test_serial_begin_records_baud_rate);
   RUN_TEST(test_serial_disconnected_does_not_block_or_record_output);

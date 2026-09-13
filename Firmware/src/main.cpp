@@ -1,13 +1,14 @@
 #include <Arduino.h> // Arduino Code Library
 #include <WiFi.h> // Library for Controlling Wifi
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
-#include <PubSubClient.h> // Library to handle MQTT
 #include "class\wifihandler.h" // Custom Handler for Wifi
 #include "Esp32Clock.h"
 #include "Esp32WifiStation.h"
 #include "Esp32NtpClient.h"
+#include "Esp32MqttClient.h"
 #include "Esp32Serial.h"
 #include "NtpHandler.h"
+#include "MqttManager.h"
 
 // ========== Pin Configuration ==========
 
@@ -45,12 +46,43 @@ Esp32WifiStation ntpWifi;
 Esp32Clock ntpClock;
 Esp32NtpClient ntpClient;
 NtpHandler ntpHandler(ntpWifi, ntpClock, ntpClient);
+MqttManager* mqttManager = nullptr;
+
+// ========== Application Configuration ==========
+
+// Broker values should be loaded from deployment configuration in production.
+const char* MQTT_HOST = "mqtt.local";
+const unsigned int MQTT_PORT = 1883;
+const char* MQTT_CLIENT_ID = "watering-controller";
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 
 // ========== PSRAM Buffering ==========
 
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
 const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
 unsigned long psramlastSend = 0;
+
+/**
+ * Creates and wires the MQTT services used for the lifetime of the application.
+ *
+ * Static local objects keep the services alive without exposing their
+ * construction details as global state.
+ *
+ * @return Nothing.
+ */
+void setupMqtt()
+{
+  static MqttConfig mqttConfig;
+  mqttConfig.host = MQTT_HOST;
+  mqttConfig.port = MQTT_PORT;
+  mqttConfig.clientId = MQTT_CLIENT_ID;
+  mqttConfig.reconnectIntervalMs = MQTT_RECONNECT_INTERVAL_MS;
+
+  static WiFiClient mqttNetworkClient;
+  static Esp32MqttClient mqttClient(mqttNetworkClient, MQTT_HOST, MQTT_PORT);
+  static MqttManager manager(ntpWifi, ntpClock, mqttClient, mqttConfig);
+  mqttManager = &manager;
+}
 
 /**
  * Initializes serial output, PSRAM, WiFi setup, and I2C.
@@ -83,6 +115,7 @@ void setup()
   
   // ========== WiFi Setup ==========
   wifi.begin();
+  setupMqtt();
   
   // ========== I2C ==========
 
@@ -101,6 +134,9 @@ void loop()
 
   wifi.update(); // Check the wifi connection status and reconnect if necessary
   ntpHandler.update(); // Synchronize network time without blocking
+  if (mqttManager != nullptr) {
+    mqttManager->update(); // Maintain MQTT and dispatch incoming messages
+  }
   wifi.reportStatus(); // Print wifi information for debugging
   
   // Debug printing

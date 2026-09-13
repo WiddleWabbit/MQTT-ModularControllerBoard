@@ -11,6 +11,10 @@ The firmware is organized as three layers:
   application workflows without directly owning hardware APIs where a driver
   can be injected.
 
+MQTT follows the same boundary. `IMqttClient` isolates PubSubClient, while
+`MqttManager` owns WiFi-aware connection/reconnection, subscriptions, publish
+policy, and message routing.
+
 `src/main.cpp` composes the production drivers and calls the non-blocking
 services from Arduino `setup()` and `loop()`.
 
@@ -34,6 +38,9 @@ environment's hardware-only test code.  Tests in `test/test_desktop/` inject
 the controllable `Fake*` implementations from `test/test_desktop/fakes/`.
 Fakes record calls and expose state/configuration for success, failure,
 timeouts, and sequencing tests.
+
+`FakeMqttClient` can control connection, publish, and subscription results,
+records all calls, and injects callback payloads (including binary payloads).
 
 Run the complete desktop suite from `Firmware/`:
 
