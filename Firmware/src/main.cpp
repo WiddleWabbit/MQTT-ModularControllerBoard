@@ -1,18 +1,6 @@
 #include <Arduino.h> // Arduino Code Library
 #include <WiFi.h> // Library for Controlling Wifi
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
-#include "Esp32Clock.h"
-#include "Esp32WifiCredentialsStore.h"
-#include "Esp32SystemControl.h"
-#include "Esp32WifiStation.h"
-#include "Esp32WifiScanner.h"
-#include "Esp32NtpClient.h"
-#include "Esp32MqttClient.h"
-#include "Esp32Serial.h"
-#include "WiFiHandler.h"
-#include "NtpHandler.h"
-#include "MqttManager.h"
-#include "RuntimeCoordinator.h"
 
 // ========== Pin Configuration ==========
 
@@ -41,49 +29,6 @@ const uint8_t MOD4_PIN = 1;
 // Specify the USB Vbus sense pin.
 const uint8_t VBUS_SNS_PIN = 8;
 
-// ========== Service Construction ==========
-
-Esp32Serial serial;
-Esp32WifiStation wifiStation;
-Esp32Clock systemClock;
-Esp32SystemControl systemControl;
-Esp32WifiScanner wifiScanner;
-Esp32WifiCredentialsStore credentialsStore;
-WiFiHandler wifi("MQTTController-Setup", "mqttcs", wifiStation, systemClock,
-                 systemControl, wifiScanner, credentialsStore, serial);
-Esp32NtpClient ntpClient;
-NtpHandler ntpHandler(wifiStation, systemClock, ntpClient);
-
-// ========== Application Configuration ==========
-
-// Broker values should be loaded from deployment configuration in production.
-constexpr char mqttHost[] = "mqtt.local";
-constexpr unsigned int mqttPort = 1883;
-constexpr char mqttClientId[] = "watering-controller";
-constexpr unsigned long mqttReconnectIntervalMs = 5000;
-
-/**
- * Builds the MQTT configuration used for the lifetime of the application.
- *
- * @return Complete broker and client configuration.
- */
-MqttConfig createMqttConfig()
-{
-  MqttConfig config;
-  config.host = mqttHost;
-  config.port = mqttPort;
-  config.clientId = mqttClientId;
-  config.reconnectIntervalMs = mqttReconnectIntervalMs;
-  return config;
-}
-
-MqttConfig mqttConfig = createMqttConfig();
-WiFiClient mqttTransportClient;
-Esp32MqttClient mqttClient(mqttTransportClient, mqttConfig.host.c_str(),
-                           mqttConfig.port);
-MqttManager mqttManager(wifiStation, systemClock, mqttClient, mqttConfig);
-RuntimeCoordinator runtimeCoordinator(ntpHandler, mqttManager);
-
 // ========== PSRAM Buffering ==========
 
 const unsigned long PSRAM_BUFFER_OBJECTS = 1440; // 1 Day at one a Minute
@@ -91,7 +36,7 @@ const unsigned long PSRAM_SEND_FREQUENCY = 100; // Send every 100ms
 unsigned long psramlastSend = 0;
 
 /**
- * Initializes serial output, PSRAM, WiFi setup, and I2C.
+ * Initializes the ESP32 and all functions.
  *
  * @return Nothing.
  */
@@ -100,31 +45,25 @@ void setup()
 
   // ========== Serial ==========
 
-  serial.begin(115200); // Initialize serial communication
+  Serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
 
-  serial.println();
-  serial.println("Powered on, Initialising..");
-
-  // Configure local-time conversion before asynchronous NTP synchronization.
-  ntpHandler.setTimezone("AWST-8");
+  Serial.println();
+  Serial.println("Powered on, Initialising..");
 
   // ========== PSRAM Initialization ==========
   if (psramInit()) { 
-    serial.println("PSRAM initialized");
-    serial.print("Memory available in PSRAM : ");
-    serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    Serial.println("PSRAM initialized");
+    Serial.print("Memory available in PSRAM : ");
+    Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
   } else {
-    serial.println("PSRAM not found or initialization failed");
+    Serial.println("PSRAM not found or initialization failed");
     return;
   }
   
-  // ========== WiFi Setup ==========
-  wifi.begin();
-  
   // ========== I2C ==========
 
-  serial.println("Beginning I2C Communication.");
+  Serial.println("Beginning I2C Communication.");
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
 
 }
@@ -136,16 +75,12 @@ void setup()
  */
 void loop()
 {
-
-  wifi.update(); // Check the wifi connection status and reconnect if necessary
-  runtimeCoordinator.update(); // Synchronize NTP and maintain MQTT
-  wifi.reportStatus(); // Print wifi information for debugging
   
   // Debug printing
-  serial.print("Free Heap Memory: ");
-  serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
-  serial.print("Free PSRAM: ");
-  serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+  Serial.print("Free Heap Memory: ");
+  Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
+  Serial.print("Free PSRAM: ");
+  Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
 
   delay(1000); // Set a delay so we don't loop too quickly
 
