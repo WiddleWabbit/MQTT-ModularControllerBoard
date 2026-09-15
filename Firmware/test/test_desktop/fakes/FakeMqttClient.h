@@ -31,6 +31,19 @@ public:
   }
 
   /**
+   * Records the simulated broker endpoint.
+   *
+   * @param host Broker hostname.
+   * @param port Broker TCP port.
+   * @return Nothing.
+   */
+  void setBroker(const char* host, uint16_t port) override
+  {
+    brokerHost = host == nullptr ? "" : host;
+    brokerPort = port;
+  }
+
+  /**
    * Attempts a simulated broker connection.
    *
    * @param clientId MQTT client identifier.
@@ -142,6 +155,8 @@ public:
   std::string lastClientId;
   std::string lastUsername;
   std::string lastPassword;
+  std::string brokerHost;
+  uint16_t brokerPort = 0;
   std::vector<std::string> subscribedTopics;
   std::vector<uint8_t> subscribedQos;
   std::vector<PublishedMessage> publishedMessages;

@@ -72,6 +72,30 @@ public:
   void update(bool networkReady);
 
   /**
+   * Replaces broker settings and forces a fresh connection sequence.
+   *
+   * @param config New broker configuration.
+   * @return Nothing.
+   */
+  void reconfigure(const MqttConfig& config);
+
+  /**
+   * Changes the broker endpoint for subsequent connections.
+   *
+   * @param host Broker hostname.
+   * @param port Broker TCP port.
+   * @return Nothing.
+   */
+  void setBroker(const char* host, uint16_t port);
+
+  /**
+   * Returns the active broker configuration.
+   *
+   * @return Active configuration.
+   */
+  const MqttConfig& config() const;
+
+  /**
    * Publishes a message when the broker is connected.
    *
    * @param topic Topic name.

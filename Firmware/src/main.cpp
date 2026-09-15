@@ -4,23 +4,23 @@
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 
 #include "Esp32Clock.h"
+#include "Esp32NetworkConfigStore.h"
 #include "Esp32NtpAdapter.h"
+#include "Esp32SerialPort.h"
+#include "Esp32UsbVbus.h"
 #include "Esp32Wifi.h"
 #include "MqttService.h"
 #include "NtpService.h"
 #include "PubSubClientAdapter.h"
+#include "NetworkRuntime.h"
+#include "SerialConfigController.h"
 #include "WifiManager.h"
 
+// ========== Pin Configuration ==========
+
+const uint8_t VBUS_SNS_PIN = 8;
 
 // ========== Network Configuration ==========
-
-const char* wifiSsid = "";
-const char* wifiPassword = "";
-const char* mqttHost = "";
-const uint16_t mqttPort = 1883;
-const char* mqttClientId = "watering-controller";
-const char* mqttUsername = nullptr;
-const char* mqttPassword = nullptr;
 
 const MqttSubscription mqttSubscriptions[] = {
   {"watering-controller/command", 1},
@@ -35,16 +35,21 @@ PubSubClientAdapter mqttDriver(pubSubClient);
 
 WifiManager wifiManager(
   wifiDriver, systemClock,
-  {wifiSsid, wifiPassword, 15000, 1000, 30000});
+  {"", "", 15000, 1000, 30000});
 NtpService ntpService(
   ntpDriver, systemClock,
   {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 60000});
 MqttService mqttService(
   mqttDriver, systemClock,
-  {mqttClientId, mqttUsername, mqttPassword, mqttSubscriptions,
+  {"watering-controller", nullptr, nullptr, mqttSubscriptions,
    sizeof(mqttSubscriptions) / sizeof(mqttSubscriptions[0]), 1000, 30000});
-
-// ========== Pin Configuration ==========
+Esp32NetworkConfigStore networkConfigStore;
+Esp32UsbVbus usbVbus(VBUS_SNS_PIN);
+Esp32SerialPort serialPort(Serial);
+NetworkRuntime networkRuntime(
+  networkConfigStore, wifiManager, mqttService);
+SerialConfigController serialConfigController(
+  serialPort, usbVbus, networkRuntime);
 
 // Specify pins to use for I2C.
 const uint8_t SDA_PIN = 4;
@@ -68,9 +73,6 @@ const uint8_t MOD1_PIN = 40;
 const uint8_t MOD2_PIN = 42;
 const uint8_t MOD3_PIN = 43;
 const uint8_t MOD4_PIN = 1;
-// Specify the USB Vbus sense pin.
-const uint8_t VBUS_SNS_PIN = 8;
-
 /**
  * Initializes the ESP32 and all functions.
  *
@@ -84,30 +86,41 @@ void setup()
   Serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
 
-  Serial.println();
-  Serial.println("Powered on, Initialising..");
+  if (usbVbus.isPresent())
+  {
+    Serial.println();
+    Serial.println("Powered on, Initialising..");
+  }
 
   // ========== PSRAM Initialization ==========
   if (psramInit()) { 
-    Serial.println("PSRAM initialized");
-    Serial.print("Memory available in PSRAM : ");
-    Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    if (usbVbus.isPresent())
+    {
+      Serial.println("PSRAM initialized");
+      Serial.print("Memory available in PSRAM : ");
+      Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    }
   } else {
-    Serial.println("PSRAM not found or initialization failed");
+    if (usbVbus.isPresent())
+    {
+      Serial.println("PSRAM not found or initialization failed");
+    }
     return;
   }
   
   // ========== I2C ==========
 
-  Serial.println("Beginning I2C Communication.");
+  if (usbVbus.isPresent())
+  {
+    Serial.println("Beginning I2C Communication.");
+  }
   Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
 
   // ========== Networking ==========
 
-  mqttDriver.setServer(mqttHost, mqttPort);
-  wifiManager.begin();
+  networkRuntime.begin(
+    {"", "", "", 1883, "watering-controller", nullptr, nullptr});
   ntpService.begin();
-  mqttService.begin();
 }
 
 /**
@@ -120,16 +133,20 @@ void loop()
   wifiManager.update();
   ntpService.update();
   mqttService.update(wifiManager.isConnected());
+  serialConfigController.update();
 
   static uint32_t lastReportAt = 0;
   const uint32_t now = systemClock.millis();
   if (static_cast<uint32_t>(now - lastReportAt) >= 1000)
   {
     lastReportAt = now;
-    Serial.print("Free Heap Memory: ");
-    Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
-    Serial.print("Free PSRAM: ");
-    Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    if (usbVbus.isPresent())
+    {
+      Serial.print("Free Heap Memory: ");
+      Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));
+      Serial.print("Free PSRAM: ");
+      Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
+    }
   }
 
   delay(10);

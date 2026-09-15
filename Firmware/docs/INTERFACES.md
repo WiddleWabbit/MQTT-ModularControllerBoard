@@ -47,3 +47,22 @@ The production adapters are intentionally thin: `Esp32Wifi` uses `WiFi`,
 `Esp32NtpAdapter` uses `configTime()` and the system epoch, `Esp32Clock` uses
 Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 `PubSubClient`.
+
+## `INetworkConfigStore`
+
+- `load()` copies a complete saved configuration into caller-owned storage and
+  returns false when no valid configuration exists.
+- `save()` persists all fields and returns false on storage failure.
+- Fakes must expose load/save results and record calls.
+
+## `IUsbVbus`
+
+- `isPresent()` is a nonblocking snapshot of the VBUS sense input.
+- Fakes must be able to toggle presence between calls.
+
+## `ISerialPort`
+
+- `available()` reports pending bytes, `read()` consumes one byte, and
+  `writeLine()` emits one response line.
+- The serial controller must not consume or emit bytes while VBUS is absent.
+- Fakes must provide queued input and inspectable output.

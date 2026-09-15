@@ -10,6 +10,11 @@
 #include "fakes/FakeNtpAdapter.h"
 #include "fakes/FakeWifi.h"
 
+void testRuntimeLoadsPersistedConfiguration();
+void testSerialStagesUntilApplyAndGatesUsb();
+void testRuntimeApplyFailureDoesNotChangeActiveConfiguration();
+void testAppliedConfigurationIsOwnedFromLaterStagedEdits();
+
 namespace
 {
 FakeClock* clockForCallback = nullptr;
@@ -423,5 +428,9 @@ int main()
   RUN_TEST(testMqttReportsPublicationFailure);
   RUN_TEST(testMqttBacksOffWhenSubscriptionFails);
   RUN_TEST(testWifiAndMqttComposeThroughInterfaces);
+  RUN_TEST(testRuntimeLoadsPersistedConfiguration);
+  RUN_TEST(testSerialStagesUntilApplyAndGatesUsb);
+  RUN_TEST(testRuntimeApplyFailureDoesNotChangeActiveConfiguration);
+  RUN_TEST(testAppliedConfigurationIsOwnedFromLaterStagedEdits);
   return UNITY_END();
 }

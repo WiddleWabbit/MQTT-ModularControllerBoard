@@ -24,6 +24,15 @@ public:
   virtual void setCallback(MqttMessageCallback callback, void* context) = 0;
 
   /**
+   * Selects the broker endpoint used by future connections.
+   *
+   * @param host Broker hostname.
+   * @param port Broker TCP port.
+   * @return Nothing.
+   */
+  virtual void setBroker(const char* host, uint16_t port) = 0;
+
+  /**
    * Attempts one broker connection.
    *
    * @param clientId MQTT client identifier.

@@ -73,6 +73,19 @@ void WifiManager::update()
   }
 }
 
+void WifiManager::reconfigure(const WifiManagerConfig& config)
+{
+  _wifi.disconnect();
+  _config = config;
+  _state = WifiManagerState::Idle;
+  _retryDelayMs = 0;
+}
+
+const WifiManagerConfig& WifiManager::config() const
+{
+  return _config;
+}
+
 /**
  * Reads the current manager state.
  *

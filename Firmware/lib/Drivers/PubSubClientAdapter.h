@@ -25,6 +25,7 @@ public:
    * @return Nothing.
    */
   void setServer(const char* host, uint16_t port);
+  void setBroker(const char* host, uint16_t port) override;
 
   /**
    * Installs the inbound message callback.

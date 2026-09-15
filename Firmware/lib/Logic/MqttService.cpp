@@ -100,6 +100,24 @@ void MqttService::update(bool networkReady)
   _retryDelayMs = _config.initialRetryDelayMs;
 }
 
+void MqttService::reconfigure(const MqttConfig& config)
+{
+  _client.disconnect();
+  _config = config;
+  _state = MqttServiceState::Idle;
+  _retryDelayMs = 0;
+}
+
+void MqttService::setBroker(const char* host, uint16_t port)
+{
+  _client.setBroker(host, port);
+}
+
+const MqttConfig& MqttService::config() const
+{
+  return _config;
+}
+
 /**
  * Publishes a message when the broker is connected.
  *

@@ -28,6 +28,11 @@ void PubSubClientAdapter::setServer(const char* host, uint16_t port)
   _client.setServer(host, port);
 }
 
+void PubSubClientAdapter::setBroker(const char* host, uint16_t port)
+{
+  setServer(host, port);
+}
+
 /**
  * Installs the inbound message callback.
  *

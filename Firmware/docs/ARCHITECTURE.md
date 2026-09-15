@@ -22,9 +22,13 @@ ESP32 APIs. This keeps each module deep: callers invoke `begin`, `update`, or
 ## Runtime composition
 
 `src/main.cpp` constructs the ESP32 drivers, injects them into the services,
-and calls each service from `loop()`. `update()` methods never wait for a
-network operation. WiFi and MQTT retries use wrap-safe elapsed-time checks and
-exponential backoff.
+and calls each service from `loop()`. `Esp32NetworkConfigStore` hides NVS
+storage, while `NetworkRuntime` applies a complete configuration to WiFi and
+MQTT only after it has been persisted. `SerialConfigController` stages
+line-oriented commands and changes runtime settings only for an explicit
+`apply` command. `Esp32UsbVbus` gates both serial input and responses.
+`update()` methods never wait for a network operation. WiFi and MQTT retries
+use wrap-safe elapsed-time checks and exponential backoff.
 
 ## Desktop testing
 
@@ -35,7 +39,9 @@ pio test -e native
 ```
 
 The fakes simulate link state, time, broker outcomes, subscriptions,
-publications, and inbound messages. This covers state transitions, retry
-backoff, failures, callbacks, and WiFi-to-MQTT interaction without hardware.
+publications, inbound messages, persisted settings, USB presence, and serial
+bytes. This covers state transitions, retry backoff, failures, callbacks,
+configuration staging, apply failure, and WiFi-to-MQTT interaction without
+hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

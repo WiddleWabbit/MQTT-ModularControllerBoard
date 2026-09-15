@@ -52,6 +52,21 @@ public:
   void update();
 
   /**
+   * Replaces connection settings and restarts the state machine.
+   *
+   * @param config New connection and retry configuration.
+   * @return Nothing.
+   */
+  void reconfigure(const WifiManagerConfig& config);
+
+  /**
+   * Returns the active WiFi configuration.
+   *
+   * @return Active configuration.
+   */
+  const WifiManagerConfig& config() const;
+
+  /**
    * Reads the current manager state.
    *
    * @return Current state.
