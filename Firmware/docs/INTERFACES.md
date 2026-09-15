@@ -55,14 +55,11 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 - `save()` persists all fields and returns false on storage failure.
 - Fakes must expose load/save results and record calls.
 
-## `IUsbVbus`
-
-- `isPresent()` is a nonblocking snapshot of the VBUS sense input.
-- Fakes must be able to toggle presence between calls.
-
 ## `ISerialPort`
 
+- `isPlugged()` is a nonblocking snapshot of the USB serial plug state.
 - `available()` reports pending bytes, `read()` consumes one byte, and
   `writeLine()` emits one response line.
-- The serial controller must not consume or emit bytes while VBUS is absent.
+- The serial controller must not consume or emit bytes while the USB serial
+  link is unplugged.
 - Fakes must provide queued input and inspectable output.

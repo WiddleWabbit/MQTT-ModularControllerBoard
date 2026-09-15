@@ -11,6 +11,13 @@ public:
   virtual ~ISerialPort() = default;
 
   /**
+   * Reports whether the USB serial link is physically plugged in.
+   *
+   * @return True when the USB serial link is present.
+   */
+  virtual bool isPlugged() const = 0;
+
+  /**
    * Reports the number of bytes ready to read.
    *
    * @return Number of available bytes.

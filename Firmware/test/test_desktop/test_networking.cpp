@@ -11,7 +11,7 @@
 #include "fakes/FakeWifi.h"
 
 void testRuntimeLoadsPersistedConfiguration();
-void testSerialStagesUntilApplyAndGatesUsb();
+void testSerialStagesUntilApplyAndGatesOnPlugState();
 void testRuntimeApplyFailureDoesNotChangeActiveConfiguration();
 void testAppliedConfigurationIsOwnedFromLaterStagedEdits();
 
@@ -429,7 +429,7 @@ int main()
   RUN_TEST(testMqttBacksOffWhenSubscriptionFails);
   RUN_TEST(testWifiAndMqttComposeThroughInterfaces);
   RUN_TEST(testRuntimeLoadsPersistedConfiguration);
-  RUN_TEST(testSerialStagesUntilApplyAndGatesUsb);
+  RUN_TEST(testSerialStagesUntilApplyAndGatesOnPlugState);
   RUN_TEST(testRuntimeApplyFailureDoesNotChangeActiveConfiguration);
   RUN_TEST(testAppliedConfigurationIsOwnedFromLaterStagedEdits);
   return UNITY_END();

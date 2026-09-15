@@ -7,7 +7,6 @@
 #include "Esp32NetworkConfigStore.h"
 #include "Esp32NtpAdapter.h"
 #include "Esp32SerialPort.h"
-#include "Esp32UsbVbus.h"
 #include "Esp32Wifi.h"
 #include "MqttService.h"
 #include "NtpService.h"
@@ -17,8 +16,6 @@
 #include "WifiManager.h"
 
 // ========== Pin Configuration ==========
-
-const uint8_t VBUS_SNS_PIN = 8;
 
 // ========== Network Configuration ==========
 
@@ -44,12 +41,11 @@ MqttService mqttService(
   {"watering-controller", nullptr, nullptr, mqttSubscriptions,
    sizeof(mqttSubscriptions) / sizeof(mqttSubscriptions[0]), 1000, 30000});
 Esp32NetworkConfigStore networkConfigStore;
-Esp32UsbVbus usbVbus(VBUS_SNS_PIN);
 Esp32SerialPort serialPort(Serial);
 NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
 SerialConfigController serialConfigController(
-  serialPort, usbVbus, networkRuntime);
+  serialPort, networkRuntime);
 
 // Specify pins to use for I2C.
 const uint8_t SDA_PIN = 4;
@@ -86,7 +82,7 @@ void setup()
   Serial.begin(115200); // Initialize serial communication
   delay(2000); // Add a small delay so that serial is full initialised for setup.
 
-  if (usbVbus.isPresent())
+  if (serialPort.isPlugged())
   {
     Serial.println();
     Serial.println("Powered on, Initialising..");
@@ -94,14 +90,14 @@ void setup()
 
   // ========== PSRAM Initialization ==========
   if (psramInit()) { 
-    if (usbVbus.isPresent())
+    if (serialPort.isPlugged())
     {
       Serial.println("PSRAM initialized");
       Serial.print("Memory available in PSRAM : ");
       Serial.println(static_cast<unsigned long>(ESP.getFreePsram()));
     }
   } else {
-    if (usbVbus.isPresent())
+    if (serialPort.isPlugged())
     {
       Serial.println("PSRAM not found or initialization failed");
     }
@@ -110,7 +106,7 @@ void setup()
   
   // ========== I2C ==========
 
-  if (usbVbus.isPresent())
+  if (serialPort.isPlugged())
   {
     Serial.println("Beginning I2C Communication.");
   }
@@ -140,7 +136,7 @@ void loop()
   if (static_cast<uint32_t>(now - lastReportAt) >= 1000)
   {
     lastReportAt = now;
-    if (usbVbus.isPresent())
+    if (serialPort.isPlugged())
     {
       Serial.print("Free Heap Memory: ");
       Serial.println(static_cast<unsigned long>(ESP.getFreeHeap()));

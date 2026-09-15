@@ -4,7 +4,6 @@
 
 #include "INetworkConfigStore.h"
 #include "ISerialPort.h"
-#include "IUsbVbus.h"
 #include "NetworkRuntime.h"
 
 /**
@@ -14,14 +13,12 @@ class SerialConfigController
 {
 public:
   /**
-   * Creates a USB-gated serial configuration controller.
+   * Creates a serial-link-gated configuration controller.
    *
    * @param serial Byte-oriented serial port.
-   * @param usb USB VBUS detector.
    * @param runtime Runtime configuration coordinator.
    */
-  SerialConfigController(ISerialPort& serial, IUsbVbus& usb,
-                         NetworkRuntime& runtime);
+  SerialConfigController(ISerialPort& serial, NetworkRuntime& runtime);
 
   /**
    * Consumes complete lines currently available from the serial port.
@@ -32,7 +29,6 @@ public:
 
 private:
   ISerialPort& _serial;
-  IUsbVbus& _usb;
   NetworkRuntime& _runtime;
   std::string _line;
   NetworkConfig _staged{};
@@ -52,7 +48,7 @@ private:
   void _handleLine(const std::string& line);
 
   /**
-   * Sends a response only while USB VBUS is present.
+   * Sends a response only while the USB serial link is plugged in.
    *
    * @param response Response text.
    * @return Nothing.

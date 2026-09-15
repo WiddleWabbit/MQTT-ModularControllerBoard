@@ -1,8 +1,13 @@
 #include "Esp32SerialPort.h"
 
-Esp32SerialPort::Esp32SerialPort(Stream& serial)
+Esp32SerialPort::Esp32SerialPort(HWCDC& serial)
   : _serial(serial)
 {
+}
+
+bool Esp32SerialPort::isPlugged() const
+{
+  return _serial.isPlugged();
 }
 
 size_t Esp32SerialPort::available() const

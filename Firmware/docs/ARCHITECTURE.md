@@ -24,9 +24,9 @@ ESP32 APIs. This keeps each module deep: callers invoke `begin`, `update`, or
 `src/main.cpp` constructs the ESP32 drivers, injects them into the services,
 and calls each service from `loop()`. `Esp32NetworkConfigStore` hides NVS
 storage, while `NetworkRuntime` applies a complete configuration to WiFi and
-MQTT only after it has been persisted. `SerialConfigController` stages
-line-oriented commands and changes runtime settings only for an explicit
-`apply` command. `Esp32UsbVbus` gates both serial input and responses.
+MQTT only after it has been persisted. `SerialConfigController` stages line-oriented commands and changes runtime
+settings only for an explicit `apply` command. `Esp32SerialPort` uses the
+ESP32 USB CDC plug state to gate serial input and responses.
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff.
 

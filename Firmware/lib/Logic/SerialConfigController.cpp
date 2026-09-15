@@ -2,9 +2,9 @@
 
 #include <cstdlib>
 
-SerialConfigController::SerialConfigController(ISerialPort& serial, IUsbVbus& usb,
+SerialConfigController::SerialConfigController(ISerialPort& serial,
                                                NetworkRuntime& runtime)
-  : _serial(serial), _usb(usb), _runtime(runtime)
+  : _serial(serial), _runtime(runtime)
 {
   const NetworkConfig& active = _runtime.config();
   _ssid = active.wifiSsid == nullptr ? "" : active.wifiSsid;
@@ -19,7 +19,7 @@ SerialConfigController::SerialConfigController(ISerialPort& serial, IUsbVbus& us
 
 void SerialConfigController::update()
 {
-  if (!_usb.isPresent())
+  if (!_serial.isPlugged())
   {
     return;
   }
@@ -114,7 +114,7 @@ void SerialConfigController::_handleLine(const std::string& line)
 
 void SerialConfigController::_respond(const char* response)
 {
-  if (_usb.isPresent())
+  if (_serial.isPlugged())
   {
     _serial.writeLine(response);
   }

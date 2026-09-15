@@ -6,7 +6,6 @@
 #include "fakes/FakeMqttClient.h"
 #include "fakes/FakeNetworkConfigStore.h"
 #include "fakes/FakeSerialPort.h"
-#include "fakes/FakeUsbVbus.h"
 #include "fakes/FakeWifi.h"
 
 namespace
@@ -44,7 +43,7 @@ void testRuntimeLoadsPersistedConfiguration()
   TEST_ASSERT_EQUAL_STRING("saved", wifiManager.config().ssid);
 }
 
-void testSerialStagesUntilApplyAndGatesUsb()
+void testSerialStagesUntilApplyAndGatesOnPlugState()
 {
   FakeNetworkConfigStore store;
   FakeClock clock;
@@ -55,8 +54,7 @@ void testSerialStagesUntilApplyAndGatesUsb()
   NetworkRuntime runtime(store, wifiManager, mqtt);
   runtime.begin(config());
   FakeSerialPort serial;
-  FakeUsbVbus usb;
-  SerialConfigController controller(serial, usb, runtime);
+  SerialConfigController controller(serial, runtime);
 
   serial.feed("set wifi.ssid new-network\n");
   controller.update();
@@ -68,11 +66,16 @@ void testSerialStagesUntilApplyAndGatesUsb()
   TEST_ASSERT_EQUAL_STRING("new-network", runtime.config().wifiSsid);
   TEST_ASSERT_EQUAL(1, store.saveCallCount);
 
-  usb.present = false;
+  serial.plugged = false;
   serial.feed("set mqtt.host hidden\napply\n");
   controller.update();
   TEST_ASSERT_EQUAL_STRING("new-network", runtime.config().wifiSsid);
   TEST_ASSERT_EQUAL(1, store.saveCallCount);
+
+  serial.plugged = true;
+  controller.update();
+  TEST_ASSERT_EQUAL_STRING("hidden", runtime.config().mqttHost);
+  TEST_ASSERT_EQUAL(2, store.saveCallCount);
 }
 
 void testRuntimeApplyFailureDoesNotChangeActiveConfiguration()
@@ -103,8 +106,7 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
   NetworkRuntime runtime(store, wifiManager, mqtt);
   runtime.begin(config());
   FakeSerialPort serial;
-  FakeUsbVbus usb;
-  SerialConfigController controller(serial, usb, runtime);
+  SerialConfigController controller(serial, runtime);
 
   serial.feed("set wifi.ssid applied-network\napply\n");
   controller.update();

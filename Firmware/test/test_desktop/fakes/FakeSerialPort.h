@@ -9,6 +9,11 @@
 class FakeSerialPort : public ISerialPort
 {
 public:
+  bool isPlugged() const override
+  {
+    return plugged;
+  }
+
   size_t available() const override
   {
     return input.size();
@@ -40,4 +45,5 @@ public:
 
   std::deque<int> input;
   std::vector<std::string> output;
+  bool plugged = true;
 };

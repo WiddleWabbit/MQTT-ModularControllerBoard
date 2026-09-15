@@ -8,7 +8,7 @@ alter the active configuration before `apply`. A failed save never changes the
 active configuration.
 
 `SerialConfigController` accepts complete newline-terminated commands while
-USB VBUS is present:
+the USB serial link is plugged in:
 
 ```text
 set wifi.ssid garden
@@ -23,8 +23,9 @@ apply
 
 `set` commands update a staging copy only. `apply` validates persistence and
 then restarts the WiFi and MQTT state machines. Unknown keys and invalid ports
-are rejected. Serial input and responses are suppressed when VBUS is absent.
+are rejected. Serial input and responses are suppressed when the USB serial
+link is unplugged.
 
-Native Unity tests use `FakeNetworkConfigStore`, `FakeUsbVbus`, and
-`FakeSerialPort` to verify staging, explicit apply, persistence failure, and
-USB gating without hardware.
+Native Unity tests use `FakeNetworkConfigStore` and `FakeSerialPort` to verify
+staging, explicit apply, persistence failure, and USB serial plug gating
+without hardware.

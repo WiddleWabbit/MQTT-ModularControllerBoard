@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <HWCDC.h>
 
 #include "ISerialPort.h"
 
@@ -10,11 +11,12 @@
 class Esp32SerialPort : public ISerialPort
 {
 public:
-  explicit Esp32SerialPort(Stream& serial);
+  explicit Esp32SerialPort(HWCDC& serial);
+  bool isPlugged() const override;
   size_t available() const override;
   int read() override;
   void writeLine(const char* line) override;
 
 private:
-  Stream& _serial;
+  HWCDC& _serial;
 };
