@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WifiManager Interactive Documentation</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --text: #e4e4e7;
+      --panel: #141416;
+      --border: #27272a;
+      --accent: #d4d4d8;
+      --shadow: 0 12px 40px rgba(0,0,0,0.55);
+      --section-bg: #111113;
+      --section-border: #3f3f46;
+      --section-title: #a1a1aa;
+      --node-bg: #18181b;
+      --node-border: #3f3f46;
+      --node-text: #e4e4e7;
+      --link: #c4b5fd;
+      --link-hover: #ddd6fe;
+      --muted: #71717a;
+    }
+
+    [data-theme="light"] {
+      --bg: #f4f4f5;
+      --text: #18181b;
+      --panel: #ffffff;
+      --border: #e4e4e7;
+      --accent: #3f3f46;
+      --shadow: 0 12px 40px rgba(0,0,0,0.1);
+      --section-bg: #eaeaec;
+      --section-border: #d4d4d8;
+      --section-title: #52525b;
+      --node-bg: #ffffff;
+      --node-border: #d4d4d8;
+      --node-text: #18181b;
+      --link: #6d28d9;
+      --link-hover: #5b21b6;
+      --muted: #71717a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    #diagram-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      cursor: grab;
+    }
+    #diagram-container:active { cursor: grabbing; }
+
+    #mermaid-wrapper {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: none;
+      transform-origin: 0 0;
+      will-change: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #mermaid-wrapper .mermaid,
+    #mermaid-wrapper svg {
+      display: block;
+    }
+
+    #mermaid-wrapper svg {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      overflow: visible;
+    }
+
+    /* Sections */
+    .cluster rect {
+      fill: var(--section-bg) !important;
+      stroke: var(--section-border) !important;
+      stroke-width: 1px !important;
+      rx: 10px !important;
+      ry: 10px !important;
+    }
+    .cluster-label .nodeLabel,
+    .cluster span {
+      color: var(--section-title) !important;
+      fill: var(--section-title) !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      letter-spacing: 0.03em;
+    }
+
+    /* Nodes – tighter, smaller text */
+    .node rect,
+    .node polygon,
+    .node circle,
+    .node path {
+      fill: var(--node-bg) !important;
+      stroke: var(--node-border) !important;
+      stroke-width: 1.25px !important;
+    }
+    .node .label,
+    .node .nodeLabel,
+    .node span,
+    .node foreignObject,
+    .nodeLabel {
+      color: var(--node-text) !important;
+      font-size: 12px !important;
+    }
+
+    /* Reduce default Mermaid node padding feel */
+    .nodeLabel {
+      padding: 1px 2px !important;
+    }
+
+    .edgePath path {
+      stroke: var(--section-border) !important;
+      stroke-width: 1.25px !important;
+    }
+    .arrowheadPath {
+      fill: var(--section-border) !important;
+      stroke: none !important;
+    }
+
+    /* Inline references inside cells */
+    .ref {
+      color: var(--link) !important;
+      cursor: pointer !important;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      transition: color 0.15s, text-decoration-color 0.15s;
+      font-weight: 500;
+    }
+    .ref:hover {
+      color: var(--link-hover) !important;
+      text-decoration-color: var(--link-hover);
+    }
+
+    /* Floating controls */
+    .fab {
+      position: fixed;
+      z-index: 30;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+      user-select: none;
+    }
+    .fab:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    .fab:active { transform: scale(0.94); }
+
+    #btn-zoom-in  { bottom: 140px; right: 20px; }
+    #btn-zoom-out { bottom: 90px;  right: 20px; }
+    #btn-reset    { bottom: 40px;  right: 20px; }
+    #theme-toggle { bottom: 20px;  left: 20px;  border-radius: 50%; }
+
+    /* ========== Structured Popup ========== */
+    #backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 90;
+      display: none;
+      backdrop-filter: blur(5px);
+    }
+    #backdrop.visible { display: block; }
+
+    #popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      width: min(520px, 94vw);
+      max-height: 80vh;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      padding: 0;
+    }
+    #popup.visible { display: block; }
+
+    #popup .popup-header {
+      padding: 22px 28px 16px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+      z-index: 2;
+    }
+    #popup .popup-header h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      padding-right: 32px;
+    }
+    #popup .popup-header .kind {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    #popup .close {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--text);
+      opacity: 0.45;
+      padding: 4px;
+    }
+    #popup .close:hover { opacity: 1; }
+
+    #popup .popup-body {
+      padding: 18px 28px 28px;
+    }
+
+    #popup .docstring {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+
+    #popup .section-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin: 18px 0 10px;
+      font-weight: 600;
+    }
+
+    /* Method list */
+    .method {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .method-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      background: var(--bg);
+      transition: background 0.12s;
+    }
+    .method-header:hover { background: var(--section-bg); }
+    .method-header .name {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--link);
+    }
+    .method-header .sig {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .method-header .chevron {
+      font-size: 0.7rem;
+      opacity: 0.5;
+      transition: transform 0.15s;
+    }
+    .method.open .chevron { transform: rotate(90deg); }
+
+    .method-body {
+      display: none;
+      padding: 12px 14px 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .method.open .method-body { display: block; }
+
+    .method-body .desc { margin-bottom: 10px; opacity: 0.9; }
+
+    .method-body .args-title,
+    .method-body .returns-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 8px 0 4px;
+      font-weight: 600;
+    }
+    .method-body ul {
+      margin: 0 0 0 16px;
+      padding: 0;
+    }
+    .method-body li {
+      margin-bottom: 3px;
+      font-size: 0.85rem;
+    }
+    .method-body code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.82rem;
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <div id="diagram-container">
+    <div id="mermaid-wrapper">
+      <div class="mermaid">
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'primaryColor': '#18181b',
+    'primaryTextColor': '#e4e4e7',
+    'primaryBorderColor': '#3f3f46',
+    'lineColor': '#3f3f46',
+    'secondaryColor': '#111113',
+    'tertiaryColor': '#18181b',
+    'clusterBkg': '#111113',
+    'clusterBorder': '#3f3f46',
+    'titleColor': '#a1a1aa',
+    'fontSize': '14px'
+  },
+  'flowchart': {
+    'htmlLabels': true,
+    'curve': 'basis',
+    'padding': 12,
+    'nodeSpacing': 24,
+    'rankSpacing': 32
+  },
+  'securityLevel': 'loose'
+}}%%
+
+flowchart TD
+   subgraph Construction["Construction and configuration"]
+       direction TB
+       A["<span class='ref' data-ref='WifiManager'>WifiManager</span>(<span class='ref' data-ref='IWifi'>IWifi</span>&amp;, <span class='ref' data-ref='IClock'>IClock</span>&amp;, <span class='ref' data-ref='WifiManagerConfig'>WifiManagerConfig</span>)"]
+       B["Stores injected services<br/>retry delay = initialRetryDelayMs"]
+   end
+
+   subgraph Lifecycle["Public lifecycle"]
+       direction TB
+       C["<span class='ref' data-ref='WifiManager'>begin()</span>"]
+       D["state = Connecting<br/>_startConnectionAttempt()"]
+       E["<span class='ref' data-ref='WifiManager'>update()</span><br/>nonblocking state-machine tick"]
+       F{"Current state?"}
+   end
+
+   subgraph Connecting["Connecting"]
+       direction TB
+       G["<span class='ref' data-ref='IWifi'>IWifi::status()</span> == Connected"]
+       H["state = Connected<br/>reset retry delay"]
+       I{"connectTimeoutMs elapsed?"}
+       J["<span class='ref' data-ref='IWifi'>IWifi::disconnect()</span><br/><span class='ref' data-ref='WifiManager'>_scheduleRetry()</span>"]
+   end
+
+   subgraph Connected["Connected"]
+       direction TB
+       K["status() != Connected?"]
+       L["disconnect() → _scheduleRetry()"]
+   end
+
+   subgraph Backoff["Backoff and retry"]
+       direction TB
+       M["state = Backoff<br/>retryAvailableAt = now + retryDelayMs"]
+       N["Double delay, capped at maxRetryDelayMs<br/>(overflow-safe)"]
+       O{"<span class='ref' data-ref='WifiManager'>_isDue()</span>?"}
+       P["<span class='ref' data-ref='WifiManager'>_startConnectionAttempt()</span><br/><span class='ref' data-ref='IWifi'>begin</span>(ssid, password)"]
+   end
+
+   subgraph Runtime["Firmware integration"]
+       direction TB
+       Q["<span class='ref' data-ref='NetworkRuntime'>NetworkRuntime</span>::begin/apply()"]
+       R["<span class='ref' data-ref='main'>loop()</span>"]
+       S["<span class='ref' data-ref='Esp32Wifi'>Esp32Wifi</span><br/>implements IWifi"]
+   end
+
+   A --> B
+   C --> D --> E
+   E --> F
+   F -->|Connecting| G
+   G -->|yes| H
+   G -->|no| I
+   I -->|yes| J --> M
+   I -->|no| E
+   F -->|Connected| K
+   K -->|yes| E
+   K -->|no| L --> M
+   F -->|Backoff| O
+   O -->|yes| P --> E
+   O -->|no| E
+   Q -->|reconfigure + begin| C
+   R -->|every loop| E
+   S -.->|platform adapter| G
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       STRUCTURED CLASS / METHOD DATA
+       data-ref on .ref spans in the diagram must match data-id here
+       ========================================================= -->
+  <div id="class-data" style="display:none">
+
+    <div class="class-info" data-id="WifiManager">
+      <div class="kind">class · Firmware/lib/Logic/WifiManager.h/.cpp</div>
+      <h2>WifiManager</h2>
+      <div class="docstring">
+        Owns nonblocking WiFi connection state and retry timing. It receives an
+        <code>IWifi</code> station interface and monotonic <code>IClock</code>, starts
+        attempts without waiting, times out failed connections, and uses capped
+        exponential backoff.
+      </div>
+      <div class="methods">
+        <div class="method">
+          <div class="method-header">
+            <span class="name">begin</span>
+            <span class="sig">()</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body">
+            <div class="desc">Resets the retry delay, enters <code>Connecting</code>, and starts the first station attempt.</div>
+          </div>
+        </div>
+        <div class="method">
+          <div class="method-header">
+            <span class="name">update</span>
+            <span class="sig">()</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body">
+            <div class="desc">Advances the state machine without blocking. Connected links are monitored; timed-out or lost links are disconnected and scheduled for retry.</div>
+          </div>
+        </div>
+        <div class="method">
+          <div class="method-header">
+            <span class="name">reconfigure</span>
+            <span class="sig">(const WifiManagerConfig&amp; config)</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body">
+            <div class="desc">Disconnects the current link, replaces settings, returns to <code>Idle</code>, and clears retry timing.</div>
+            <div class="args-title">Arguments</div>
+            <ul><li><code>config</code> — SSID, password, timeout, and retry limits</li></ul>
+          </div>
+        </div>
+        <div class="method">
+          <div class="method-header">
+            <span class="name">config / state / isConnected / currentRetryDelayMs</span>
+            <span class="sig">() const</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body">
+            <div class="desc">Read the active configuration, current <code>WifiManagerState</code>, connected flag, and current retry delay.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-info" data-id="WifiManagerConfig">
+      <div class="kind">struct · configuration</div>
+      <h2>WifiManagerConfig</h2>
+      <div class="docstring">
+        Values consumed by <code>WifiManager</code>: <code>ssid</code>,
+        <code>password</code>, <code>connectTimeoutMs</code>,
+        <code>initialRetryDelayMs</code>, and <code>maxRetryDelayMs</code>.
+      </div>
+      <div class="methods"></div>
+    </div>
+
+    <div class="class-info" data-id="WifiManagerState">
+      <div class="kind">enum class · state</div>
+      <h2>WifiManagerState</h2>
+      <div class="docstring">
+        State values are <code>Idle</code>, <code>Connecting</code>,
+        <code>Connected</code>, and <code>Backoff</code>. The manager remains
+        idle until <code>begin()</code> is called.
+      </div>
+      <div class="methods"></div>
+    </div>
+
+    <div class="class-info" data-id="IWifi">
+      <div class="kind">interface · Firmware/lib/Interfaces/IWifi.h</div>
+      <h2>IWifi</h2>
+      <div class="docstring">
+        Platform-neutral WiFi station contract injected into <code>WifiManager</code>.
+        Exposes nonblocking <code>begin</code>, link <code>status</code>, and
+        <code>disconnect</code>; reports <code>WifiLinkState</code>.
+      </div>
+      <div class="methods">
+        <div class="method">
+          <div class="method-header">
+            <span class="name">begin</span>
+            <span class="sig">(const char* ssid, const char* password)</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body">
+            <div class="desc">Starts a nonblocking station connection attempt.</div>
+          </div>
+        </div>
+        <div class="method">
+          <div class="method-header">
+            <span class="name">status</span>
+            <span class="sig">() const → WifiLinkState</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body"><div class="desc">Reads the current abstract link state.</div></div>
+        </div>
+        <div class="method">
+          <div class="method-header">
+            <span class="name">disconnect</span>
+            <span class="sig">()</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body"><div class="desc">Stops the current station connection.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-info" data-id="IClock">
+      <div class="kind">interface · Firmware/lib/Interfaces/IClock.h</div>
+      <h2>IClock</h2>
+      <div class="docstring">
+        Monotonic timing dependency injected into <code>WifiManager</code>.
+        Its <code>millis()</code> result drives timeout and retry comparisons.
+      </div>
+      <div class="methods">
+        <div class="method">
+          <div class="method-header">
+            <span class="name">millis</span>
+            <span class="sig">() const → uint32_t</span>
+            <span class="chevron">▶</span>
+          </div>
+          <div class="method-body"><div class="desc">Returns elapsed monotonic milliseconds.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-info" data-id="Esp32Wifi">
+      <div class="kind">class · driver adapter</div>
+      <h2>Esp32Wifi</h2>
+      <div class="docstring">
+        Concrete <code>IWifi</code> implementation used by <code>main.cpp</code>.
+        It selects <code>WIFI_STA</code>, delegates to Arduino
+        <code>WiFi.begin</code>/<code>WiFi.status</code>, maps native statuses to
+        <code>WifiLinkState</code>, and calls <code>WiFi.disconnect</code>.
+      </div>
+      <div class="methods"></div>
+    </div>
+
+    <div class="class-info" data-id="NetworkRuntime">
+      <div class="kind">class · coordinator</div>
+      <h2>NetworkRuntime</h2>
+      <div class="docstring">
+        Loads or applies network configuration, calls <code>WifiManager::reconfigure</code>,
+        then starts it with <code>WifiManager::begin</code>. It also coordinates MQTT,
+        so it is shown as the configuration path into the WiFi manager.
+      </div>
+      <div class="methods"></div>
+    </div>
+
+    <div class="class-info" data-id="main">
+      <div class="kind">firmware entry point · Firmware/src/main.cpp</div>
+      <h2>setup() / loop()</h2>
+      <div class="docstring">
+        <code>setup()</code> constructs the global <code>WifiManager</code>, invokes
+        <code>networkRuntime.begin(...)</code>, and <code>loop()</code> calls
+        <code>wifiManager.update()</code> every cycle before servicing other network
+        services.
+      </div>
+      <div class="methods"></div>
+    </div>
+
+  </div>
+
+  <div id="backdrop"></div>
+  <div id="popup">
+    <button class="close" onclick="closePopup()">×</button>
+    <div id="popup-content"></div>
+  </div>
+
+  <button class="fab" id="btn-zoom-in"  onclick="zoomIn()"  title="Zoom in">+</button>
+  <button class="fab" id="btn-zoom-out" onclick="zoomOut()" title="Zoom out">−</button>
+  <button class="fab" id="btn-reset"    onclick="resetView()" title="Reset view">↺</button>
+  <button class="fab" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">◐</button>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: 'loose',
+      theme: 'base'
+    });
+
+    /* ---------- Attach click handlers to .ref spans ---------- */
+    function attachRefHandlers() {
+      const svg = document.querySelector('#mermaid-wrapper svg');
+      if (!svg) return false;
+
+      // Event delegation – works even after Mermaid rewrites the DOM
+      svg.addEventListener('click', (e) => {
+        const ref = e.target.closest('.ref');
+        if (!ref) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const id = ref.getAttribute('data-ref');
+        if (id) showClassPopup(id);
+      });
+      return true;
+    }
+
+    const tryAttach = setInterval(() => {
+      if (attachRefHandlers()) {
+        clearInterval(tryAttach);
+        requestAnimationFrame(() => setTimeout(centerDiagram, 40));
+      }
+    }, 50);
+
+    /* ---------- Structured popup ---------- */
+    function showClassPopup(id) {
+      const src = document.querySelector(`.class-info[data-id="${id}"]`);
+      const content = document.getElementById('popup-content');
+
+      if (!src) {
+        content.innerHTML = `
+          <div class="popup-header">
+            <div class="kind">unknown</div>
+            <h2>${id}</h2>
+          </div>
+          <div class="popup-body"><p>No documentation available.</p></div>`;
+      } else {
+        const kind = src.querySelector('.kind')?.textContent || 'class';
+        const title = src.querySelector('h2')?.textContent || id;
+        const docstring = src.querySelector('.docstring')?.innerHTML || '';
+        const methods = src.querySelector('.methods')?.innerHTML || '';
+
+        content.innerHTML = `
+          <div class="popup-header">
+            <div class="kind">${kind}</div>
+            <h2>${title}</h2>
+          </div>
+          <div class="popup-body">
+            <div class="docstring">${docstring}</div>
+            ${methods ? '<div class="section-title">Public methods</div>' + methods : ''}
+          </div>`;
+
+        // Wire method expand/collapse
+        content.querySelectorAll('.method-header').forEach(header => {
+          header.addEventListener('click', () => {
+            header.parentElement.classList.toggle('open');
+          });
+        });
+      }
+
+      document.getElementById('popup').classList.add('visible');
+      document.getElementById('backdrop').classList.add('visible');
+    }
+
+    function closePopup() {
+      document.getElementById('popup').classList.remove('visible');
+      document.getElementById('backdrop').classList.remove('visible');
+    }
+
+    document.getElementById('backdrop').addEventListener('click', closePopup);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePopup(); });
+
+    /* ---------- Zoom / Pan ---------- */
+    // SVG-native zoom/pan.
+  // Keep the SVG at its natural aspect ratio. Zooming changes only its
+  // viewBox, so text remains crisp. Panning converts mouse pixels directly
+  // into SVG units and uses a much faster response.
+  let scale = 1;
+  let panX = 0, panY = 0;
+  let isDragging = false, startX = 0, startY = 0;
+  let baseViewBox = null;
+  let fitViewBox = null;
+
+  const wrapper = document.getElementById('mermaid-wrapper');
+  const container = document.getElementById('diagram-container');
+
+  function getSvg() { return wrapper.querySelector('svg'); }
+
+  function readBaseViewBox(svg) {
+    const vb = svg.viewBox.baseVal;
+    if (vb && vb.width && vb.height) {
+      return { x: vb.x, y: vb.y, width: vb.width, height: vb.height };
+    }
+    const width = parseFloat(svg.getAttribute('width')) || 1000;
+    const height = parseFloat(svg.getAttribute('height')) || 700;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    return { x: 0, y: 0, width, height };
+  }
+
+  function calculateFitViewBox() {
+    if (!baseViewBox) return null;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (!cw || !ch) return { ...baseViewBox };
+
+    const diagramRatio = baseViewBox.width / baseViewBox.height;
+    const screenRatio = cw / ch;
+    let width, height;
+
+    if (diagramRatio > screenRatio) {
+      width = baseViewBox.width;
+      height = width / screenRatio;
+    } else {
+      height = baseViewBox.height;
+      width = height * screenRatio;
+    }
+
+    return {
+      x: baseViewBox.x + (baseViewBox.width - width) / 2,
+      y: baseViewBox.y + (baseViewBox.height - height) / 2,
+      width, height
+    };
+  }
+
+  function updateViewBox() {
+    const svg = getSvg();
+    if (!svg || !fitViewBox) return;
+
+    const width = fitViewBox.width / scale;
+    const height = fitViewBox.height / scale;
+    const x = fitViewBox.x + (fitViewBox.width - width) / 2 - panX;
+    const y = fitViewBox.y + (fitViewBox.height - height) / 2 - panY;
+
+    svg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+  }
+
+  function zoomAt(factor, clientX, clientY) {
+    if (!fitViewBox) return;
+
+    const rect = container.getBoundingClientRect();
+    const mx = (clientX - rect.left) / rect.width;
+    const my = (clientY - rect.top) / rect.height;
+    const oldScale = scale;
+    const nextScale = Math.max(0.55, Math.min(scale * factor, 12));
+    if (nextScale === oldScale) return;
+
+    const oldW = fitViewBox.width / oldScale;
+    const oldH = fitViewBox.height / oldScale;
+    const oldX = fitViewBox.x + (fitViewBox.width - oldW) / 2 - panX;
+    const oldY = fitViewBox.y + (fitViewBox.height - oldH) / 2 - panY;
+
+    const anchorX = oldX + mx * oldW;
+    const anchorY = oldY + my * oldH;
+
+    scale = nextScale;
+
+    const newW = fitViewBox.width / scale;
+    const newH = fitViewBox.height / scale;
+    const newX = anchorX - mx * newW;
+    const newY = anchorY - my * newH;
+
+    const centeredX = fitViewBox.x + (fitViewBox.width - newW) / 2;
+    const centeredY = fitViewBox.y + (fitViewBox.height - newH) / 2;
+
+    panX = centeredX - newX;
+    panY = centeredY - newY;
+    updateViewBox();
+  }
+
+  function zoomIn() {
+    const r = container.getBoundingClientRect();
+    zoomAt(1.25, r.left + r.width / 2, r.top + r.height / 2);
+  }
+
+  function zoomOut() {
+    const r = container.getBoundingClientRect();
+    zoomAt(1 / 1.25, r.left + r.width / 2, r.top + r.height / 2);
+  }
+
+  function centerDiagram() {
+    const svg = getSvg();
+    if (!svg) return;
+
+    if (!baseViewBox) baseViewBox = readBaseViewBox(svg);
+    fitViewBox = calculateFitViewBox();
+
+    // Start at a useful reading size rather than fitting the whole SVG's
+    // viewport (which can contain large amounts of empty space).
+    // Keep this separate from wheel/button zoom so reset remains predictable.
+    const diagramRatio = baseViewBox.width / baseViewBox.height;
+    const screenRatio = container.clientWidth / container.clientHeight;
+    const aspectBoost = diagramRatio > screenRatio ? 1.35 : 1.20;
+    scale = Math.min(2.0, Math.max(1.15, aspectBoost));
+
+    panX = 0;
+    panY = 0;
+    updateViewBox();
+  }
+
+  function resetView() {
+    centerDiagram();
+  }
+
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
+  }, { passive: false });
+
+  container.addEventListener('mousedown', e => {
+    if (e.target.closest('.ref') || e.target.closest('.node .ref')) return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    container.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isDragging || !fitViewBox) return;
+
+    const rect = container.getBoundingClientRect();
+    const currentW = fitViewBox.width / scale;
+    const currentH = fitViewBox.height / scale;
+
+    // Direct hand movement: keep the cursor and diagram motion closely
+    // coupled, with a deliberately stronger response than the old viewport.
+    const PAN_SPEED = 5.0;
+    panX += (e.clientX - startX) * currentW / rect.width * PAN_SPEED;
+    panY += (e.clientY - startY) * currentH / rect.height * PAN_SPEED;
+
+    startX = e.clientX;
+    startY = e.clientY;
+    updateViewBox();
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    container.style.cursor = 'grab';
+  });
+
+  window.addEventListener('resize', () => {
+    if (!baseViewBox) return;
+    fitViewBox = calculateFitViewBox();
+    updateViewBox();
+  });
+
+</script>
+</body>
+</html>
