@@ -15,8 +15,6 @@
 #include "SerialConfigController.h"
 #include "WifiManager.h"
 
-// ========== Pin Configuration ==========
-
 // ========== Network Configuration ==========
 
 const MqttSubscription mqttSubscriptions[] = {
@@ -46,6 +44,8 @@ NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
 SerialConfigController serialConfigController(
   serialPort, networkRuntime);
+
+// ========== Pin Configuration ==========
 
 // Specify pins to use for I2C.
 const uint8_t SDA_PIN = 4;
