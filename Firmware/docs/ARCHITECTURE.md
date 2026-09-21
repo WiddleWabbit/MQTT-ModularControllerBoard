@@ -27,8 +27,8 @@ and calls each service from `loop()`. `Esp32NetworkConfigStore` hides NVS
 storage, while `NetworkRuntime` applies a complete configuration to WiFi and
 MQTT only after it has been persisted. `SerialConfigController` stages line-oriented commands and changes runtime
 settings only for an explicit `apply` command. `SerialStatusReporter` writes
-WiFi and NTP snapshots on a one-second interval while USB serial is plugged
-in. `Esp32SerialPort` uses the
+WiFi, NTP, and MQTT snapshots on a session interval started from `setup()`
+while USB serial is plugged in. `Esp32SerialPort` uses the
 ESP32 USB CDC plug state to gate serial input and responses.
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff.

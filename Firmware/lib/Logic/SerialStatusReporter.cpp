@@ -38,12 +38,12 @@ void civilFromDays(int64_t days, int32_t& year, unsigned& month, unsigned& day)
 SerialStatusReporter::SerialStatusReporter(ISerialPort& serial, IClock& clock,
                                            WifiManager& wifiManager,
                                            NtpService& ntpService,
-                                           uint32_t intervalMs)
+                                           MqttService& mqttService)
   : _serial(serial),
     _clock(clock),
     _wifiManager(wifiManager),
     _ntpService(ntpService),
-    _intervalMs(intervalMs)
+    _mqttService(mqttService)
 {
 }
 
@@ -51,20 +51,43 @@ SerialStatusReporter::SerialStatusReporter(ISerialPort& serial, IClock& clock,
 // ========== Public API ==========
 
 /**
- * Writes one WiFi line and one NTP line when the USB link is plugged in
- * and the snapshot interval has elapsed.
+ * Starts status reporting with the supplied snapshot interval.
+ *
+ * @param config Snapshot interval configuration.
+ * @return Nothing.
+ */
+void SerialStatusReporter::begin(const SerialStatusReporterConfig& config)
+{
+  _config = config;
+  _started = true;
+}
+
+/**
+ * Replaces the snapshot interval for the rest of the power-on session.
+ *
+ * @param config New snapshot interval configuration.
+ * @return Nothing.
+ */
+void SerialStatusReporter::reconfigure(const SerialStatusReporterConfig& config)
+{
+  _config = config;
+}
+
+/**
+ * Writes WiFi, NTP, and MQTT status lines when started, the USB link is
+ * plugged in, and the snapshot interval has elapsed.
  *
  * @return Nothing.
  */
 void SerialStatusReporter::update()
 {
-  if (!_serial.isPlugged())
+  if (!_started || !_serial.isPlugged())
   {
     return;
   }
 
   const uint32_t now = _clock.millis();
-  if (!_hasElapsed(now, _lastReportAt, _intervalMs))
+  if (!_hasElapsed(now, _lastReportAt, _config.intervalMs))
   {
     return;
   }
@@ -72,6 +95,17 @@ void SerialStatusReporter::update()
   _lastReportAt = now;
   _writeWifiStatus();
   _writeNtpStatus();
+  _writeMqttStatus();
+}
+
+/**
+ * Returns the active snapshot configuration.
+ *
+ * @return Active configuration.
+ */
+const SerialStatusReporterConfig& SerialStatusReporter::config() const
+{
+  return _config;
 }
 
 
@@ -121,6 +155,19 @@ void SerialStatusReporter::_writeNtpStatus()
     std::snprintf(line, sizeof(line), "NTP Status: %s",
                   _ntpStateName(_ntpService.state()));
   }
+  _serial.writeLine(line);
+}
+
+/**
+ * Writes the current MQTT service state.
+ *
+ * @return Nothing.
+ */
+void SerialStatusReporter::_writeMqttStatus()
+{
+  char line[64];
+  std::snprintf(line, sizeof(line), "MQTT Status: %s",
+                _mqttStateName(_mqttService.state()));
   _serial.writeLine(line);
 }
 
@@ -175,6 +222,30 @@ const char* SerialStatusReporter::_ntpStateName(NtpServiceState state)
     case NtpServiceState::Synchronized:
       return "Synchronized";
     case NtpServiceState::Idle:
+    default:
+      return "Idle";
+  }
+}
+
+/**
+ * Maps an MQTT service state to its serial label.
+ *
+ * @param state MQTT service state.
+ * @return Status label.
+ */
+const char* SerialStatusReporter::_mqttStateName(MqttServiceState state)
+{
+  switch (state)
+  {
+    case MqttServiceState::WaitingForNetwork:
+      return "WaitingForNetwork";
+    case MqttServiceState::Connecting:
+      return "Connecting";
+    case MqttServiceState::Connected:
+      return "Connected";
+    case MqttServiceState::Backoff:
+      return "Backoff";
+    case MqttServiceState::Idle:
     default:
       return "Idle";
   }

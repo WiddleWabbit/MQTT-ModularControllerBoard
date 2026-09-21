@@ -40,20 +40,28 @@ publication results, loop counts, and inbound callback delivery.
 
 ## Serial status
 
-`SerialStatusReporter` writes a WiFi line and an NTP line through
-`ISerialPort` once per snapshot interval while USB serial is plugged in.
+`SerialStatusReporter` writes WiFi, NTP, and MQTT lines through `ISerialPort`
+on a configured snapshot interval while USB serial is plugged in.
+`begin(config)` starts reporting for the power-on session; `reconfigure(config)`
+replaces the interval without stopping. The interval is not persisted to NVS.
+`setup()` currently starts reporting at 1000 ms.
+
 It uses `WifiManager` state names (`Idle`, `Connecting`, `Connected`,
-`Backoff`) and appends RSSI only when connected:
+`Backoff`) and appends RSSI only when connected. MQTT labels match
+`MqttServiceState` (`Idle`, `WaitingForNetwork`, `Connecting`, `Connected`,
+`Backoff`):
 
 ```text
 WiFi Status: Connected (-62 dBm)
 NTP Status: Synchronized (2026-09-21 16:04:00)
+MQTT Status: Connected
 ```
 
 Unsynchronized NTP omits the timestamp: `NTP Status: WaitingForSync`. Local
 time is the UTC epoch plus the NTP UTC and daylight offsets, formatted as
 `YYYY-MM-DD HH:MM:SS` without `localtime()`. Native tests pin the epoch and
-offsets, cover plug gating, interval spacing, and advancing time after sync.
+offsets, cover plug gating, interval spacing, `begin`/`reconfigure`, MQTT
+states, and advancing time after sync.
 
 ## Configuration and testing
 

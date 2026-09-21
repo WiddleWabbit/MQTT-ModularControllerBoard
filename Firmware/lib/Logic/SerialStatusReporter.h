@@ -6,11 +6,18 @@
 
 #include "IClock.h"
 #include "ISerialPort.h"
+#include "MqttService.h"
 #include "NtpService.h"
 #include "WifiManager.h"
 
+struct SerialStatusReporterConfig
+{
+  uint32_t intervalMs;
+};
+
 /**
- * Writes USB-gated WiFi and NTP status snapshots on a fixed interval.
+ * Writes USB-gated WiFi, NTP, and MQTT status snapshots on a configured
+ * interval for the current power-on session.
  */
 class SerialStatusReporter
 {
@@ -22,26 +29,51 @@ public:
    * @param clock Monotonic clock.
    * @param wifiManager WiFi connection manager.
    * @param ntpService NTP synchronization service.
-   * @param intervalMs Snapshot interval in milliseconds.
+   * @param mqttService MQTT connection manager.
    */
   SerialStatusReporter(ISerialPort& serial, IClock& clock,
                        WifiManager& wifiManager, NtpService& ntpService,
-                       uint32_t intervalMs);
+                       MqttService& mqttService);
 
   /**
-   * Writes one WiFi line and one NTP line when the USB link is plugged in
-   * and the snapshot interval has elapsed.
+   * Starts status reporting with the supplied snapshot interval.
+   *
+   * @param config Snapshot interval configuration.
+   * @return Nothing.
+   */
+  void begin(const SerialStatusReporterConfig& config);
+
+  /**
+   * Replaces the snapshot interval for the rest of the power-on session.
+   *
+   * @param config New snapshot interval configuration.
+   * @return Nothing.
+   */
+  void reconfigure(const SerialStatusReporterConfig& config);
+
+  /**
+   * Writes WiFi, NTP, and MQTT status lines when started, the USB link is
+   * plugged in, and the snapshot interval has elapsed.
    *
    * @return Nothing.
    */
   void update();
+
+  /**
+   * Returns the active snapshot configuration.
+   *
+   * @return Active configuration.
+   */
+  const SerialStatusReporterConfig& config() const;
 
 private:
   ISerialPort& _serial;
   IClock& _clock;
   WifiManager& _wifiManager;
   NtpService& _ntpService;
-  uint32_t _intervalMs;
+  MqttService& _mqttService;
+  SerialStatusReporterConfig _config{};
+  bool _started = false;
   uint32_t _lastReportAt = 0;
 
   /**
@@ -57,6 +89,13 @@ private:
    * @return Nothing.
    */
   void _writeNtpStatus();
+
+  /**
+   * Writes the current MQTT service state.
+   *
+   * @return Nothing.
+   */
+  void _writeMqttStatus();
 
   /**
    * Tests elapsed time using wrap-safe unsigned arithmetic.
@@ -83,6 +122,14 @@ private:
    * @return Status label.
    */
   static const char* _ntpStateName(NtpServiceState state);
+
+  /**
+   * Maps an MQTT service state to its serial label.
+   *
+   * @param state MQTT service state.
+   * @return Status label.
+   */
+  static const char* _mqttStateName(MqttServiceState state);
 
   /**
    * Formats a UTC epoch plus timezone offsets as a local civil timestamp.

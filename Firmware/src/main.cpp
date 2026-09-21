@@ -46,7 +46,7 @@ NetworkRuntime networkRuntime(
 SerialConfigController serialConfigController(
   serialPort, networkRuntime);
 SerialStatusReporter serialStatusReporter(
-  serialPort, systemClock, wifiManager, ntpService, 1000);
+  serialPort, systemClock, wifiManager, ntpService, mqttService);
 
 // ========== Pin Configuration ==========
 
@@ -120,10 +120,12 @@ void setup()
   networkRuntime.begin(
     {"", "", "", 1883, "watering-controller", nullptr, nullptr});
   ntpService.begin();
+  serialStatusReporter.begin({1000});
 }
 
 /**
- * Services WiFi and NTP, then reports runtime memory and connection status.
+ * Services WiFi, NTP, and MQTT, then reports runtime memory and connection
+ * status.
  *
  * @return Nothing.
  */
