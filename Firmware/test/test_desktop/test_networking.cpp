@@ -14,6 +14,19 @@ void testRuntimeLoadsPersistedConfiguration();
 void testSerialStagesUntilApplyAndGatesOnPlugState();
 void testRuntimeApplyFailureDoesNotChangeActiveConfiguration();
 void testAppliedConfigurationIsOwnedFromLaterStagedEdits();
+void testWifiManagerForwardsRssi();
+void testNtpServiceExposesConfig();
+void testStatusReporterWritesNothingWhenUnplugged();
+void testStatusReporterPrintsIdleStates();
+void testStatusReporterPrintsConnectingWithoutRssi();
+void testStatusReporterPrintsBackoffWithoutRssi();
+void testStatusReporterPrintsConnectedRssi();
+void testStatusReporterPrintsWaitingForSyncWithoutTime();
+void testStatusReporterPrintsSynchronizedLocalTime();
+void testStatusReporterAppliesDaylightOffset();
+void testStatusReporterWaitsForIntervalBeforeReprint();
+void testStatusReporterAdvancesClockAfterSync();
+void testStatusReporterStopsWhenUnpluggedAfterPrint();
 
 namespace
 {
@@ -432,5 +445,18 @@ int main()
   RUN_TEST(testSerialStagesUntilApplyAndGatesOnPlugState);
   RUN_TEST(testRuntimeApplyFailureDoesNotChangeActiveConfiguration);
   RUN_TEST(testAppliedConfigurationIsOwnedFromLaterStagedEdits);
+  RUN_TEST(testWifiManagerForwardsRssi);
+  RUN_TEST(testNtpServiceExposesConfig);
+  RUN_TEST(testStatusReporterWritesNothingWhenUnplugged);
+  RUN_TEST(testStatusReporterPrintsIdleStates);
+  RUN_TEST(testStatusReporterPrintsConnectingWithoutRssi);
+  RUN_TEST(testStatusReporterPrintsBackoffWithoutRssi);
+  RUN_TEST(testStatusReporterPrintsConnectedRssi);
+  RUN_TEST(testStatusReporterPrintsWaitingForSyncWithoutTime);
+  RUN_TEST(testStatusReporterPrintsSynchronizedLocalTime);
+  RUN_TEST(testStatusReporterAppliesDaylightOffset);
+  RUN_TEST(testStatusReporterWaitsForIntervalBeforeReprint);
+  RUN_TEST(testStatusReporterAdvancesClockAfterSync);
+  RUN_TEST(testStatusReporterStopsWhenUnpluggedAfterPrint);
   return UNITY_END();
 }

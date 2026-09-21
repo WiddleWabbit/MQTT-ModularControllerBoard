@@ -86,6 +86,16 @@ time_t NtpService::currentTime() const
   return isSynchronized() ? _adapter.currentTime() : static_cast<time_t>(0);
 }
 
+/**
+ * Returns the active NTP configuration.
+ *
+ * @return Active configuration.
+ */
+const NtpConfig& NtpService::config() const
+{
+  return _config;
+}
+
 
 // ========== Private Helpers ==========
 

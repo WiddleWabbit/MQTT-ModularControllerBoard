@@ -15,10 +15,11 @@ desktop tests use controllable fakes.
 
 - `begin(ssid, password)` starts one nonblocking station attempt.
 - `status()` reports `Disconnected`, `Connecting`, or `Connected`.
+- `rssi()` reports station signal strength in dBm.
 - `disconnect()` stops the current attempt or connection.
 - The driver must not wait for association inside `begin()`.
-- The fake records credentials and disconnects and can return a sequence of
-  link states.
+- The fake records credentials and disconnects, can return a sequence of
+  link states, and exposes a settable RSSI.
 
 ## `INtpAdapter`
 

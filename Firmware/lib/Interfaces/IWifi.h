@@ -34,6 +34,13 @@ public:
   virtual WifiLinkState status() const = 0;
 
   /**
+   * Reads the current station signal strength.
+   *
+   * @return Received signal strength in dBm.
+   */
+  virtual int32_t rssi() const = 0;
+
+  /**
    * Stops the current station connection.
    *
    * @return Nothing.

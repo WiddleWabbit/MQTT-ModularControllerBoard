@@ -9,7 +9,8 @@ not include Arduino headers. Hardware adapters are isolated in
 
 - `lib/Interfaces/` contains pure abstract hardware contracts only.
 - `lib/Drivers/` contains ESP32/Arduino implementations of those contracts.
-- `lib/Logic/` contains nonblocking WiFi, NTP, and MQTT state machines.
+- `lib/Logic/` contains nonblocking WiFi, NTP, and MQTT state machines plus
+  USB-gated serial status reporting.
 - `test/test_desktop/fakes/` contains controllable implementations for native
   tests.
 - `test/test_desktop/` contains Unity unit and interaction tests.
@@ -25,7 +26,9 @@ ESP32 APIs. This keeps each module deep: callers invoke `begin`, `update`, or
 and calls each service from `loop()`. `Esp32NetworkConfigStore` hides NVS
 storage, while `NetworkRuntime` applies a complete configuration to WiFi and
 MQTT only after it has been persisted. `SerialConfigController` stages line-oriented commands and changes runtime
-settings only for an explicit `apply` command. `Esp32SerialPort` uses the
+settings only for an explicit `apply` command. `SerialStatusReporter` writes
+WiFi and NTP snapshots on a one-second interval while USB serial is plugged
+in. `Esp32SerialPort` uses the
 ESP32 USB CDC plug state to gate serial input and responses.
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff.
@@ -38,10 +41,10 @@ Tests run exclusively with PlatformIO's `native` environment:
 pio test -e native
 ```
 
-The fakes simulate link state, time, broker outcomes, subscriptions,
+The fakes simulate link state, RSSI, time, broker outcomes, subscriptions,
 publications, inbound messages, persisted settings, USB presence, and serial
 bytes. This covers state transitions, retry backoff, failures, callbacks,
-configuration staging, apply failure, and WiFi-to-MQTT interaction without
-hardware.
+configuration staging, apply failure, WiFi-to-MQTT interaction, and serial
+status snapshots without hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

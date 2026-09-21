@@ -116,6 +116,16 @@ uint32_t WifiManager::currentRetryDelayMs() const
   return _retryDelayMs;
 }
 
+/**
+ * Reads the current station signal strength.
+ *
+ * @return Received signal strength in dBm.
+ */
+int32_t WifiManager::rssi() const
+{
+  return _wifi.rssi();
+}
+
 // ========== Private Helpers ==========
 
 /**

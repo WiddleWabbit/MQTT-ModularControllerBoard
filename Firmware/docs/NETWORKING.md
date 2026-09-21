@@ -7,15 +7,17 @@
 `IWifi`, times out unsuccessful attempts, and retries with capped exponential
 backoff. It never delays or waits for a connection.
 
-`IWifi` exposes `begin`, `status`, and `disconnect`. The ESP32 implementation
-is `Esp32Wifi`; native tests use `FakeWifi`, which records credentials and
-disconnects and allows each link state to be selected.
+`IWifi` exposes `begin`, `status`, `rssi`, and `disconnect`. The ESP32
+implementation is `Esp32Wifi`; native tests use `FakeWifi`, which records
+credentials and disconnects, allows each link state to be selected, and
+exposes a settable RSSI. `WifiManager::rssi()` forwards the driver value.
 
 ## NTP
 
 `NtpService` configures the injected `INtpAdapter` and reports `Idle`,
 `WaitingForSync`, or `Synchronized`. It periodically reapplies configuration
 while waiting, then exposes the synchronized epoch through `currentTime()`.
+`config()` returns the active servers, UTC/DST offsets, and retry interval.
 `Esp32NtpAdapter` calls Arduino `configTime` and considers an epoch after
 November 2023 valid. `FakeNtpAdapter` records servers and offsets and can
 toggle synchronization.
@@ -35,6 +37,23 @@ Inbound payloads are forwarded through `MqttMessageCallback`.
 already-constructed PubSubClient and is configured with `setServer`.
 `FakeMqttClient` provides deterministic connection failures, subscription and
 publication results, loop counts, and inbound callback delivery.
+
+## Serial status
+
+`SerialStatusReporter` writes a WiFi line and an NTP line through
+`ISerialPort` once per snapshot interval while USB serial is plugged in.
+It uses `WifiManager` state names (`Idle`, `Connecting`, `Connected`,
+`Backoff`) and appends RSSI only when connected:
+
+```text
+WiFi Status: Connected (-62 dBm)
+NTP Status: Synchronized (2026-09-21 16:04:00)
+```
+
+Unsynchronized NTP omits the timestamp: `NTP Status: WaitingForSync`. Local
+time is the UTC epoch plus the NTP UTC and daylight offsets, formatted as
+`YYYY-MM-DD HH:MM:SS` without `localtime()`. Native tests pin the epoch and
+offsets, cover plug gating, interval spacing, and advancing time after sync.
 
 ## Configuration and testing
 

@@ -1,19 +1,19 @@
 [cli]
 auto_update = true
 
-[agent]
-# name = "grok-build-0.1"
-
-[models]
-default = "grok-build-0.1"
-
 [permission]
 # Allow full access to the two specified folders
 allow = [
-  "Read(/src/**)",
-  "Edit(/src/**)",
-  "Bash(/src/**)",
-  "Read(/lib/**)",
-  "Edit(/lib/**)",
-  "Bash(/lib/**)"
+  "Read(src/**)",
+  "Edit(src/**)",
+  "Bash(src/**)",
+  "Read(lib/**)",
+  "Edit(lib/**)",
+  "Bash(lib/**)",
+  "Read(test/**)",
+  "Edit(test/**)",
+  "Bash(test/**)",
+  "Read(docs/**)",
+  "Edit(docs/**)",
+  "Bash(docs/**)"
 ]

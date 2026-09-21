@@ -25,6 +25,13 @@ public:
   WifiLinkState status() const override;
 
   /**
+   * Reads the ESP32 station signal strength.
+   *
+   * @return Received signal strength in dBm.
+   */
+  int32_t rssi() const override;
+
+  /**
    * Disconnects the ESP32 station.
    *
    * @return Nothing.

@@ -37,6 +37,16 @@ public:
   }
 
   /**
+   * Returns the simulated signal strength.
+   *
+   * @return Simulated RSSI in dBm.
+   */
+  int32_t rssi() const override
+  {
+    return rssiDbm;
+  }
+
+  /**
    * Records a simulated disconnect.
    *
    * @return Nothing.
@@ -48,6 +58,7 @@ public:
   }
 
   WifiLinkState linkState = WifiLinkState::Disconnected;
+  int32_t rssiDbm = 0;
   int beginCallCount = 0;
   int disconnectCallCount = 0;
   std::string lastSsid;

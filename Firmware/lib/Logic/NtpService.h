@@ -73,6 +73,13 @@ public:
    */
   time_t currentTime() const;
 
+  /**
+   * Returns the active NTP configuration.
+   *
+   * @return Active configuration.
+   */
+  const NtpConfig& config() const;
+
 private:
   INtpAdapter& _adapter;
   IClock& _clock;

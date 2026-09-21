@@ -37,6 +37,16 @@ WifiLinkState Esp32Wifi::status() const
 }
 
 /**
+ * Reads the ESP32 station signal strength.
+ *
+ * @return Received signal strength in dBm.
+ */
+int32_t Esp32Wifi::rssi() const
+{
+  return WiFi.RSSI();
+}
+
+/**
  * Disconnects the ESP32 station.
  *
  * @return Nothing.

@@ -13,6 +13,7 @@
 #include "PubSubClientAdapter.h"
 #include "NetworkRuntime.h"
 #include "SerialConfigController.h"
+#include "SerialStatusReporter.h"
 #include "WifiManager.h"
 
 // ========== Network Configuration ==========
@@ -33,7 +34,7 @@ WifiManager wifiManager(
   {"", "", 15000, 1000, 30000});
 NtpService ntpService(
   ntpDriver, systemClock,
-  {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 60000});
+  {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 0, 60000});
 MqttService mqttService(
   mqttDriver, systemClock,
   {"watering-controller", nullptr, nullptr, mqttSubscriptions,
@@ -44,6 +45,8 @@ NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
 SerialConfigController serialConfigController(
   serialPort, networkRuntime);
+SerialStatusReporter serialStatusReporter(
+  serialPort, systemClock, wifiManager, ntpService, 1000);
 
 // ========== Pin Configuration ==========
 
@@ -130,6 +133,7 @@ void loop()
   ntpService.update();
   mqttService.update(wifiManager.isConnected());
   serialConfigController.update();
+  serialStatusReporter.update();
 
   static uint32_t lastReportAt = 0;
   const uint32_t now = systemClock.millis();

@@ -87,6 +87,13 @@ public:
    */
   uint32_t currentRetryDelayMs() const;
 
+  /**
+   * Reads the current station signal strength.
+   *
+   * @return Received signal strength in dBm.
+   */
+  int32_t rssi() const;
+
 private:
   IWifi& _wifi;
   IClock& _clock;
