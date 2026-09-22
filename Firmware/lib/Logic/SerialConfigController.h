@@ -7,7 +7,8 @@
 #include "NetworkRuntime.h"
 
 /**
- * Stages line-oriented network commands and applies them only on `apply`.
+ * Stages line-oriented network commands. `apply` persists only fields set
+ * since the previous successful apply.
  */
 class SerialConfigController
 {
@@ -38,6 +39,7 @@ private:
   std::string _mqttClientId;
   std::string _mqttUsername;
   std::string _mqttPassword;
+  NetworkConfigFieldMask _fields{};
 
   /**
    * Handles one complete command line.

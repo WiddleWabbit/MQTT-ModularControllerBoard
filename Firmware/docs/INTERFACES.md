@@ -51,10 +51,23 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 
 ## `INetworkConfigStore`
 
-- `load()` copies a complete saved configuration into caller-owned storage and
-  returns false when no valid configuration exists.
-- `save()` persists all fields and returns false on storage failure.
-- Fakes must expose load/save results and record calls.
+- `load()` overlays stored fields onto the defaults already in the destination.
+  Missing keys keep those defaults. It returns false when no network key is
+  stored.
+- `save(config, fields)` writes only the selected fields. An empty string is a
+  successful write when the key exists afterwards. Other stored fields stay
+  unchanged.
+- `loadWarning()` returns a boot note from the last load, or an empty string.
+- Fakes must expose load/save results, the field mask, and owned stored values.
+
+## `IPreferenceStore`
+
+- `open` / `close` bracket one read or write session.
+- `contains` reports a key without reading it. Callers use it before
+  `readString` so a missing key does not surface a storage error.
+- `writeString` returns the number of characters stored. Empty text returns 0
+  on both success and failure; `contains` distinguishes them.
+- `writeUShort` returns 2 on success.
 
 ## `ISerialPort`
 

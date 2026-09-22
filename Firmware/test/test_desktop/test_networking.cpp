@@ -14,6 +14,18 @@ void testRuntimeLoadsPersistedConfiguration();
 void testSerialStagesUntilApplyAndGatesOnPlugState();
 void testRuntimeApplyFailureDoesNotChangeActiveConfiguration();
 void testAppliedConfigurationIsOwnedFromLaterStagedEdits();
+void testApplyWithNoChangesDoesNotSave();
+void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid();
+void testApplyRetriesDirtyFieldsAfterSaveFailure();
+void testRecordSaveWritesOnlySelectedFields();
+void testRecordEmptyStringSaveSucceedsWhenKeyIsStored();
+void testRecordEmptyStringSaveFailsWhenKeyIsMissing();
+void testRecordNonEmptyWriteFailureReturnsFalse();
+void testRecordLoadUsesDefaultClientIdWithoutReadingMissingKey();
+void testRecordLoadFailureDoesNotWarnWhenNothingIsStored();
+void testRecordFailedClientRepairStillLoads();
+void testMqttWithoutBrokerStaysUnconfigured();
+void testStatusReporterPrintsMqttUnconfigured();
 void testWifiManagerForwardsRssi();
 void testNtpServiceExposesConfig();
 void testStatusReporterWritesNothingBeforeBegin();
@@ -273,6 +285,7 @@ void testMqttWaitsForNetworkThenConnectsAndSubscribes()
   FakeMqttClient client;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(false);
   TEST_ASSERT_EQUAL(MqttServiceState::WaitingForNetwork, service.state());
@@ -293,6 +306,7 @@ void testMqttFailedConnectionUsesNonblockingBackoff()
   client.connectResult = false;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
   TEST_ASSERT_EQUAL(MqttServiceState::Backoff, service.state());
@@ -313,6 +327,7 @@ void testMqttServicesLoopAndPublishesOnlyWhenConnected()
   FakeMqttClient client;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   TEST_ASSERT_FALSE(service.publish("status", "offline", false));
   service.update(true);
@@ -331,6 +346,7 @@ void testMqttForwardsInboundMessagesToApplicationHandler()
   MqttService service(client, clock, mqttConfig());
 
   service.setMessageHandler(recordMessage, nullptr);
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
   client.deliver("controller/command", "water-now");
@@ -345,6 +361,7 @@ void testMqttDisconnectsWhenNetworkIsLost()
   FakeMqttClient client;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
   service.update(false);
@@ -359,6 +376,7 @@ void testMqttRetriesAfterBrokerDisconnectUsingBackoff()
   FakeMqttClient client;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
   TEST_ASSERT_EQUAL(MqttServiceState::Connected, service.state());
@@ -384,6 +402,7 @@ void testMqttReportsPublicationFailure()
   client.publishResult = false;
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
 
@@ -398,6 +417,7 @@ void testMqttBacksOffWhenSubscriptionFails()
   client.subscribeResults = {true, false};
   MqttService service(client, clock, mqttConfig());
 
+  service.setBroker("broker.local", 1883);
   service.begin();
   service.update(true);
 
@@ -415,6 +435,7 @@ void testWifiAndMqttComposeThroughInterfaces()
   MqttService mqtt(client, clock, mqttConfig());
 
   manager.begin();
+  mqtt.setBroker("broker.local", 1883);
   mqtt.begin();
   mqtt.update(manager.isConnected());
   TEST_ASSERT_EQUAL(0, client.connectCallCount);
@@ -425,6 +446,32 @@ void testWifiAndMqttComposeThroughInterfaces()
 
   TEST_ASSERT_EQUAL(1, client.connectCallCount);
   TEST_ASSERT_EQUAL(MqttServiceState::Connected, mqtt.state());
+}
+
+void testMqttWithoutBrokerStaysUnconfigured()
+{
+  FakeClock clock;
+  FakeMqttClient client;
+  MqttService service(client, clock, mqttConfig());
+
+  service.setBroker("", 1883);
+  service.begin();
+  service.update(true);
+  service.update(true);
+
+  TEST_ASSERT_EQUAL(MqttServiceState::Unconfigured, service.state());
+  TEST_ASSERT_EQUAL(0, client.connectCallCount);
+
+  service.setBroker(nullptr, 1883);
+  service.update(true);
+  TEST_ASSERT_EQUAL(0, client.connectCallCount);
+
+  service.setBroker("broker.local", 1883);
+  service.begin();
+  service.update(true);
+
+  TEST_ASSERT_EQUAL(1, client.connectCallCount);
+  TEST_ASSERT_EQUAL(MqttServiceState::Connected, service.state());
 }
 
 int main()
@@ -448,10 +495,21 @@ int main()
   RUN_TEST(testMqttReportsPublicationFailure);
   RUN_TEST(testMqttBacksOffWhenSubscriptionFails);
   RUN_TEST(testWifiAndMqttComposeThroughInterfaces);
+  RUN_TEST(testMqttWithoutBrokerStaysUnconfigured);
   RUN_TEST(testRuntimeLoadsPersistedConfiguration);
   RUN_TEST(testSerialStagesUntilApplyAndGatesOnPlugState);
   RUN_TEST(testRuntimeApplyFailureDoesNotChangeActiveConfiguration);
   RUN_TEST(testAppliedConfigurationIsOwnedFromLaterStagedEdits);
+  RUN_TEST(testApplyWithNoChangesDoesNotSave);
+  RUN_TEST(testApplyUpdatesOnlyPasswordAndKeepsStoredSsid);
+  RUN_TEST(testApplyRetriesDirtyFieldsAfterSaveFailure);
+  RUN_TEST(testRecordSaveWritesOnlySelectedFields);
+  RUN_TEST(testRecordEmptyStringSaveSucceedsWhenKeyIsStored);
+  RUN_TEST(testRecordEmptyStringSaveFailsWhenKeyIsMissing);
+  RUN_TEST(testRecordNonEmptyWriteFailureReturnsFalse);
+  RUN_TEST(testRecordLoadUsesDefaultClientIdWithoutReadingMissingKey);
+  RUN_TEST(testRecordLoadFailureDoesNotWarnWhenNothingIsStored);
+  RUN_TEST(testRecordFailedClientRepairStillLoads);
   RUN_TEST(testWifiManagerForwardsRssi);
   RUN_TEST(testNtpServiceExposesConfig);
   RUN_TEST(testStatusReporterWritesNothingBeforeBegin);
@@ -466,6 +524,7 @@ int main()
   RUN_TEST(testStatusReporterPrintsMqttWaitingForNetwork);
   RUN_TEST(testStatusReporterPrintsMqttConnected);
   RUN_TEST(testStatusReporterPrintsMqttBackoff);
+  RUN_TEST(testStatusReporterPrintsMqttUnconfigured);
   RUN_TEST(testStatusReporterUsesConfiguredInterval);
   RUN_TEST(testStatusReporterExposesConfig);
   RUN_TEST(testStatusReporterReconfigureChangesInterval);

@@ -37,7 +37,8 @@ void MqttService::begin()
   _client.setCallback(_handleClientMessage, this);
   _retryDelayMs = _config.initialRetryDelayMs;
   _retryAvailableAt = _clock.millis();
-  _state = MqttServiceState::WaitingForNetwork;
+  _state = _hasBroker() ? MqttServiceState::WaitingForNetwork
+                        : MqttServiceState::Unconfigured;
 }
 
 /**
@@ -50,6 +51,16 @@ void MqttService::update(bool networkReady)
 {
   if (_state == MqttServiceState::Idle)
   {
+    return;
+  }
+
+  if (!_hasBroker())
+  {
+    if (_client.connected())
+    {
+      _client.disconnect();
+    }
+    _state = MqttServiceState::Unconfigured;
     return;
   }
 
@@ -110,7 +121,9 @@ void MqttService::reconfigure(const MqttConfig& config)
 
 void MqttService::setBroker(const char* host, uint16_t port)
 {
-  _client.setBroker(host, port);
+  _brokerHost = host == nullptr ? "" : host;
+  _brokerPort = port;
+  _client.setBroker(_brokerHost.c_str(), _brokerPort);
 }
 
 const MqttConfig& MqttService::config() const
@@ -218,4 +231,14 @@ void MqttService::_scheduleRetry()
 bool MqttService::_isDue(uint32_t now, uint32_t due)
 {
   return static_cast<int32_t>(now - due) >= 0;
+}
+
+/**
+ * Reports whether a broker host has been configured.
+ *
+ * @return True when the broker host is non-empty.
+ */
+bool MqttService::_hasBroker() const
+{
+  return !_brokerHost.empty();
 }

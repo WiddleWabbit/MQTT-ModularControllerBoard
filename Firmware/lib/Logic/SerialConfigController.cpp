@@ -48,7 +48,15 @@ void SerialConfigController::_handleLine(const std::string& line)
   if (line == "apply")
   {
     _refreshStagedPointers();
-    _respond(_runtime.apply(_staged) ? "OK applied" : "ERR apply");
+    if (_runtime.apply(_staged, _fields))
+    {
+      _fields = {};
+      _respond("OK applied");
+    }
+    else
+    {
+      _respond("ERR apply");
+    }
     return;
   }
 
@@ -71,26 +79,32 @@ void SerialConfigController::_handleLine(const std::string& line)
   if (key == "wifi.ssid")
   {
     _ssid = value;
+    _fields.wifiSsid = true;
   }
   else if (key == "wifi.password")
   {
     _wifiPassword = value;
+    _fields.wifiPassword = true;
   }
   else if (key == "mqtt.host")
   {
     _mqttHost = value;
+    _fields.mqttHost = true;
   }
   else if (key == "mqtt.client")
   {
     _mqttClientId = value;
+    _fields.mqttClientId = true;
   }
   else if (key == "mqtt.username")
   {
     _mqttUsername = value;
+    _fields.mqttUsername = true;
   }
   else if (key == "mqtt.password")
   {
     _mqttPassword = value;
+    _fields.mqttPassword = true;
   }
   else if (key == "mqtt.port")
   {
@@ -101,6 +115,7 @@ void SerialConfigController::_handleLine(const std::string& line)
       return;
     }
     _staged.mqttPort = static_cast<uint16_t>(port);
+    _fields.mqttPort = true;
   }
   else
   {

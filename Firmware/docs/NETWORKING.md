@@ -24,11 +24,13 @@ toggle synchronization.
 
 ## MQTT
 
-`MqttService` owns `Idle`, `WaitingForNetwork`, `Connecting`, `Connected`, and
-`Backoff` states. `update(networkReady)` waits for WiFi, reconnects without
-blocking, subscribes after a successful connection, services the MQTT loop,
-and disconnects when WiFi is lost. The service only enters `Connected` after
-every configured subscription succeeds; a subscription failure closes the
+`MqttService` owns `Idle`, `Unconfigured`, `WaitingForNetwork`, `Connecting`,
+`Connected`, and `Backoff` states. An empty broker host stays `Unconfigured`
+and does not call `connect`, so the ESP32 DNS resolver is not asked to look up
+a blank name. `update(networkReady)` otherwise waits for WiFi, reconnects
+without blocking, subscribes after a successful connection, services the MQTT
+loop, and disconnects when WiFi is lost. The service only enters `Connected`
+after every configured subscription succeeds; a subscription failure closes the
 broker connection and uses the normal reconnect backoff. `publish` is rejected
 while disconnected.
 Inbound payloads are forwarded through `MqttMessageCallback`.
@@ -48,8 +50,8 @@ replaces the interval without stopping. The interval is not persisted to NVS.
 
 It uses `WifiManager` state names (`Idle`, `Connecting`, `Connected`,
 `Backoff`) and appends RSSI only when connected. MQTT labels match
-`MqttServiceState` (`Idle`, `WaitingForNetwork`, `Connecting`, `Connected`,
-`Backoff`):
+`MqttServiceState` (`Idle`, `Unconfigured`, `WaitingForNetwork`, `Connecting`,
+`Connected`, `Backoff`):
 
 ```text
 WiFi Status: Connected (-62 dBm)

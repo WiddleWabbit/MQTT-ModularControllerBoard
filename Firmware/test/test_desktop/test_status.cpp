@@ -225,6 +225,7 @@ void testStatusReporterPrintsMqttWaitingForNetwork()
   StatusFixture fixture;
   fixture.start();
 
+  fixture.mqttService.setBroker("broker.local", 1883);
   fixture.mqttService.begin();
   fixture.mqttService.update(false);
   fixture.clock.advance(1000);
@@ -239,6 +240,7 @@ void testStatusReporterPrintsMqttConnected()
   StatusFixture fixture;
   fixture.start();
 
+  fixture.mqttService.setBroker("broker.local", 1883);
   fixture.mqttService.begin();
   fixture.mqttService.update(true);
   fixture.clock.advance(1000);
@@ -254,6 +256,7 @@ void testStatusReporterPrintsMqttBackoff()
   fixture.mqttClient.connectResult = false;
   fixture.start();
 
+  fixture.mqttService.setBroker("broker.local", 1883);
   fixture.mqttService.begin();
   fixture.mqttService.update(true);
   fixture.clock.advance(1000);
@@ -261,6 +264,23 @@ void testStatusReporterPrintsMqttBackoff()
 
   TEST_ASSERT_EQUAL(MqttServiceState::Backoff, fixture.mqttService.state());
   TEST_ASSERT_EQUAL_STRING("MQTT Status: Backoff",
+                           fixture.serial.output[2].c_str());
+}
+
+void testStatusReporterPrintsMqttUnconfigured()
+{
+  StatusFixture fixture;
+  fixture.start();
+
+  fixture.mqttService.setBroker("", 1883);
+  fixture.mqttService.begin();
+  fixture.mqttService.update(true);
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+
+  TEST_ASSERT_EQUAL(MqttServiceState::Unconfigured, fixture.mqttService.state());
+  TEST_ASSERT_EQUAL(0, fixture.mqttClient.connectCallCount);
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: Unconfigured",
                            fixture.serial.output[2].c_str());
 }
 

@@ -4,7 +4,8 @@
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 
 #include "Esp32Clock.h"
-#include "Esp32NetworkConfigStore.h"
+#include "Esp32PreferenceStore.h"
+#include "PreferenceNetworkConfigStore.h"
 #include "Esp32NtpAdapter.h"
 #include "Esp32SerialPort.h"
 #include "Esp32Wifi.h"
@@ -39,7 +40,8 @@ MqttService mqttService(
   mqttDriver, systemClock,
   {"watering-controller", nullptr, nullptr, mqttSubscriptions,
    sizeof(mqttSubscriptions) / sizeof(mqttSubscriptions[0]), 1000, 30000});
-Esp32NetworkConfigStore networkConfigStore;
+Esp32PreferenceStore networkPreferences("network");
+PreferenceNetworkConfigStore networkConfigStore(networkPreferences);
 Esp32SerialPort serialPort(Serial);
 NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
@@ -119,6 +121,14 @@ void setup()
 
   networkRuntime.begin(
     {"", "", "", 1883, "watering-controller", nullptr, nullptr});
+  if (serialPort.isPlugged())
+  {
+    const char* warning = networkConfigStore.loadWarning();
+    if (warning != nullptr && warning[0] != '\0')
+    {
+      Serial.println(warning);
+    }
+  }
   ntpService.begin();
   serialStatusReporter.begin({10000});
 }

@@ -237,6 +237,8 @@ const char* SerialStatusReporter::_mqttStateName(MqttServiceState state)
 {
   switch (state)
   {
+    case MqttServiceState::Unconfigured:
+      return "Unconfigured";
     case MqttServiceState::WaitingForNetwork:
       return "WaitingForNetwork";
     case MqttServiceState::Connecting:

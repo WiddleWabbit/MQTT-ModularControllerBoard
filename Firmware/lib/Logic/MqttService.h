@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "IClock.h"
 #include "IMqttClient.h"
@@ -26,6 +27,7 @@ struct MqttConfig
 enum class MqttServiceState : uint8_t
 {
   Idle,
+  Unconfigured,
   WaitingForNetwork,
   Connecting,
   Connected,
@@ -119,6 +121,8 @@ private:
   MqttServiceState _state = MqttServiceState::Idle;
   MqttMessageCallback _messageHandler = nullptr;
   void* _messageContext = nullptr;
+  std::string _brokerHost;
+  uint16_t _brokerPort = 0;
   uint32_t _retryAvailableAt = 0;
   uint32_t _retryDelayMs = 0;
 
@@ -156,4 +160,11 @@ private:
    * @return True when retry time is due.
    */
   static bool _isDue(uint32_t now, uint32_t due);
+
+  /**
+   * Reports whether a broker host has been configured.
+   *
+   * @return True when the broker host is non-empty.
+   */
+  bool _hasBroker() const;
 };
