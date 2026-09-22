@@ -120,7 +120,7 @@ void setup()
   networkRuntime.begin(
     {"", "", "", 1883, "watering-controller", nullptr, nullptr});
   ntpService.begin();
-  serialStatusReporter.begin({1000});
+  serialStatusReporter.begin({10000});
 }
 
 /**
@@ -139,7 +139,7 @@ void loop()
 
   static uint32_t lastReportAt = 0;
   const uint32_t now = systemClock.millis();
-  if (static_cast<uint32_t>(now - lastReportAt) >= 1000)
+  if (static_cast<uint32_t>(now - lastReportAt) >= 30000)
   {
     lastReportAt = now;
     if (serialPort.isPlugged())
