@@ -64,3 +64,28 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 - The serial controller must not consume or emit bytes while the USB serial
   link is unplugged.
 - Fakes must provide queued input and inspectable output.
+
+## `IDigitalPin`
+
+- `setMode()` selects `DigitalInput`, `DigitalInputPullup`, `DigitalOutput`,
+  or `DigitalOutputOpenDrain`. Names avoid Arduino `INPUT`/`OUTPUT` macros.
+- `DigitalOutputOpenDrain` drives LOW as the safe default after mode change.
+- `read()` is true when the pin is HIGH. Sense present is LOW.
+- `write()` drives an output; true is HIGH / open-drain Hi-Z.
+- The ESP32 driver must use Arduino `pinMode` so UART0 detaches from GPIO43/44.
+- Fakes must record mode, writes, push-pull HIGH attempts, and an external
+  level override for sense.
+
+## `I2cMaster`
+
+- `begin()`, `setClockHz()`, and `setTimeoutMs()` configure the bus.
+- `write()` issues STOP. `writeRead()` uses a repeated start; a write-phase
+  NACK/timeout/bus-error returns immediately without the read phase.
+- `recover()` clocks SCL up to nine times, issues STOP, and re-inits. It is
+  best-effort; a still-stuck SDA needs the module unplugged.
+- Results are `Ok`, `Nack`, `Timeout`, or `BusError`.
+- Fakes record operations (address, tx, rxLen, STOP) and dispatch to
+  simulated modules. They must support stuck-SDA and two-ACK collision.
+
+Module command IDs, frame layout, and CRC-8/SMBus live in copyable
+`lib/Interfaces/ModuleProtocol.h`. See `docs/MODULES.md`.

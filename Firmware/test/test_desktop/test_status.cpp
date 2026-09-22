@@ -4,7 +4,9 @@
 #include "NtpService.h"
 #include "SerialStatusReporter.h"
 #include "WifiManager.h"
+#include "fakes/EmptyModuleHostFixture.h"
 #include "fakes/FakeClock.h"
+#include "fakes/FakeModuleDevice.h"
 #include "fakes/FakeMqttClient.h"
 #include "fakes/FakeNtpAdapter.h"
 #include "fakes/FakeSerialPort.h"
@@ -31,6 +33,7 @@ MqttConfig mqttConfig()
 struct StatusFixture
 {
   FakeClock clock;
+  EmptyModuleHostFixture modules;
   FakeWifi wifi;
   FakeNtpAdapter ntpAdapter;
   FakeMqttClient mqttClient;
@@ -46,10 +49,12 @@ struct StatusFixture
   }
 
   explicit StatusFixture(const NtpConfig& ntp)
-    : wifiManager(wifi, clock, wifiConfig()),
+    : modules(clock),
+      wifiManager(wifi, clock, wifiConfig()),
       ntpService(ntpAdapter, clock, ntp),
       mqttService(mqttClient, clock, mqttConfig()),
-      reporter(serial, clock, wifiManager, ntpService, mqttService)
+      reporter(serial, clock, wifiManager, ntpService, mqttService,
+               modules.host)
   {
   }
 
@@ -117,13 +122,17 @@ void testStatusReporterPrintsIdleStates()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
                            fixture.serial.output[0].c_str());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
                            fixture.serial.output[1].c_str());
   TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
                            fixture.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 2: Empty", fixture.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 3: Empty", fixture.serial.output[5].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[6].c_str());
 }
 
 void testStatusReporterPrintsConnectingWithoutRssi()
@@ -135,7 +144,7 @@ void testStatusReporterPrintsConnectingWithoutRssi()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
                            fixture.serial.output[0].c_str());
 }
@@ -151,7 +160,7 @@ void testStatusReporterPrintsBackoffWithoutRssi()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL(WifiManagerState::Backoff, fixture.wifiManager.state());
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Backoff",
                            fixture.serial.output[0].c_str());
 }
@@ -168,7 +177,7 @@ void testStatusReporterPrintsConnectedRssi()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connected (-67 dBm)",
                            fixture.serial.output[0].c_str());
 }
@@ -182,7 +191,7 @@ void testStatusReporterPrintsWaitingForSyncWithoutTime()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: WaitingForSync",
                            fixture.serial.output[1].c_str());
 }
@@ -199,7 +208,7 @@ void testStatusReporterPrintsSynchronizedLocalTime()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:20)",
                            fixture.serial.output[1].c_str());
 }
@@ -275,7 +284,7 @@ void testStatusReporterUsesConfiguredInterval()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
 }
 
 void testStatusReporterExposesConfig()
@@ -304,7 +313,7 @@ void testStatusReporterReconfigureChangesInterval()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(afterFirst + 3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(afterFirst + 7, fixture.serial.output.size());
 }
 
 void testStatusReporterWaitsForIntervalBeforeReprint()
@@ -322,7 +331,7 @@ void testStatusReporterWaitsForIntervalBeforeReprint()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(afterFirst + 3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(afterFirst + 7, fixture.serial.output.size());
 }
 
 void testStatusReporterAdvancesClockAfterSync()
@@ -341,11 +350,11 @@ void testStatusReporterAdvancesClockAfterSync()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(6, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(14, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:20)",
                            fixture.serial.output[1].c_str());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:21)",
-                           fixture.serial.output[4].c_str());
+                           fixture.serial.output[8].c_str());
 }
 
 void testStatusReporterStopsWhenUnpluggedAfterPrint()
@@ -355,10 +364,80 @@ void testStatusReporterStopsWhenUnpluggedAfterPrint()
 
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
 
   fixture.serial.plugged = false;
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+}
+
+void testStatusReporterPrintsEmptySlots()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[6].c_str());
+}
+
+void testStatusReporterSlotOneIsIndexZeroAddr10()
+{
+  StatusFixture fixture;
+  FakeModuleDevice device(fixture.clock, fixture.modules.mod1);
+  fixture.modules.host.begin();
+  fixture.modules.bus.attach(device);
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Online IdentityEcho addr=0x10",
+                           fixture.serial.output[3].c_str());
+}
+
+void testStatusReporterPrintsOnlineSlot()
+{
+  testStatusReporterSlotOneIsIndexZeroAddr10();
+}
+
+void testStatusReporterPrintsFault()
+{
+  StatusFixture fixture;
+  fixture.modules.host.begin();
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Fault Nack",
+                           fixture.serial.output[3].c_str());
+}
+
+void testSerialStatusDoesNotCallPingOrEcho()
+{
+  StatusFixture fixture;
+  FakeModuleDevice device(fixture.clock, fixture.modules.mod1);
+  fixture.modules.host.begin();
+  fixture.modules.bus.attach(device);
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  const size_t before = fixture.modules.bus.protocolOpCount();
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(before, fixture.modules.bus.protocolOpCount());
 }

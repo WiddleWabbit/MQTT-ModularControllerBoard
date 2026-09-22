@@ -40,8 +40,8 @@ publication results, loop counts, and inbound callback delivery.
 
 ## Serial status
 
-`SerialStatusReporter` writes WiFi, NTP, and MQTT lines through `ISerialPort`
-on a configured snapshot interval while USB serial is plugged in.
+`SerialStatusReporter` writes WiFi, NTP, MQTT, and four slot lines through
+`ISerialPort` on a configured snapshot interval while USB serial is plugged in.
 `begin(config)` starts reporting for the power-on session; `reconfigure(config)`
 replaces the interval without stopping. The interval is not persisted to NVS.
 `setup()` currently starts reporting at 1000 ms.
@@ -55,13 +55,19 @@ It uses `WifiManager` state names (`Idle`, `Connecting`, `Connected`,
 WiFi Status: Connected (-62 dBm)
 NTP Status: Synchronized (2026-09-21 16:04:00)
 MQTT Status: Connected
+Slot 1: Empty
+Slot 2: Online IdentityEcho addr=0x11
+Slot 3: Unsupported type=0x02AA addr=0x12
+Slot 4: Fault Nack
 ```
 
 Unsynchronized NTP omits the timestamp: `NTP Status: WaitingForSync`. Local
 time is the UTC epoch plus the NTP UTC and daylight offsets, formatted as
-`YYYY-MM-DD HH:MM:SS` without `localtime()`. Native tests pin the epoch and
+`YYYY-MM-DD HH:MM:SS` without `localtime()`. Slot lines use public
+`ModuleHost` snapshots only; the reporter never calls `ping()` or `echo()`.
+Firmware Slot 1 is index 0 / address `0x10`. Native tests pin the epoch and
 offsets, cover plug gating, interval spacing, `begin`/`reconfigure`, MQTT
-states, and advancing time after sync.
+states, slot occupancy, and advancing time after sync.
 
 ## Configuration and testing
 
