@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "IClock.h"
 #include "IWifi.h"
@@ -12,6 +13,7 @@ struct WifiManagerConfig
   uint32_t connectTimeoutMs;
   uint32_t initialRetryDelayMs;
   uint32_t maxRetryDelayMs;
+  const char* hostname;
 };
 
 enum class WifiManagerState : uint8_t
@@ -94,6 +96,13 @@ public:
    */
   int32_t rssi() const;
 
+  /**
+   * Reads the current station address.
+   *
+   * @return Assigned IPv4 address, or 0.0.0.0 when none is assigned.
+   */
+  Ipv4Address localIp() const;
+
 private:
   IWifi& _wifi;
   IClock& _clock;
@@ -102,6 +111,7 @@ private:
   uint32_t _attemptStartedAt = 0;
   uint32_t _retryAvailableAt = 0;
   uint32_t _retryDelayMs = 0;
+  std::string _appliedHostname;
 
   /**
    * Starts a connection attempt and records its start time.
@@ -109,6 +119,13 @@ private:
    * @return Nothing.
    */
   void _startConnectionAttempt();
+
+  /**
+   * Commits a changed non-empty hostname before the station starts.
+   *
+   * @return Nothing.
+   */
+  void _commitHostname();
 
   /**
    * Schedules the next attempt and advances exponential backoff.

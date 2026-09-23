@@ -16,10 +16,18 @@ desktop tests use controllable fakes.
 - `begin(ssid, password)` starts one nonblocking station attempt.
 - `status()` reports `Disconnected`, `Connecting`, or `Connected`.
 - `rssi()` reports station signal strength in dBm.
+- `localIp()` reports the station IPv4 address, or `0.0.0.0` when none is
+  assigned.
+- `setHostname(hostname)` stores the DHCP hostname committed on the next
+  station start.
+- `resetStationMode()` stops station mode so the next start commits that name.
+  The ESP32 driver uses this because Arduino-ESP32 2.0 applies the hostname
+  only when station mode changes.
 - `disconnect()` stops the current attempt or connection.
 - The driver must not wait for association inside `begin()`.
-- The fake records credentials and disconnects, can return a sequence of
-  link states, and exposes a settable RSSI.
+- The fake records credentials, hostname commits, mode resets, and
+  disconnects, can return a sequence of link states, and exposes a settable
+  RSSI and address.
 
 ## `INtpAdapter`
 

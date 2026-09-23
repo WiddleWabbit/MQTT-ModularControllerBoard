@@ -68,7 +68,9 @@ bool hasNetworkKey(IPreferenceStore& store)
          store.contains(NetworkConfigKeys::mqttPort) ||
          store.contains(NetworkConfigKeys::mqttClientId) ||
          store.contains(NetworkConfigKeys::mqttUsername) ||
-         store.contains(NetworkConfigKeys::mqttPassword);
+         store.contains(NetworkConfigKeys::mqttPassword) ||
+         store.contains(NetworkConfigKeys::wifiHostname) ||
+         store.contains(NetworkConfigKeys::statusReport);
 }
 }
 
@@ -113,6 +115,13 @@ bool NetworkConfigRecord::load(IPreferenceStore& store,
                                    defaults.mqttUsername);
   data.mqttPassword = readOptional(store, NetworkConfigKeys::mqttPassword,
                                    defaults.mqttPassword);
+  data.wifiHostname = readOptional(store, NetworkConfigKeys::wifiHostname,
+                                   defaults.wifiHostname);
+  data.statusReporting =
+    store.contains(NetworkConfigKeys::statusReport)
+      ? store.readUShort(NetworkConfigKeys::statusReport,
+                         defaults.statusReporting ? 1 : 0) != 0
+      : defaults.statusReporting;
   data.warning.clear();
   store.close();
 
@@ -182,6 +191,18 @@ bool NetworkConfigRecord::save(IPreferenceStore& store,
   {
     succeeded = writeText(store, NetworkConfigKeys::mqttPassword,
                           config.mqttPassword) &&
+                succeeded;
+  }
+  if (fields.wifiHostname)
+  {
+    succeeded = writeText(store, NetworkConfigKeys::wifiHostname,
+                          config.wifiHostname) &&
+                succeeded;
+  }
+  if (fields.statusReporting)
+  {
+    succeeded = (store.writeUShort(NetworkConfigKeys::statusReport,
+                                   config.statusReporting ? 1 : 0) == 2) &&
                 succeeded;
   }
   store.close();

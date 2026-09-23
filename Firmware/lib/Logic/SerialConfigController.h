@@ -4,6 +4,7 @@
 
 #include "INetworkConfigStore.h"
 #include "ISerialPort.h"
+#include "ISerialStatusControl.h"
 #include "NetworkRuntime.h"
 
 /**
@@ -18,8 +19,10 @@ public:
    *
    * @param serial Byte-oriented serial port.
    * @param runtime Runtime configuration coordinator.
+   * @param status Live status reporter controlled after a successful apply.
    */
-  SerialConfigController(ISerialPort& serial, NetworkRuntime& runtime);
+  SerialConfigController(ISerialPort& serial, NetworkRuntime& runtime,
+                         ISerialStatusControl& status);
 
   /**
    * Consumes complete lines currently available from the serial port.
@@ -31,10 +34,12 @@ public:
 private:
   ISerialPort& _serial;
   NetworkRuntime& _runtime;
+  ISerialStatusControl& _status;
   std::string _line;
   NetworkConfig _staged{};
   std::string _ssid;
   std::string _wifiPassword;
+  std::string _hostname;
   std::string _mqttHost;
   std::string _mqttClientId;
   std::string _mqttUsername;

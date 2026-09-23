@@ -52,6 +52,8 @@ public:
       _clientId.clear();
       _username.clear();
       _mqttPassword.clear();
+      _hostname.clear();
+      _statusReporting = false;
       _port = 1883;
       _hasRecord = true;
     }
@@ -82,6 +84,14 @@ public:
     if (fields.mqttPassword)
     {
       _mqttPassword = text(config.mqttPassword);
+    }
+    if (fields.wifiHostname)
+    {
+      _hostname = text(config.wifiHostname);
+    }
+    if (fields.statusReporting)
+    {
+      _statusReporting = config.statusReporting;
     }
     _bind();
     return true;
@@ -114,6 +124,8 @@ public:
     _clientId = text(config.mqttClientId);
     _username = text(config.mqttUsername);
     _mqttPassword = text(config.mqttPassword);
+    _hostname = text(config.wifiHostname);
+    _statusReporting = config.statusReporting;
     _bind();
   }
 
@@ -154,6 +166,26 @@ public:
     return _mqttHost;
   }
 
+  /**
+   * Returns the stored station hostname.
+   *
+   * @return Stored hostname.
+   */
+  const std::string& wifiHostname() const
+  {
+    return _hostname;
+  }
+
+  /**
+   * Returns the stored periodic-status flag.
+   *
+   * @return True when stored reporting is enabled.
+   */
+  bool statusReporting() const
+  {
+    return _statusReporting;
+  }
+
 private:
   /**
    * Copies a possibly null C string.
@@ -176,7 +208,8 @@ private:
     _view = {_ssid.c_str(), _wifiPassword.c_str(), _mqttHost.c_str(), _port,
              _clientId.c_str(),
              _username.empty() ? nullptr : _username.c_str(),
-             _mqttPassword.empty() ? nullptr : _mqttPassword.c_str()};
+             _mqttPassword.empty() ? nullptr : _mqttPassword.c_str(),
+             _hostname.c_str(), _statusReporting};
   }
 
   bool _hasRecord = false;
@@ -186,6 +219,8 @@ private:
   std::string _clientId;
   std::string _username;
   std::string _mqttPassword;
+  std::string _hostname;
+  bool _statusReporting = false;
   uint16_t _port = 1883;
   NetworkConfig _view{};
 };

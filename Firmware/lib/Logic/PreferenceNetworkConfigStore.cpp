@@ -22,11 +22,13 @@ bool PreferenceNetworkConfigStore::load(NetworkConfig& config)
   _clientId = data.mqttClientId;
   _username = data.mqttUsername;
   _mqttPassword = data.mqttPassword;
+  _hostname = data.wifiHostname;
   _warning = data.warning;
   config = {_ssid.c_str(), _wifiPassword.c_str(), _mqttHost.c_str(),
             data.mqttPort, _clientId.c_str(),
             _username.empty() ? nullptr : _username.c_str(),
-            _mqttPassword.empty() ? nullptr : _mqttPassword.c_str()};
+            _mqttPassword.empty() ? nullptr : _mqttPassword.c_str(),
+            _hostname.c_str(), data.statusReporting};
   return true;
 }
 

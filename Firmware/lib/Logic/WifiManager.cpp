@@ -126,6 +126,16 @@ int32_t WifiManager::rssi() const
   return _wifi.rssi();
 }
 
+/**
+ * Reads the current station address.
+ *
+ * @return Assigned IPv4 address, or 0.0.0.0 when none is assigned.
+ */
+Ipv4Address WifiManager::localIp() const
+{
+  return _wifi.localIp();
+}
+
 // ========== Private Helpers ==========
 
 /**
@@ -135,9 +145,28 @@ int32_t WifiManager::rssi() const
  */
 void WifiManager::_startConnectionAttempt()
 {
+  _commitHostname();
   _wifi.begin(_config.ssid, _config.password);
   _attemptStartedAt = _clock.millis();
   _state = WifiManagerState::Connecting;
+}
+
+/**
+ * Commits a changed non-empty hostname before the station starts.
+ *
+ * @return Nothing.
+ */
+void WifiManager::_commitHostname()
+{
+  const char* hostname = _config.hostname == nullptr ? "" : _config.hostname;
+  if (hostname[0] == '\0' || _appliedHostname == hostname)
+  {
+    return;
+  }
+
+  _wifi.resetStationMode();
+  _wifi.setHostname(hostname);
+  _appliedHostname = hostname;
 }
 
 /**

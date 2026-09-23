@@ -74,14 +74,15 @@ void SerialStatusReporter::reconfigure(const SerialStatusReporterConfig& config)
 }
 
 /**
- * Writes WiFi, NTP, and MQTT status lines when started, the USB link is
- * plugged in, and the snapshot interval has elapsed.
+ * Writes WiFi, NTP, and MQTT status lines when started, periodic reporting
+ * is enabled, the USB link is plugged in, and the snapshot interval has
+ * elapsed.
  *
  * @return Nothing.
  */
 void SerialStatusReporter::update()
 {
-  if (!_started || !_serial.isPlugged())
+  if (!_started || !_reportingEnabled || !_serial.isPlugged())
   {
     return;
   }
@@ -93,9 +94,53 @@ void SerialStatusReporter::update()
   }
 
   _lastReportAt = now;
-  _writeWifiStatus();
-  _writeNtpStatus();
-  _writeMqttStatus();
+  _writeSnapshot();
+}
+
+/**
+ * Enables or disables periodic snapshots for this power-on session.
+ *
+ * Enabling restarts the snapshot interval from the current time.
+ *
+ * @param enabled True to print on the snapshot interval.
+ * @return Nothing.
+ */
+void SerialStatusReporter::setReportingEnabled(bool enabled)
+{
+  _reportingEnabled = enabled;
+  if (enabled)
+  {
+    _lastReportAt = _clock.millis();
+  }
+}
+
+/**
+ * Reports whether periodic snapshots are enabled.
+ *
+ * @return True when periodic snapshots are enabled.
+ */
+bool SerialStatusReporter::reportingEnabled() const
+{
+  return _reportingEnabled;
+}
+
+/**
+ * Writes one WiFi, NTP, and MQTT snapshot immediately.
+ *
+ * The USB link must be plugged in. Periodic reporting may be disabled.
+ * A successful print restarts the snapshot interval.
+ *
+ * @return Nothing.
+ */
+void SerialStatusReporter::printStatus()
+{
+  if (!_serial.isPlugged())
+  {
+    return;
+  }
+
+  _writeSnapshot();
+  _lastReportAt = _clock.millis();
 }
 
 /**
@@ -112,14 +157,41 @@ const SerialStatusReporterConfig& SerialStatusReporter::config() const
 // ========== Private Helpers ==========
 
 /**
- * Writes the current WiFi manager state, including RSSI when connected.
+ * Writes the WiFi, NTP, and MQTT lines.
+ *
+ * @return Nothing.
+ */
+void SerialStatusReporter::_writeSnapshot()
+{
+  _writeWifiStatus();
+  _writeNtpStatus();
+  _writeMqttStatus();
+}
+
+/**
+ * Writes the current WiFi manager state.
+ *
+ * A connected station with an address includes that address and RSSI.
+ * A connected station without an address includes RSSI only.
  *
  * @return Nothing.
  */
 void SerialStatusReporter::_writeWifiStatus()
 {
-  char line[64];
-  if (_wifiManager.state() == WifiManagerState::Connected)
+  char line[80];
+  const Ipv4Address address = _wifiManager.localIp();
+  if (_wifiManager.state() == WifiManagerState::Connected &&
+      !address.isUnspecified())
+  {
+    std::snprintf(line, sizeof(line),
+                  "WiFi Status: Connected (%u.%u.%u.%u, %ld dBm)",
+                  static_cast<unsigned>(address.octets[0]),
+                  static_cast<unsigned>(address.octets[1]),
+                  static_cast<unsigned>(address.octets[2]),
+                  static_cast<unsigned>(address.octets[3]),
+                  static_cast<long>(_wifiManager.rssi()));
+  }
+  else if (_wifiManager.state() == WifiManagerState::Connected)
   {
     std::snprintf(line, sizeof(line), "WiFi Status: Connected (%ld dBm)",
                   static_cast<long>(_wifiManager.rssi()));

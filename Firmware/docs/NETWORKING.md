@@ -7,10 +7,18 @@
 `IWifi`, times out unsuccessful attempts, and retries with capped exponential
 backoff. It never delays or waits for a connection.
 
-`IWifi` exposes `begin`, `status`, `rssi`, and `disconnect`. The ESP32
-implementation is `Esp32Wifi`; native tests use `FakeWifi`, which records
-credentials and disconnects, allows each link state to be selected, and
-exposes a settable RSSI. `WifiManager::rssi()` forwards the driver value.
+`IWifi` exposes `begin`, `status`, `rssi`, `localIp`, `setHostname`,
+`resetStationMode`, and `disconnect`. The ESP32 implementation is `Esp32Wifi`;
+native tests use `FakeWifi`, which records credentials, hostname commits,
+station-mode resets, and disconnects, allows each link state to be selected,
+and exposes a settable RSSI and address. `WifiManager::rssi()` and
+`localIp()` forward the driver values.
+
+A non-empty hostname is committed only when it differs from the name already
+given to the driver. `WifiManager` calls `resetStationMode()` and then
+`setHostname()` before `begin()`. `Esp32Wifi` turns station mode off in
+`resetStationMode()` because Arduino-ESP32 2.0 commits the DHCP hostname only
+when station mode changes. A retry with the same name calls `begin()` only.
 
 ## NTP
 
@@ -43,18 +51,24 @@ publication results, loop counts, and inbound callback delivery.
 ## Serial status
 
 `SerialStatusReporter` writes WiFi, NTP, and MQTT lines through `ISerialPort`
-on a configured snapshot interval while USB serial is plugged in.
-`begin(config)` starts reporting for the power-on session; `reconfigure(config)`
-replaces the interval without stopping. The interval is not persisted to NVS.
-`setup()` currently starts reporting at 1000 ms.
+on a configured snapshot interval while USB serial is plugged in and periodic
+reporting is enabled. `begin(config)` starts reporting for the power-on
+session; `reconfigure(config)` replaces the interval without stopping. The
+interval stays in session RAM. Whether periodic reporting is enabled is loaded
+from NVS (`status_report`) during `setup()` and changes only after
+`set status on` or `set status off` is applied. `setup()` starts reporting at
+10000 ms.
 
-It uses `WifiManager` state names (`Idle`, `Connecting`, `Connected`,
-`Backoff`) and appends RSSI only when connected. MQTT labels match
+`status` prints one snapshot immediately, including when periodic reporting is
+off, and restarts the interval. It still requires the USB link to be plugged in.
+
+Connected WiFi includes the station address and RSSI. Address `0.0.0.0` keeps
+the RSSI-only line. Other states omit both. MQTT labels match
 `MqttServiceState` (`Idle`, `Unconfigured`, `WaitingForNetwork`, `Connecting`,
 `Connected`, `Backoff`):
 
 ```text
-WiFi Status: Connected (-62 dBm)
+WiFi Status: Connected (192.168.1.42, -62 dBm)
 NTP Status: Synchronized (2026-09-21 16:04:00)
 MQTT Status: Connected
 ```

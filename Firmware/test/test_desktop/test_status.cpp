@@ -382,3 +382,177 @@ void testStatusReporterStopsWhenUnpluggedAfterPrint()
   fixture.reporter.update();
   TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
 }
+
+void testStatusReporterPrintsConnectedAddressAndRssi()
+{
+  StatusFixture fixture;
+  fixture.wifi.rssiDbm = -67;
+  fixture.wifi.localAddress = {{192, 168, 4, 20}};
+  fixture.start();
+
+  fixture.wifiManager.begin();
+  fixture.wifi.linkState = WifiLinkState::Connected;
+  fixture.wifiManager.update();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connected (192.168.4.20, -67 dBm)",
+                           fixture.serial.output[0].c_str());
+}
+
+void testStatusReporterOmitsAddressUntilConnected()
+{
+  StatusFixture fixture;
+  fixture.wifi.localAddress = {{10, 1, 2, 3}};
+  fixture.wifi.rssiDbm = -40;
+  fixture.start();
+
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
+                           fixture.serial.output[0].c_str());
+
+  fixture.wifiManager.begin();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           fixture.serial.output[3].c_str());
+
+  fixture.wifiManager.update();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(WifiManagerState::Backoff, fixture.wifiManager.state());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Backoff",
+                           fixture.serial.output[6].c_str());
+}
+
+void testStatusReporterSkipsPrintsWhenDisabled()
+{
+  StatusFixture fixture;
+  fixture.start();
+  TEST_ASSERT_TRUE(fixture.reporter.reportingEnabled());
+
+  fixture.reporter.setReportingEnabled(false);
+  TEST_ASSERT_EQUAL(1000, fixture.reporter.config().intervalMs);
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(0, fixture.serial.output.size());
+}
+
+void testStatusReporterResumeWaitsForFullInterval()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+
+  fixture.reporter.setReportingEnabled(false);
+  fixture.clock.advance(5000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+
+  fixture.reporter.setReportingEnabled(true);
+  fixture.clock.advance(999);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+
+  fixture.clock.advance(1);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(6, fixture.serial.output.size());
+}
+
+void testStatusReporterPrintsOnDemandWhileDisabled()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.reporter.setReportingEnabled(false);
+  fixture.reporter.printStatus();
+
+  TEST_ASSERT_EQUAL(3, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
+                           fixture.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
+                           fixture.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
+                           fixture.serial.output[2].c_str());
+}
+
+void testStatusReporterPrintOnDemandWritesNothingWhenUnplugged()
+{
+  StatusFixture fixture;
+  fixture.serial.plugged = false;
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL(0, fixture.serial.output.size());
+}
+
+void testStatusReporterPrintOnDemandRestartsInterval()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.clock.advance(1000);
+  fixture.reporter.update();
+  fixture.clock.advance(400);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL(6, fixture.serial.output.size());
+
+  fixture.clock.advance(999);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(6, fixture.serial.output.size());
+
+  fixture.clock.advance(1);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(9, fixture.serial.output.size());
+}
+
+void testWifiManagerForwardsLocalAddress()
+{
+  FakeClock clock;
+  FakeWifi wifi;
+  wifi.localAddress = {{192, 168, 4, 20}};
+  WifiManager manager(wifi, clock, wifiConfig());
+
+  const Ipv4Address address = manager.localIp();
+  TEST_ASSERT_EQUAL(192, address.octets[0]);
+  TEST_ASSERT_EQUAL(168, address.octets[1]);
+  TEST_ASSERT_EQUAL(4, address.octets[2]);
+  TEST_ASSERT_EQUAL(20, address.octets[3]);
+}
+
+void testWifiManagerCommitsChangedHostnameBeforeBegin()
+{
+  FakeClock clock;
+  FakeWifi wifi;
+  WifiManager manager(wifi, clock,
+                      {"garden", "secret", 1000, 100, 400, nullptr});
+  manager.begin();
+  TEST_ASSERT_EQUAL(0, wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL(0, wifi.setHostnameCount);
+  TEST_ASSERT_EQUAL(1, wifi.beginCallCount);
+
+  manager.reconfigure({"garden", "secret", 1000, 100, 400, "plant-room"});
+  manager.begin();
+  TEST_ASSERT_EQUAL(1, wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL(1, wifi.setHostnameCount);
+  TEST_ASSERT_EQUAL_STRING("plant-room", wifi.lastHostname.c_str());
+  TEST_ASSERT_EQUAL_STRING("reset", wifi.calls[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("hostname", wifi.calls[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("begin", wifi.calls[3].c_str());
+
+  clock.advance(1000);
+  manager.update();
+  clock.advance(100);
+  manager.update();
+  TEST_ASSERT_EQUAL(1, wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL(1, wifi.setHostnameCount);
+  TEST_ASSERT_EQUAL(3, wifi.beginCallCount);
+
+  manager.reconfigure({"garden", "secret", 1000, 100, 400, "plant-room"});
+  manager.begin();
+  TEST_ASSERT_EQUAL(1, wifi.resetStationModeCount);
+
+  manager.reconfigure({"garden", "secret", 1000, 100, 400, "tank-room"});
+  manager.begin();
+  TEST_ASSERT_EQUAL(2, wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL_STRING("tank-room", wifi.lastHostname.c_str());
+}

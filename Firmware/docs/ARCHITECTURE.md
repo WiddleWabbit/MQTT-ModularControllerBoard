@@ -29,8 +29,10 @@ and calls each service from `loop()`. `Esp32PreferenceStore` hides NVS, and
 persisted. `SerialConfigController` stages line-oriented commands and, on
 `apply`, persists only the fields set since the previous successful apply.
 `SerialStatusReporter` writes WiFi, NTP, and MQTT snapshots on a session
-interval started from `setup()`
-while USB serial is plugged in. `Esp32SerialPort` uses the
+interval started from `setup()` while USB serial is plugged in and periodic
+reporting is enabled. The on/off flag and the DHCP hostname are staged with
+the other `set` commands and stored on `apply`. `status` prints one snapshot
+immediately. `Esp32SerialPort` uses the
 ESP32 USB CDC plug state to gate serial input and responses.
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff.

@@ -31,5 +31,6 @@ private:
   std::string _clientId;
   std::string _username;
   std::string _mqttPassword;
+  std::string _hostname;
   std::string _warning;
 };

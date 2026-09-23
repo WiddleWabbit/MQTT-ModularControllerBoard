@@ -49,6 +49,17 @@ public:
    */
   const NetworkConfig& config() const;
 
+  /**
+   * Reports whether a hostname can be stored and advertised.
+   *
+   * A valid name is 1–31 characters, uses letters, digits, and hyphens, and
+   * starts and ends with a letter or digit.
+   *
+   * @param hostname Candidate hostname.
+   * @return True when the hostname is valid.
+   */
+  static bool isValidHostname(const char* hostname);
+
 private:
   INetworkConfigStore& _store;
   WifiManager& _wifi;
@@ -59,6 +70,8 @@ private:
   std::string _mqttClientId;
   std::string _mqttUsername;
   std::string _mqttPassword;
+  std::string _wifiHostname;
+  bool _statusReporting = true;
   NetworkConfig _config{};
 
   /**

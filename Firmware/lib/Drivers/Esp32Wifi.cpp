@@ -47,6 +47,44 @@ int32_t Esp32Wifi::rssi() const
 }
 
 /**
+ * Reads the ESP32 station address.
+ *
+ * @return Assigned IPv4 address, or 0.0.0.0 when none is assigned.
+ */
+Ipv4Address Esp32Wifi::localIp() const
+{
+  const IPAddress address = WiFi.localIP();
+  Ipv4Address ip{{address[0], address[1], address[2], address[3]}};
+  return ip;
+}
+
+/**
+ * Stores the DHCP hostname committed on the next station start.
+ *
+ * @param hostname Non-empty hostname.
+ * @return Nothing.
+ */
+void Esp32Wifi::setHostname(const char* hostname)
+{
+  if (hostname != nullptr && hostname[0] != '\0')
+  {
+    WiFi.setHostname(hostname);
+  }
+}
+
+/**
+ * Stops station mode so the next station start commits the hostname.
+ *
+ * Arduino-ESP32 2.0 commits the DHCP hostname only when station mode changes.
+ *
+ * @return Nothing.
+ */
+void Esp32Wifi::resetStationMode()
+{
+  WiFi.mode(WIFI_OFF);
+}
+
+/**
  * Disconnects the ESP32 station.
  *
  * @return Nothing.

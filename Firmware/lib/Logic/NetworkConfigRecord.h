@@ -18,6 +18,8 @@ constexpr const char* mqttPort = "mqtt_port";
 constexpr const char* mqttClientId = "mqtt_client";
 constexpr const char* mqttUsername = "mqtt_user";
 constexpr const char* mqttPassword = "mqtt_password";
+constexpr const char* wifiHostname = "wifi_hostname";
+constexpr const char* statusReport = "status_report";
 }
 
 /**
@@ -32,6 +34,8 @@ struct NetworkConfigData
   std::string mqttClientId;
   std::string mqttUsername;
   std::string mqttPassword;
+  std::string wifiHostname;
+  bool statusReporting = true;
   std::string warning;
 };
 

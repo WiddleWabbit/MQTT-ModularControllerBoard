@@ -3,12 +3,14 @@
 #include <cstdlib>
 
 SerialConfigController::SerialConfigController(ISerialPort& serial,
-                                               NetworkRuntime& runtime)
-  : _serial(serial), _runtime(runtime)
+                                               NetworkRuntime& runtime,
+                                               ISerialStatusControl& status)
+  : _serial(serial), _runtime(runtime), _status(status)
 {
   const NetworkConfig& active = _runtime.config();
   _ssid = active.wifiSsid == nullptr ? "" : active.wifiSsid;
   _wifiPassword = active.wifiPassword == nullptr ? "" : active.wifiPassword;
+  _hostname = active.wifiHostname == nullptr ? "" : active.wifiHostname;
   _mqttHost = active.mqttHost == nullptr ? "" : active.mqttHost;
   _mqttClientId = active.mqttClientId == nullptr ? "" : active.mqttClientId;
   _mqttUsername = active.mqttUsername == nullptr ? "" : active.mqttUsername;
@@ -45,11 +47,23 @@ void SerialConfigController::update()
 
 void SerialConfigController::_handleLine(const std::string& line)
 {
+  if (line == "status")
+  {
+    _status.printStatus();
+    return;
+  }
+
   if (line == "apply")
   {
     _refreshStagedPointers();
+    const bool applyStatus = _fields.statusReporting;
+    const bool statusEnabled = _staged.statusReporting;
     if (_runtime.apply(_staged, _fields))
     {
+      if (applyStatus)
+      {
+        _status.setReportingEnabled(statusEnabled);
+      }
       _fields = {};
       _respond("OK applied");
     }
@@ -85,6 +99,33 @@ void SerialConfigController::_handleLine(const std::string& line)
   {
     _wifiPassword = value;
     _fields.wifiPassword = true;
+  }
+  else if (key == "wifi.hostname")
+  {
+    if (!NetworkRuntime::isValidHostname(value.c_str()))
+    {
+      _respond("ERR hostname");
+      return;
+    }
+    _hostname = value;
+    _fields.wifiHostname = true;
+  }
+  else if (key == "status")
+  {
+    if (value == "on")
+    {
+      _staged.statusReporting = true;
+    }
+    else if (value == "off")
+    {
+      _staged.statusReporting = false;
+    }
+    else
+    {
+      _respond("ERR status");
+      return;
+    }
+    _fields.statusReporting = true;
   }
   else if (key == "mqtt.host")
   {
@@ -139,6 +180,7 @@ void SerialConfigController::_refreshStagedPointers()
 {
   _staged.wifiSsid = _ssid.c_str();
   _staged.wifiPassword = _wifiPassword.c_str();
+  _staged.wifiHostname = _hostname.c_str();
   _staged.mqttHost = _mqttHost.c_str();
   _staged.mqttClientId = _mqttClientId.c_str();
   _staged.mqttUsername = _mqttUsername.empty() ? nullptr : _mqttUsername.c_str();

@@ -45,10 +45,10 @@ PreferenceNetworkConfigStore networkConfigStore(networkPreferences);
 Esp32SerialPort serialPort(Serial);
 NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
-SerialConfigController serialConfigController(
-  serialPort, networkRuntime);
 SerialStatusReporter serialStatusReporter(
   serialPort, systemClock, wifiManager, ntpService, mqttService);
+SerialConfigController serialConfigController(
+  serialPort, networkRuntime, serialStatusReporter);
 
 // ========== Pin Configuration ==========
 
@@ -120,7 +120,8 @@ void setup()
   // ========== Networking ==========
 
   networkRuntime.begin(
-    {"", "", "", 1883, "watering-controller", nullptr, nullptr});
+    {"", "", "", 1883, "watering-controller", nullptr, nullptr,
+     "watering-controller", true});
   if (serialPort.isPlugged())
   {
     const char* warning = networkConfigStore.loadWarning();
@@ -131,6 +132,8 @@ void setup()
   }
   ntpService.begin();
   serialStatusReporter.begin({10000});
+  serialStatusReporter.setReportingEnabled(
+    networkRuntime.config().statusReporting);
 }
 
 /**

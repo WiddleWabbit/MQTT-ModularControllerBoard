@@ -1,13 +1,19 @@
+#include <string>
+
 #include <unity.h>
 
 #include "NetworkConfigRecord.h"
 #include "NetworkRuntime.h"
+#include "NtpService.h"
 #include "SerialConfigController.h"
+#include "SerialStatusReporter.h"
 #include "fakes/FakeClock.h"
 #include "fakes/FakeMqttClient.h"
 #include "fakes/FakeNetworkConfigStore.h"
+#include "fakes/FakeNtpAdapter.h"
 #include "fakes/FakePreferenceStore.h"
 #include "fakes/FakeSerialPort.h"
+#include "fakes/FakeSerialStatusControl.h"
 #include "fakes/FakeWifi.h"
 
 namespace
@@ -26,6 +32,39 @@ MqttConfig mqttConfig()
 {
   return {"controller", nullptr, nullptr, nullptr, 0, 100, 400};
 }
+
+struct CommandStack
+{
+  FakeNetworkConfigStore store;
+  FakeClock clock;
+  FakeWifi wifi;
+  FakeNtpAdapter ntpAdapter;
+  FakeMqttClient mqttClient;
+  FakeSerialPort serial;
+  WifiManager wifiManager;
+  NtpService ntpService;
+  MqttService mqttService;
+  NetworkRuntime runtime;
+  SerialStatusReporter reporter;
+  SerialConfigController controller;
+
+  CommandStack()
+    : wifiManager(wifi, clock, wifiConfig()),
+      ntpService(ntpAdapter, clock,
+                 {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000}),
+      mqttService(mqttClient, clock, mqttConfig()),
+      runtime(store, wifiManager, mqttService),
+      reporter(serial, clock, wifiManager, ntpService, mqttService),
+      controller(serial, runtime, reporter)
+  {
+    const NetworkConfig defaults = {
+      "old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr,
+      "watering-controller", true};
+    runtime.begin(defaults);
+    reporter.begin({1000});
+    reporter.setReportingEnabled(runtime.config().statusReporting);
+  }
+};
 }
 
 void testRuntimeLoadsPersistedConfiguration()
@@ -55,7 +94,8 @@ void testSerialStagesUntilApplyAndGatesOnPlugState()
   NetworkRuntime runtime(store, wifiManager, mqtt);
   runtime.begin(config());
   FakeSerialPort serial;
-  SerialConfigController controller(serial, runtime);
+  FakeSerialStatusControl statusControl;
+  SerialConfigController controller(serial, runtime, statusControl);
 
   serial.feed("set wifi.ssid new-network\n");
   controller.update();
@@ -91,7 +131,8 @@ void testRuntimeApplyFailureDoesNotChangeActiveConfiguration()
   runtime.begin(config());
   store.saveResult = false;
 
-  NetworkConfig replacement = {"new", "pw", "host", 1883, "id", nullptr, nullptr};
+  NetworkConfig replacement = {"new", "pw", "host", 1883, "id", nullptr, nullptr,
+                              "plant-room", true};
   TEST_ASSERT_FALSE(runtime.apply(replacement, NetworkConfigFieldMask::all()));
   TEST_ASSERT_EQUAL_STRING("old", runtime.config().wifiSsid);
 }
@@ -107,7 +148,8 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
   NetworkRuntime runtime(store, wifiManager, mqtt);
   runtime.begin(config());
   FakeSerialPort serial;
-  SerialConfigController controller(serial, runtime);
+  FakeSerialStatusControl statusControl;
+  SerialConfigController controller(serial, runtime, statusControl);
 
   serial.feed("set wifi.ssid applied-network\napply\n");
   controller.update();
@@ -130,7 +172,8 @@ void testApplyWithNoChangesDoesNotSave()
   NetworkRuntime runtime(store, wifiManager, mqtt);
   runtime.begin(config());
   FakeSerialPort serial;
-  SerialConfigController controller(serial, runtime);
+  FakeSerialStatusControl statusControl;
+  SerialConfigController controller(serial, runtime, statusControl);
 
   serial.feed("apply\n");
   controller.update();
@@ -152,7 +195,8 @@ void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid()
   MqttService mqtt(client, clock, mqttConfig());
   NetworkRuntime runtime(store, wifiManager, mqtt);
   FakeSerialPort serial;
-  SerialConfigController controller(serial, runtime);
+  FakeSerialStatusControl statusControl;
+  SerialConfigController controller(serial, runtime, statusControl);
   runtime.begin(config());
   const int disconnectsAfterBegin = client.disconnectCallCount;
   const int wifiBeginsAfterBegin = wifi.beginCallCount;
@@ -202,7 +246,8 @@ void testApplyRetriesDirtyFieldsAfterSaveFailure()
   MqttService mqtt(client, clock, mqttConfig());
   NetworkRuntime runtime(store, wifiManager, mqtt);
   FakeSerialPort serial;
-  SerialConfigController controller(serial, runtime);
+  FakeSerialStatusControl statusControl;
+  SerialConfigController controller(serial, runtime, statusControl);
   runtime.begin(config());
   store.saveResult = false;
 
@@ -333,4 +378,344 @@ void testRecordFailedClientRepairStillLoads()
   TEST_ASSERT_EQUAL_STRING("watering-controller", data.mqttClientId.c_str());
   TEST_ASSERT_FALSE(data.warning.empty());
   TEST_ASSERT_FALSE(store.contains(NetworkConfigKeys::mqttClientId));
+}
+
+void testSetStatusOffRemainsEnabledUntilApply()
+{
+  CommandStack stack;
+  stack.serial.feed("set status off\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("OK staged", stack.serial.output.back().c_str());
+  TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_EQUAL(0, stack.store.saveCallCount);
+
+  const size_t before = stack.serial.output.size();
+  stack.clock.advance(1000);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(before + 3, stack.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[before].c_str());
+}
+
+void testApplyStatusOffStoresZeroAndStopsPrints()
+{
+  CommandStack stack;
+  stack.serial.feed("set status off\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("OK staged", stack.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[1].c_str());
+  TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_FALSE(stack.runtime.config().statusReporting);
+  TEST_ASSERT_FALSE(stack.store.statusReporting());
+  TEST_ASSERT_TRUE(stack.store.lastFields.statusReporting);
+  TEST_ASSERT_FALSE(stack.store.lastFields.wifiHostname);
+
+  const size_t afterApply = stack.serial.output.size();
+  stack.clock.advance(1000);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(afterApply, stack.serial.output.size());
+}
+
+void testApplyStatusOnResumesAfterInterval()
+{
+  CommandStack stack;
+  stack.serial.feed("set status off\napply\nset status on\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_TRUE(stack.runtime.config().statusReporting);
+  TEST_ASSERT_TRUE(stack.store.statusReporting());
+
+  const size_t afterApply = stack.serial.output.size();
+  stack.clock.advance(999);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(afterApply, stack.serial.output.size());
+
+  stack.clock.advance(1);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(afterApply + 3, stack.serial.output.size());
+}
+
+void testStatusCommandPrintsWhileReportingIsOff()
+{
+  CommandStack stack;
+  stack.serial.feed("set status off\nstatus\n");
+  stack.controller.update();
+  TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[1].c_str());
+
+  stack.serial.feed("apply\nstatus\n");
+  stack.controller.update();
+  TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[5].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
+                           stack.serial.output[7].c_str());
+}
+
+void testStatusCommandPrintsNothingWhenUnplugged()
+{
+  CommandStack stack;
+  stack.serial.plugged = false;
+  const size_t before = stack.serial.output.size();
+  stack.serial.feed("status\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL(before, stack.serial.output.size());
+}
+
+void testStatusCommandRestartsSnapshotInterval()
+{
+  CommandStack stack;
+  stack.clock.advance(1000);
+  stack.reporter.update();
+  const size_t afterPeriodic = stack.serial.output.size();
+  TEST_ASSERT_EQUAL(3, afterPeriodic);
+
+  stack.clock.advance(400);
+  stack.serial.feed("status\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL(afterPeriodic + 3, stack.serial.output.size());
+
+  stack.clock.advance(999);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(afterPeriodic + 3, stack.serial.output.size());
+
+  stack.clock.advance(1);
+  stack.reporter.update();
+  TEST_ASSERT_EQUAL(afterPeriodic + 6, stack.serial.output.size());
+}
+
+void testSetStatusRejectsUnknownValue()
+{
+  CommandStack stack;
+  stack.serial.feed("set status maybe\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("ERR status", stack.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL(0, stack.store.saveCallCount);
+  TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
+}
+
+void testHostnameStaysStagedUntilApply()
+{
+  CommandStack stack;
+  const int begins = stack.wifi.beginCallCount;
+  const int resets = stack.wifi.resetStationModeCount;
+  const int names = stack.wifi.setHostnameCount;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+  const size_t events = stack.wifi.calls.size();
+
+  stack.serial.feed("set wifi.hostname plant-room\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("OK staged", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL(begins, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL_STRING("watering-controller",
+                           stack.runtime.config().wifiHostname);
+
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.store.wifiHostname().c_str());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.wifi.lastHostname.c_str());
+  TEST_ASSERT_TRUE(stack.store.lastFields.wifiHostname);
+  TEST_ASSERT_FALSE(stack.store.lastFields.wifiPassword);
+  TEST_ASSERT_FALSE(stack.store.lastFields.statusReporting);
+  TEST_ASSERT_FALSE(stack.store.lastFields.mqttHost);
+  TEST_ASSERT_EQUAL(resets + 1, stack.wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL(names + 1, stack.wifi.setHostnameCount);
+  TEST_ASSERT_EQUAL(begins + 1, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+  TEST_ASSERT_EQUAL_STRING("reset", stack.wifi.calls[events].c_str());
+  TEST_ASSERT_EQUAL_STRING("hostname", stack.wifi.calls[events + 1].c_str());
+  TEST_ASSERT_EQUAL_STRING("begin", stack.wifi.calls[events + 2].c_str());
+}
+
+void testInvalidHostnameIsRejectedBeforeStaging()
+{
+  CommandStack stack;
+  const int begins = stack.wifi.beginCallCount;
+  const std::string tooLong(32, 'a');
+  stack.serial.feed("set wifi.hostname -bad\n");
+  stack.serial.feed("set wifi.hostname bad_name\n");
+  stack.serial.feed("set wifi.hostname " + tooLong + "\n");
+  stack.serial.feed("set wifi.hostname \n");
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("ERR hostname", stack.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("ERR hostname", stack.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("ERR hostname", stack.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("ERR hostname", stack.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL(0, stack.store.saveCallCount);
+  TEST_ASSERT_EQUAL(begins, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL_STRING("watering-controller",
+                           stack.runtime.config().wifiHostname);
+}
+
+void testFailedApplyKeepsHostnameAndStatusUntilRetry()
+{
+  CommandStack stack;
+  stack.store.saveResult = false;
+  const int begins = stack.wifi.beginCallCount;
+  stack.serial.feed("set status off\nset wifi.hostname plant-room\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("ERR apply", stack.serial.output.back().c_str());
+  TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_TRUE(stack.runtime.config().statusReporting);
+  TEST_ASSERT_EQUAL_STRING("watering-controller",
+                           stack.runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL(begins, stack.wifi.beginCallCount);
+
+  stack.store.saveResult = true;
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output.back().c_str());
+  TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
+  TEST_ASSERT_FALSE(stack.store.statusReporting());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.store.wifiHostname().c_str());
+  TEST_ASSERT_EQUAL(begins + 1, stack.wifi.beginCallCount);
+  TEST_ASSERT_TRUE(stack.store.lastFields.wifiHostname);
+  TEST_ASSERT_TRUE(stack.store.lastFields.statusReporting);
+}
+
+void testPasswordApplyReconnectsWithStoredHostname()
+{
+  CommandStack stack;
+  stack.serial.feed("set wifi.hostname plant-room\napply\n");
+  stack.controller.update();
+  const int resets = stack.wifi.resetStationModeCount;
+  const int names = stack.wifi.setHostnameCount;
+  const int begins = stack.wifi.beginCallCount;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+
+  stack.serial.feed("set wifi.password new-password\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("new-password",
+                           stack.runtime.config().wifiPassword);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.store.wifiHostname().c_str());
+  TEST_ASSERT_EQUAL_STRING("new-password", stack.store.wifiPassword().c_str());
+  TEST_ASSERT_TRUE(stack.store.lastFields.wifiPassword);
+  TEST_ASSERT_FALSE(stack.store.lastFields.wifiHostname);
+  TEST_ASSERT_EQUAL(resets, stack.wifi.resetStationModeCount);
+  TEST_ASSERT_EQUAL(names, stack.wifi.setHostnameCount);
+  TEST_ASSERT_EQUAL(begins + 1, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.wifi.lastHostname.c_str());
+  TEST_ASSERT_EQUAL_STRING("new-password", stack.wifi.lastPassword.c_str());
+}
+
+void testRecordKeepsDefaultHostnameAndStatusWhenMissing()
+{
+  FakePreferenceStore store;
+  store.strings[NetworkConfigKeys::wifiSsid] = "garden";
+  NetworkConfig defaults = {"", "", "", 1883, "watering-controller", nullptr,
+                            nullptr, "watering-controller", true};
+  NetworkConfigData data;
+
+  TEST_ASSERT_TRUE(NetworkConfigRecord::load(store, defaults, data));
+  TEST_ASSERT_EQUAL_STRING("watering-controller", data.wifiHostname.c_str());
+  TEST_ASSERT_TRUE(data.statusReporting);
+  TEST_ASSERT_EQUAL(0, store.writeCounts[NetworkConfigKeys::wifiHostname]);
+  TEST_ASSERT_EQUAL(0, store.writeCounts[NetworkConfigKeys::statusReport]);
+  TEST_ASSERT_FALSE(store.contains(NetworkConfigKeys::wifiHostname));
+  TEST_ASSERT_FALSE(store.contains(NetworkConfigKeys::statusReport));
+}
+
+void testRecordLoadsStoredHostnameAndStatus()
+{
+  FakePreferenceStore store;
+  store.strings[NetworkConfigKeys::wifiSsid] = "garden";
+  store.strings[NetworkConfigKeys::wifiHostname] = "plant-room";
+  store.ports[NetworkConfigKeys::statusReport] = 0;
+  NetworkConfig defaults = {"", "", "", 1883, "watering-controller", nullptr,
+                            nullptr, "watering-controller", true};
+  NetworkConfigData data;
+
+  TEST_ASSERT_TRUE(NetworkConfigRecord::load(store, defaults, data));
+  TEST_ASSERT_EQUAL_STRING("plant-room", data.wifiHostname.c_str());
+  TEST_ASSERT_FALSE(data.statusReporting);
+}
+
+void testRecordSavesHostnameAndStatusOnly()
+{
+  FakePreferenceStore store;
+  NetworkConfig update = {"ignored", "ignored", "ignored", 1883, "ignored",
+                          nullptr, nullptr, "plant-room", false};
+  NetworkConfigFieldMask fields;
+  fields.wifiHostname = true;
+  fields.statusReporting = true;
+
+  TEST_ASSERT_TRUE(NetworkConfigRecord::save(store, update, fields));
+  TEST_ASSERT_EQUAL_STRING(
+    "plant-room", store.strings[NetworkConfigKeys::wifiHostname].c_str());
+  TEST_ASSERT_EQUAL(0, store.ports[NetworkConfigKeys::statusReport]);
+  TEST_ASSERT_EQUAL(0, store.writeCounts[NetworkConfigKeys::wifiSsid]);
+  TEST_ASSERT_EQUAL(1, store.writeCounts[NetworkConfigKeys::wifiHostname]);
+  TEST_ASSERT_EQUAL(1, store.writeCounts[NetworkConfigKeys::statusReport]);
+}
+
+void testRuntimeRejectsInvalidHostnameWithoutSaving()
+{
+  FakeNetworkConfigStore store;
+  FakeClock clock;
+  FakeWifi wifi;
+  FakeMqttClient client;
+  WifiManager wifiManager(wifi, clock, wifiConfig());
+  MqttService mqtt(client, clock, mqttConfig());
+  NetworkRuntime runtime(store, wifiManager, mqtt);
+  runtime.begin(config());
+  NetworkConfig update = config();
+  update.wifiHostname = "-bad";
+  NetworkConfigFieldMask fields;
+  fields.wifiHostname = true;
+
+  TEST_ASSERT_FALSE(runtime.apply(update, fields));
+  TEST_ASSERT_EQUAL(0, store.saveCallCount);
+  TEST_ASSERT_EQUAL_STRING("old", runtime.config().wifiSsid);
+  TEST_ASSERT_EQUAL(1, wifi.beginCallCount);
+}
+
+void testStoredStatusOffLoadsDisabled()
+{
+  FakeNetworkConfigStore store;
+  store.seed({"garden", "pw", "broker", 1883, "controller", nullptr, nullptr,
+              "plant-room", false});
+  FakeClock clock;
+  FakeWifi wifi;
+  FakeNtpAdapter ntpAdapter;
+  FakeMqttClient client;
+  FakeSerialPort serial;
+  WifiManager wifiManager(wifi, clock, wifiConfig());
+  NtpService ntpService(
+    ntpAdapter, clock, {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000});
+  MqttService mqtt(client, clock, mqttConfig());
+  NetworkRuntime runtime(store, wifiManager, mqtt);
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt);
+  const NetworkConfig defaults = {
+    "", "", "", 1883, "watering-controller", nullptr, nullptr,
+    "watering-controller", true};
+
+  TEST_ASSERT_TRUE(runtime.begin(defaults));
+  reporter.begin({1000});
+  reporter.setReportingEnabled(runtime.config().statusReporting);
+
+  TEST_ASSERT_FALSE(runtime.config().statusReporting);
+  TEST_ASSERT_FALSE(reporter.reportingEnabled());
+  TEST_ASSERT_EQUAL_STRING("plant-room", runtime.config().wifiHostname);
+  clock.advance(1000);
+  reporter.update();
+  TEST_ASSERT_EQUAL(0, serial.output.size());
 }
