@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <ctime>
 
+#include "ModuleProtocol.h"
+
 namespace
 {
 constexpr int64_t secondsPerDay = 86400;
@@ -38,12 +40,14 @@ void civilFromDays(int64_t days, int32_t& year, unsigned& month, unsigned& day)
 SerialStatusReporter::SerialStatusReporter(ISerialPort& serial, IClock& clock,
                                            WifiManager& wifiManager,
                                            NtpService& ntpService,
-                                           MqttService& mqttService)
+                                           MqttService& mqttService,
+                                           ModuleHost& moduleHost)
   : _serial(serial),
     _clock(clock),
     _wifiManager(wifiManager),
     _ntpService(ntpService),
-    _mqttService(mqttService)
+    _mqttService(mqttService),
+    _moduleHost(moduleHost)
 {
 }
 
@@ -74,9 +78,9 @@ void SerialStatusReporter::reconfigure(const SerialStatusReporterConfig& config)
 }
 
 /**
- * Writes WiFi, NTP, and MQTT status lines when started, periodic reporting
- * is enabled, the USB link is plugged in, and the snapshot interval has
- * elapsed.
+ * Writes WiFi, NTP, MQTT, and slot status lines when started, periodic
+ * reporting is enabled, the USB link is plugged in, and the snapshot
+ * interval has elapsed.
  *
  * @return Nothing.
  */
@@ -125,7 +129,7 @@ bool SerialStatusReporter::reportingEnabled() const
 }
 
 /**
- * Writes one WiFi, NTP, and MQTT snapshot immediately.
+ * Writes one WiFi, NTP, MQTT, and slot snapshot immediately.
  *
  * The USB link must be plugged in. Periodic reporting may be disabled.
  * A successful print restarts the snapshot interval.
@@ -157,7 +161,7 @@ const SerialStatusReporterConfig& SerialStatusReporter::config() const
 // ========== Private Helpers ==========
 
 /**
- * Writes the WiFi, NTP, and MQTT lines.
+ * Writes the WiFi, NTP, MQTT, and slot lines.
  *
  * @return Nothing.
  */
@@ -166,6 +170,10 @@ void SerialStatusReporter::_writeSnapshot()
   _writeWifiStatus();
   _writeNtpStatus();
   _writeMqttStatus();
+  for (uint8_t i = 0; i < module_protocol::kSlotCount; ++i)
+  {
+    _writeSlotStatus(i);
+  }
 }
 
 /**
@@ -240,6 +248,44 @@ void SerialStatusReporter::_writeMqttStatus()
   char line[64];
   std::snprintf(line, sizeof(line), "MQTT Status: %s",
                 _mqttStateName(_mqttService.state()));
+  _serial.writeLine(line);
+}
+
+/**
+ * Writes one slot's public snapshot line.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Nothing.
+ */
+void SerialStatusReporter::_writeSlotStatus(uint8_t slotIndex)
+{
+  char line[80];
+  const uint8_t slotNumber = static_cast<uint8_t>(slotIndex + 1);
+  const SlotState state = _moduleHost.state(slotIndex);
+  if (state == SlotState::Online)
+  {
+    const char* name = _moduleHost.typeName(slotIndex);
+    std::snprintf(line, sizeof(line), "Slot %u: Online %s addr=0x%02X",
+                  slotNumber, name == nullptr ? "Unknown" : name,
+                  _moduleHost.address(slotIndex));
+  }
+  else if (state == SlotState::Unsupported)
+  {
+    std::snprintf(line, sizeof(line),
+                  "Slot %u: Unsupported type=0x%04X addr=0x%02X", slotNumber,
+                  _moduleHost.typeId(slotIndex),
+                  _moduleHost.address(slotIndex));
+  }
+  else if (state == SlotState::Fault)
+  {
+    std::snprintf(line, sizeof(line), "Slot %u: Fault %s", slotNumber,
+                  _slotFaultName(_moduleHost.fault(slotIndex)));
+  }
+  else
+  {
+    std::snprintf(line, sizeof(line), "Slot %u: %s", slotNumber,
+                  _slotStateName(state));
+  }
   _serial.writeLine(line);
 }
 
@@ -322,6 +368,58 @@ const char* SerialStatusReporter::_mqttStateName(MqttServiceState state)
     case MqttServiceState::Idle:
     default:
       return "Idle";
+  }
+}
+
+/**
+ * Maps a public slot state to its serial label.
+ *
+ * @param state Public slot state.
+ * @return Status label.
+ */
+const char* SerialStatusReporter::_slotStateName(SlotState state)
+{
+  switch (state)
+  {
+    case SlotState::Debouncing:
+      return "Debouncing";
+    case SlotState::Enumerating:
+      return "Enumerating";
+    case SlotState::Online:
+      return "Online";
+    case SlotState::Unsupported:
+      return "Unsupported";
+    case SlotState::Fault:
+      return "Fault";
+    case SlotState::Empty:
+    default:
+      return "Empty";
+  }
+}
+
+/**
+ * Maps a slot fault to its serial label.
+ *
+ * @param fault Slot fault.
+ * @return Fault label.
+ */
+const char* SerialStatusReporter::_slotFaultName(SlotFault fault)
+{
+  switch (fault)
+  {
+    case SlotFault::Nack:
+      return "Nack";
+    case SlotFault::BadCrc:
+      return "BadCrc";
+    case SlotFault::BadFrame:
+      return "BadFrame";
+    case SlotFault::Timeout:
+      return "Timeout";
+    case SlotFault::Busy:
+      return "Busy";
+    case SlotFault::None:
+    default:
+      return "None";
   }
 }
 

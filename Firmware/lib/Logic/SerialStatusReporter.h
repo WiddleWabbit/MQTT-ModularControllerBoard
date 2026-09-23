@@ -7,6 +7,7 @@
 #include "IClock.h"
 #include "ISerialPort.h"
 #include "ISerialStatusControl.h"
+#include "ModuleHost.h"
 #include "MqttService.h"
 #include "NtpService.h"
 #include "WifiManager.h"
@@ -17,8 +18,8 @@ struct SerialStatusReporterConfig
 };
 
 /**
- * Writes USB-gated WiFi, NTP, and MQTT status snapshots on a configured
- * interval for the current power-on session.
+ * Writes USB-gated WiFi, NTP, MQTT, and slot status snapshots on a
+ * configured interval for the current power-on session.
  */
 class SerialStatusReporter : public ISerialStatusControl
 {
@@ -31,10 +32,11 @@ public:
    * @param wifiManager WiFi connection manager.
    * @param ntpService NTP synchronization service.
    * @param mqttService MQTT connection manager.
+   * @param moduleHost Four-slot module host.
    */
   SerialStatusReporter(ISerialPort& serial, IClock& clock,
                        WifiManager& wifiManager, NtpService& ntpService,
-                       MqttService& mqttService);
+                       MqttService& mqttService, ModuleHost& moduleHost);
 
   /**
    * Starts status reporting with the supplied snapshot interval.
@@ -53,9 +55,9 @@ public:
   void reconfigure(const SerialStatusReporterConfig& config);
 
   /**
-   * Writes WiFi, NTP, and MQTT status lines when started, periodic reporting
-   * is enabled, the USB link is plugged in, and the snapshot interval has
-   * elapsed.
+   * Writes WiFi, NTP, MQTT, and slot status lines when started, periodic
+   * reporting is enabled, the USB link is plugged in, and the snapshot
+   * interval has elapsed.
    *
    * @return Nothing.
    */
@@ -79,7 +81,7 @@ public:
   bool reportingEnabled() const override;
 
   /**
-   * Writes one WiFi, NTP, and MQTT snapshot immediately.
+   * Writes one WiFi, NTP, MQTT, and slot snapshot immediately.
    *
    * The USB link must be plugged in. Periodic reporting may be disabled.
    * A successful print restarts the snapshot interval.
@@ -101,13 +103,14 @@ private:
   WifiManager& _wifiManager;
   NtpService& _ntpService;
   MqttService& _mqttService;
+  ModuleHost& _moduleHost;
   SerialStatusReporterConfig _config{};
   bool _started = false;
   bool _reportingEnabled = true;
   uint32_t _lastReportAt = 0;
 
   /**
-   * Writes the WiFi, NTP, and MQTT lines.
+   * Writes the WiFi, NTP, MQTT, and slot lines.
    *
    * @return Nothing.
    */
@@ -136,6 +139,30 @@ private:
    * @return Nothing.
    */
   void _writeMqttStatus();
+
+  /**
+   * Writes one slot's public snapshot line.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Nothing.
+   */
+  void _writeSlotStatus(uint8_t slotIndex);
+
+  /**
+   * Maps a public slot state to its serial label.
+   *
+   * @param state Public slot state.
+   * @return Status label.
+   */
+  static const char* _slotStateName(SlotState state);
+
+  /**
+   * Maps a slot fault to its serial label.
+   *
+   * @param fault Slot fault.
+   * @return Fault label.
+   */
+  static const char* _slotFaultName(SlotFault fault);
 
   /**
    * Tests elapsed time using wrap-safe unsigned arithmetic.

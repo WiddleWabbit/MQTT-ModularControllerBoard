@@ -4,11 +4,14 @@
 #include <Wire.h> // Wire Library to Communicate with I2C Devices
 
 #include "Esp32Clock.h"
+#include "Esp32DigitalPin.h"
+#include "Esp32I2cMaster.h"
 #include "Esp32PreferenceStore.h"
 #include "PreferenceNetworkConfigStore.h"
 #include "Esp32NtpAdapter.h"
 #include "Esp32SerialPort.h"
 #include "Esp32Wifi.h"
+#include "ModuleHost.h"
 #include "MqttService.h"
 #include "NtpService.h"
 #include "PubSubClientAdapter.h"
@@ -45,35 +48,55 @@ PreferenceNetworkConfigStore networkConfigStore(networkPreferences);
 Esp32SerialPort serialPort(Serial);
 NetworkRuntime networkRuntime(
   networkConfigStore, wifiManager, mqttService);
-SerialStatusReporter serialStatusReporter(
-  serialPort, systemClock, wifiManager, ntpService, mqttService);
-SerialConfigController serialConfigController(
-  serialPort, networkRuntime, serialStatusReporter);
 
 // ========== Pin Configuration ==========
 
-// Specify pins to use for I2C.
 const uint8_t SDA_PIN = 4;
 const uint8_t SCL_PIN = 5;
-// Specify pins for SPI.
 const uint8_t MOSI_PIN = 11;
+// PCB/README/FSPI: MOSI=11, SCK=12, MISO=13. These two are swapped vs the PCB;
+// do not use until PR 6.
 const uint8_t MISO_PIN = 12;
 const uint8_t SCK_PIN = 13;
-// Specify chip-select pins.
 const uint8_t CS1_PIN = 6;
 const uint8_t CS2_PIN = 7;
 const uint8_t CS3_PIN = 15;
 const uint8_t CS4_PIN = 16;
-// Specify sense pins.
 const uint8_t SNS1_PIN = 39;
 const uint8_t SNS2_PIN = 41;
 const uint8_t SNS3_PIN = 44;
 const uint8_t SNS4_PIN = 2;
-// Specify general-use pins.
 const uint8_t MOD1_PIN = 40;
 const uint8_t MOD2_PIN = 42;
 const uint8_t MOD3_PIN = 43;
 const uint8_t MOD4_PIN = 1;
+
+Esp32DigitalPin sns1(SNS1_PIN);
+Esp32DigitalPin sns2(SNS2_PIN);
+Esp32DigitalPin sns3(SNS3_PIN);
+Esp32DigitalPin sns4(SNS4_PIN);
+Esp32DigitalPin mod1(MOD1_PIN);
+Esp32DigitalPin mod2(MOD2_PIN);
+Esp32DigitalPin mod3(MOD3_PIN);
+Esp32DigitalPin mod4(MOD4_PIN);
+Esp32DigitalPin cs1(CS1_PIN);
+Esp32DigitalPin cs2(CS2_PIN);
+Esp32DigitalPin cs3(CS3_PIN);
+Esp32DigitalPin cs4(CS4_PIN);
+Esp32I2cMaster i2cMaster(Wire, SDA_PIN, SCL_PIN);
+SlotPins slotPins[4] = {
+  {sns1, mod1, cs1},
+  {sns2, mod2, cs2},
+  {sns3, mod3, cs3},
+  {sns4, mod4, cs4},
+};
+ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
+SerialStatusReporter serialStatusReporter(
+  serialPort, systemClock, wifiManager, ntpService, mqttService, moduleHost);
+SerialConfigController serialConfigController(
+  serialPort, networkRuntime, serialStatusReporter);
+
+
 /**
  * Initializes the ESP32 and all functions.
  *
@@ -109,13 +132,13 @@ void setup()
     return;
   }
   
-  // ========== I2C ==========
+  // ========== Modules ==========
 
   if (serialPort.isPlugged())
   {
     Serial.println("Beginning I2C Communication.");
   }
-  Wire.begin(SDA_PIN, SCL_PIN); // Initialize I2C Communication
+  moduleHost.begin();
 
   // ========== Networking ==========
 
@@ -137,8 +160,8 @@ void setup()
 }
 
 /**
- * Services WiFi, NTP, and MQTT, then reports runtime memory and connection
- * status.
+ * Services WiFi, NTP, MQTT, modules, and serial, then reports runtime
+ * memory.
  *
  * @return Nothing.
  */
@@ -148,6 +171,7 @@ void loop()
   ntpService.update();
   mqttService.update(wifiManager.isConnected());
   serialConfigController.update();
+  moduleHost.update();
   serialStatusReporter.update();
 
   static uint32_t lastReportAt = 0;

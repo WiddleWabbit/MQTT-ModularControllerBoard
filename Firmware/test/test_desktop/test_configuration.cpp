@@ -7,6 +7,7 @@
 #include "NtpService.h"
 #include "SerialConfigController.h"
 #include "SerialStatusReporter.h"
+#include "fakes/EmptyModuleHostFixture.h"
 #include "fakes/FakeClock.h"
 #include "fakes/FakeMqttClient.h"
 #include "fakes/FakeNetworkConfigStore.h"
@@ -37,6 +38,7 @@ struct CommandStack
 {
   FakeNetworkConfigStore store;
   FakeClock clock;
+  EmptyModuleHostFixture modules;
   FakeWifi wifi;
   FakeNtpAdapter ntpAdapter;
   FakeMqttClient mqttClient;
@@ -49,12 +51,14 @@ struct CommandStack
   SerialConfigController controller;
 
   CommandStack()
-    : wifiManager(wifi, clock, wifiConfig()),
+    : modules(clock),
+      wifiManager(wifi, clock, wifiConfig()),
       ntpService(ntpAdapter, clock,
                  {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000}),
       mqttService(mqttClient, clock, mqttConfig()),
       runtime(store, wifiManager, mqttService),
-      reporter(serial, clock, wifiManager, ntpService, mqttService),
+      reporter(serial, clock, wifiManager, ntpService, mqttService,
+               modules.host),
       controller(serial, runtime, reporter)
   {
     const NetworkConfig defaults = {
@@ -393,7 +397,7 @@ void testSetStatusOffRemainsEnabledUntilApply()
   const size_t before = stack.serial.output.size();
   stack.clock.advance(1000);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(before + 3, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(before + 7, stack.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
                            stack.serial.output[before].c_str());
 }
@@ -435,7 +439,7 @@ void testApplyStatusOnResumesAfterInterval()
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterApply + 3, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterApply + 7, stack.serial.output.size());
 }
 
 void testStatusCommandPrintsWhileReportingIsOff()
@@ -450,12 +454,12 @@ void testStatusCommandPrintsWhileReportingIsOff()
   stack.serial.feed("apply\nstatus\n");
   stack.controller.update();
   TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
-  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[8].c_str());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
-                           stack.serial.output[5].c_str());
-  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[6].c_str());
+                           stack.serial.output[9].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[10].c_str());
   TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
-                           stack.serial.output[7].c_str());
+                           stack.serial.output[11].c_str());
 }
 
 void testStatusCommandPrintsNothingWhenUnplugged()
@@ -474,20 +478,20 @@ void testStatusCommandRestartsSnapshotInterval()
   stack.clock.advance(1000);
   stack.reporter.update();
   const size_t afterPeriodic = stack.serial.output.size();
-  TEST_ASSERT_EQUAL(3, afterPeriodic);
+  TEST_ASSERT_EQUAL(7, afterPeriodic);
 
   stack.clock.advance(400);
   stack.serial.feed("status\n");
   stack.controller.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 3, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 7, stack.serial.output.size());
 
   stack.clock.advance(999);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 3, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 7, stack.serial.output.size());
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 6, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 14, stack.serial.output.size());
 }
 
 void testSetStatusRejectsUnknownValue()
@@ -694,6 +698,7 @@ void testStoredStatusOffLoadsDisabled()
   store.seed({"garden", "pw", "broker", 1883, "controller", nullptr, nullptr,
               "plant-room", false});
   FakeClock clock;
+  EmptyModuleHostFixture modules(clock);
   FakeWifi wifi;
   FakeNtpAdapter ntpAdapter;
   FakeMqttClient client;
@@ -703,7 +708,8 @@ void testStoredStatusOffLoadsDisabled()
     ntpAdapter, clock, {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000});
   MqttService mqtt(client, clock, mqttConfig());
   NetworkRuntime runtime(store, wifiManager, mqtt);
-  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt);
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
   const NetworkConfig defaults = {
     "", "", "", 1883, "watering-controller", nullptr, nullptr,
     "watering-controller", true};

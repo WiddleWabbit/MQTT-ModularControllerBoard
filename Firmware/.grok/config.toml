@@ -15,5 +15,8 @@ allow = [
   "Bash(test/**)",
   "Read(docs/**)",
   "Edit(docs/**)",
-  "Bash(docs/**)"
+  "Bash(docs/**)",
+  "Read(/Users/Nathan/AppData/Local/Temp/grok-Nathan/**)",
+  "Edit(/Users/Nathan/AppData/Local/Temp/grok-Nathan/**)",
+  "Bash(/Users/Nathan/AppData/Local/Temp/grok-Nathan/**)",
 ]
