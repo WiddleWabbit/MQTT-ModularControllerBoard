@@ -139,6 +139,16 @@ void testWriteReadNackOnWriteDoesNotParseRx();
 void testNoncompliantAlwaysAck0x0AIsDetected();
 void testSenseGlitchDuringWaitForLockDoesNotAbortEnumerate();
 void testSetAddressNackRetries();
+void testSlotPublisherPublishesRetainedEmptySlots();
+void testSlotPublisherWaitsUntilMqttConnected();
+void testSlotPublisherPublishesLatestSnapshotAfterReconnect();
+void testSlotPublisherRetriesRejectedSlotOnly();
+void testSlotPublisherPublishesOnlyTheChangedSlot();
+void testSlotPublisherPublishesOnlineIdentityEcho();
+void testSlotPublisherPublishesUnsupportedType();
+void testSlotPublisherPublishesFaultNack();
+void testSlotPublisherRepublishesEmptyAfterUnplug();
+void testSlotPublisherDoesNotTouchTheBus();
 
 namespace
 {
@@ -717,5 +727,15 @@ int main()
   RUN_TEST(testNoncompliantAlwaysAck0x0AIsDetected);
   RUN_TEST(testSenseGlitchDuringWaitForLockDoesNotAbortEnumerate);
   RUN_TEST(testSetAddressNackRetries);
+  RUN_TEST(testSlotPublisherPublishesRetainedEmptySlots);
+  RUN_TEST(testSlotPublisherWaitsUntilMqttConnected);
+  RUN_TEST(testSlotPublisherPublishesLatestSnapshotAfterReconnect);
+  RUN_TEST(testSlotPublisherRetriesRejectedSlotOnly);
+  RUN_TEST(testSlotPublisherPublishesOnlyTheChangedSlot);
+  RUN_TEST(testSlotPublisherPublishesOnlineIdentityEcho);
+  RUN_TEST(testSlotPublisherPublishesUnsupportedType);
+  RUN_TEST(testSlotPublisherPublishesFaultNack);
+  RUN_TEST(testSlotPublisherRepublishesEmptyAfterUnplug);
+  RUN_TEST(testSlotPublisherDoesNotTouchTheBus);
   return UNITY_END();
 }

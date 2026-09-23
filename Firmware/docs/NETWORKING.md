@@ -43,6 +43,27 @@ broker connection and uses the normal reconnect backoff. `publish` is rejected
 while disconnected.
 Inbound payloads are forwarded through `MqttMessageCallback`.
 
+`ModuleSlotPublisher` reads `ModuleHost` public snapshots and publishes one
+retained message per slot when that text changes. `loop()` calls `update()`
+after `moduleHost.update()`. The host does not depend on MQTT, and the
+publisher does not call `ping()` or `echo()`. Topics are `watering/slot/1`
+through `watering/slot/4` (firmware index 0 is topic 1). Payloads use the
+same words as the serial slot line, without the `Slot N:` prefix:
+
+```text
+Empty
+Debouncing
+Enumerating
+Online IdentityEcho addr=0x10
+Unsupported type=0x02AA addr=0x12
+Fault Nack
+```
+
+Publication waits until `MqttService` is connected. A rejected publish stays
+pending and is retried on a later `update()`. An unchanged snapshot is not
+sent again, including after a broker reconnect. The publish contract has no
+QoS argument, so slot status uses the client default.
+
 `IMqttClient` is the narrow client contract. `PubSubClientAdapter` wraps an
 already-constructed PubSubClient and is configured with `setServer`.
 `FakeMqttClient` provides deterministic connection failures, subscription and

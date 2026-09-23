@@ -10,7 +10,8 @@ not include Arduino headers. Hardware adapters are isolated in
 - `lib/Interfaces/` contains pure abstract hardware contracts only.
 - `lib/Drivers/` contains ESP32/Arduino implementations of those contracts.
 - `lib/Logic/` contains nonblocking WiFi, NTP, MQTT, and four-slot module
-  host state machines plus USB-gated serial status reporting.
+  host state machines, USB-gated serial status reporting, and retained MQTT
+  publication of slot snapshots.
 - `test/test_desktop/fakes/` contains controllable implementations for native
   tests.
 - `test/test_desktop/` contains Unity unit and interaction tests.
@@ -40,6 +41,10 @@ pull-up), then runs a nonblocking per-slot state machine from `loop()`.
 Unconfigured modules share address `0x0A`; the host selects one slot at a
 time with MOD, assigns `0x10 + slot`, and identifies the type. At most one
 I2C protocol transaction runs per `ModuleHost::update()`.
+`ModuleSlotPublisher` publishes a retained MQTT snapshot when a slot's public
+status text changes. `loop()` calls it after `moduleHost.update()`.
+`ModuleHost` does not depend on the MQTT client, and the publisher does not
+call `ping()` or `echo()`.
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions
 are bounded by a 50 ms driver timeout.
@@ -57,6 +62,6 @@ publications, inbound messages, persisted settings, USB presence, serial
 bytes, GPIO levels, and I2C slaves. This covers state transitions, retry
 backoff, failures, callbacks, configuration staging, apply failure,
 WiFi-to-MQTT interaction, serial status snapshots, hot-plug enumeration,
-and module protocol frames without hardware.
+module protocol frames, and retained slot-status publication without hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

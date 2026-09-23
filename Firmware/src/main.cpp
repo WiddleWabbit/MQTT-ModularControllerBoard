@@ -12,6 +12,7 @@
 #include "Esp32SerialPort.h"
 #include "Esp32Wifi.h"
 #include "ModuleHost.h"
+#include "ModuleSlotPublisher.h"
 #include "MqttService.h"
 #include "NtpService.h"
 #include "PubSubClientAdapter.h"
@@ -26,6 +27,8 @@ const MqttSubscription mqttSubscriptions[] = {
   {"watering/solenoids", 1},
   {"watering/pump", 1}
 };
+
+const char kSlotStatusTopicPrefix[] = "watering/slot";
 
 Esp32Clock systemClock;
 Esp32Wifi wifiDriver;
@@ -92,6 +95,8 @@ SlotPins slotPins[4] = {
   {sns4, mod4, cs4},
 };
 ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
+ModuleSlotPublisher moduleSlotPublisher(
+  moduleHost, mqttService, kSlotStatusTopicPrefix);
 SerialStatusReporter serialStatusReporter(
   serialPort, systemClock, wifiManager, ntpService, mqttService, moduleHost);
 SerialConfigController serialConfigController(
@@ -161,8 +166,8 @@ void setup()
 }
 
 /**
- * Services WiFi, NTP, MQTT, modules, and serial, then reports runtime
- * memory.
+ * Services WiFi, NTP, MQTT, modules, and serial, publishes slot status,
+ * then reports runtime memory.
  *
  * @return Nothing.
  */
@@ -173,6 +178,7 @@ void loop()
   mqttService.update(wifiManager.isConnected());
   serialConfigController.update();
   moduleHost.update();
+  moduleSlotPublisher.update();
   serialStatusReporter.update();
 
   static uint32_t lastReportAt = 0;

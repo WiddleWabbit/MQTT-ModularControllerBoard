@@ -149,22 +149,6 @@ private:
   void _writeSlotStatus(uint8_t slotIndex);
 
   /**
-   * Maps a public slot state to its serial label.
-   *
-   * @param state Public slot state.
-   * @return Status label.
-   */
-  static const char* _slotStateName(SlotState state);
-
-  /**
-   * Maps a slot fault to its serial label.
-   *
-   * @param fault Slot fault.
-   * @return Fault label.
-   */
-  static const char* _slotFaultName(SlotFault fault);
-
-  /**
    * Tests elapsed time using wrap-safe unsigned arithmetic.
    *
    * @param now Current monotonic time.

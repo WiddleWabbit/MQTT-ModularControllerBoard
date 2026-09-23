@@ -5,6 +5,7 @@
 #include <ctime>
 
 #include "ModuleProtocol.h"
+#include "SlotStatusText.h"
 
 namespace
 {
@@ -259,33 +260,11 @@ void SerialStatusReporter::_writeMqttStatus()
  */
 void SerialStatusReporter::_writeSlotStatus(uint8_t slotIndex)
 {
-  char line[80];
+  char body[kSlotStatusBodyBytes];
+  char line[96];
+  writeSlotStatusBody(_moduleHost, slotIndex, body, sizeof(body));
   const uint8_t slotNumber = static_cast<uint8_t>(slotIndex + 1);
-  const SlotState state = _moduleHost.state(slotIndex);
-  if (state == SlotState::Online)
-  {
-    const char* name = _moduleHost.typeName(slotIndex);
-    std::snprintf(line, sizeof(line), "Slot %u: Online %s addr=0x%02X",
-                  slotNumber, name == nullptr ? "Unknown" : name,
-                  _moduleHost.address(slotIndex));
-  }
-  else if (state == SlotState::Unsupported)
-  {
-    std::snprintf(line, sizeof(line),
-                  "Slot %u: Unsupported type=0x%04X addr=0x%02X", slotNumber,
-                  _moduleHost.typeId(slotIndex),
-                  _moduleHost.address(slotIndex));
-  }
-  else if (state == SlotState::Fault)
-  {
-    std::snprintf(line, sizeof(line), "Slot %u: Fault %s", slotNumber,
-                  _slotFaultName(_moduleHost.fault(slotIndex)));
-  }
-  else
-  {
-    std::snprintf(line, sizeof(line), "Slot %u: %s", slotNumber,
-                  _slotStateName(state));
-  }
+  std::snprintf(line, sizeof(line), "Slot %u: %s", slotNumber, body);
   _serial.writeLine(line);
 }
 
@@ -368,58 +347,6 @@ const char* SerialStatusReporter::_mqttStateName(MqttServiceState state)
     case MqttServiceState::Idle:
     default:
       return "Idle";
-  }
-}
-
-/**
- * Maps a public slot state to its serial label.
- *
- * @param state Public slot state.
- * @return Status label.
- */
-const char* SerialStatusReporter::_slotStateName(SlotState state)
-{
-  switch (state)
-  {
-    case SlotState::Debouncing:
-      return "Debouncing";
-    case SlotState::Enumerating:
-      return "Enumerating";
-    case SlotState::Online:
-      return "Online";
-    case SlotState::Unsupported:
-      return "Unsupported";
-    case SlotState::Fault:
-      return "Fault";
-    case SlotState::Empty:
-    default:
-      return "Empty";
-  }
-}
-
-/**
- * Maps a slot fault to its serial label.
- *
- * @param fault Slot fault.
- * @return Fault label.
- */
-const char* SerialStatusReporter::_slotFaultName(SlotFault fault)
-{
-  switch (fault)
-  {
-    case SlotFault::Nack:
-      return "Nack";
-    case SlotFault::BadCrc:
-      return "BadCrc";
-    case SlotFault::BadFrame:
-      return "BadFrame";
-    case SlotFault::Timeout:
-      return "Timeout";
-    case SlotFault::Busy:
-      return "Busy";
-    case SlotFault::None:
-    default:
-      return "None";
   }
 }
 
