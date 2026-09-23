@@ -23,7 +23,8 @@
 // ========== Network Configuration ==========
 
 const MqttSubscription mqttSubscriptions[] = {
-  {"watering-controller/command", 1},
+  {"watering/solenoids", 1},
+  {"watering/pump", 1}
 };
 
 Esp32Clock systemClock;
