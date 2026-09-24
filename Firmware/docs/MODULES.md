@@ -89,6 +89,90 @@ Unsupported 0x05.
 | `0x0201–0x02FF` | Further sensor types |
 | `0xF000–0xFFFF` | Experimental |
 
+## Several modules
+
+The host watches all four slots on every pass. Presence, enumeration,
+identify, and the action that follows are per slot. Two modules plugged in
+at once each run this sequence. They share the I2C bus, so enumeration and
+later bus commands take turns.
+
+### Scan
+
+Every `ModuleHost::update()` reads SENSE on every slot before any I2C.
+LOW means present and starts that slot's own 50 ms debounce. The other slots
+keep doing whatever they were doing. After debounce the slot waits 200 ms for
+the module to boot. The public state is `Debouncing` during the presence
+debounce, then `Enumerating` from the boot wait through identify.
+
+Slots debounce and boot together. A slot waits for another slot only when it
+needs the bus.
+
+### One enumeration at a time
+
+Unconfigured modules all answer at `0x0A`, so the host selects one slot.
+The enumeration lock goes to the lowest waiting slot number: slot 1 before
+slot 2, and so on. That slot drives MOD low, waits 10 ms, then:
+
+1. `PING` at `0x0A`
+2. `SET_ADDRESS` to `0x10 + slotIndex` (slot 1 → `0x10`, slot 2 → `0x11`)
+3. `PING` at the assigned address
+4. `GET_IDENTITY`
+
+The lock stays with that slot until identify finishes and MOD is released.
+The other module remains `Enumerating` with no address yet. The lock then
+moves to the next waiting slot, which gets its own address. One host
+transaction runs per `ModuleHost::update()`. While a slot holds the lock for
+a ping, address assignment, or identify, that step is the host transaction
+for the pass.
+
+### Identify chooses the action
+
+`GET_IDENTITY` returns a type id, a protocol version, and a firmware version.
+Protocol version must be 1. The type id is looked up in a fixed table. The
+bands above reserve ids for later modules. Two ids are acted on today:
+IdentityEcho `0x0001` and Sensor `0x0200`. Any other identified id, including
+another id inside those bands, is `Unsupported`.
+
+| Identity | Public state | Action for that slot |
+| --- | --- | --- |
+| `0x0001` IdentityEcho, protocol 1 | `Online` | Health `PING` about once a second. Status text `Online IdentityEcho addr=0x1N`. `ECHO` exists for a caller. `loop()` does not poll it. |
+| `0x0200` Sensor, protocol 1 | `Online` | Health `PING` about once a second, plus the count and reading cycle in [SENSORMODULE.md](SENSORMODULE.md). Status text `Online Sensor addr=0x1N`. |
+| Any other type id, or protocol version other than 1 | `Unsupported` | Health `PING` about once a second. Status text `Unsupported type=0xTTTT addr=0x1N`. No type-specific commands. |
+| Address assignment or identify keeps failing | `Fault` | No health ping and no type-specific commands. Enumeration is tried again after 1 s. Status text `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy`. |
+
+Each online or unsupported slot has its own one-second health timer. The
+host sends one due health ping per pass and rotates through the slots. Three
+failed health pings start recovery on that slot. The other slots stay as
+they are. A sense gap shorter than the 50 ms absence debounce leaves the
+slot in its current public state.
+
+`watering/slot/N` is published when that slot's status text changes. Serial
+status prints one line per slot. One module's line does not replace the
+other's topic.
+
+### Two modules plugged in together
+
+A Sensor module in slot 1 and an IdentityEcho module in slot 2:
+
+```text
+both slots   Debouncing, then Enumerating, over the same time
+slot 1       holds the lock: PING 0x0A, SET_ADDRESS 0x10, PING 0x10, GET_IDENTITY
+             Online Sensor addr=0x10
+             sensor count, then presence and a reading for each input
+slot 2       waits in Enumerating while slot 1 holds the lock
+             then the same steps to address 0x11
+             Online IdentityEcho addr=0x11
+             health pings only
+```
+
+Two Sensor modules use that same enumeration. After a slot is online, only
+that slot starts the sensor cycle. How those cycles share the poller is
+described in [SENSORMODULE.md](SENSORMODULE.md).
+
+Unplugging slot 2 returns slot 2 to `Empty`. When slot 2 was a Sensor module,
+its sensor topics publish retained `unavailable`. Slot 1 keeps its address,
+its type, and its own cycle.
+
 ## Sensor module (`0x0200`)
 
 The host sends these commands only after identify reports type `0x0200` and

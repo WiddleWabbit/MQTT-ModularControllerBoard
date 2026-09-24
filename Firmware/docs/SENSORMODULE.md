@@ -79,6 +79,63 @@ a health recovery that identifies the module again. A sense glitch that
 leaves the slot `Online` keeps the cache. The slot is queried for its count
 again once it is an online Sensor module.
 
+## More than one module
+
+Scanning, the enumeration lock, and the action chosen from the type id are
+in [MODULES.md](MODULES.md). Each slot is identified on its own. A Sensor
+module then gets the cycle below. An IdentityEcho module gets health pings.
+An unsupported type gets health pings and no sensor commands. An empty or
+faulted slot gets no sensor commands.
+
+Each Sensor slot has its own count, samples, and minute timer. Unplugging
+one Sensor module drops that slot's cache and publishes `unavailable` on its
+sensor topics. Another module in another slot keeps its count and its timer.
+
+The poller still runs one sensor query per pass, for one slot, in this order:
+
+1. An immediate read whose slot is an online Sensor module and whose count
+   is already known.
+2. `GET_SENSOR_COUNT` for an online Sensor module that has not reported a
+   count. Slot 1 is queried before slot 2, and so on. A queued immediate
+   read for a module that has no count yet makes that module the next count
+   query.
+3. The next presence or reading step. A slot that has started a cycle
+   finishes every input before another slot starts a cycle. When no cycle
+   is underway, the lowest due slot starts. A slot is due when its count is
+   known, the count is greater than 0, and its own 60 s timer has elapsed.
+   The timer is clear after the count is stored, so the first cycle starts
+   on the following pass. It is set to 60 s when that slot's last reading
+   finishes. Two modules therefore repeat on their own minutes, offset by
+   the time the earlier cycle took.
+
+A count query for a module that has just come online is step 2, so it runs
+before the next step of another module's cycle. That other cycle continues
+on the following pass.
+
+Two Sensor modules, one input each, after both have been identified:
+
+```text
+slot 1  GET_SENSOR_COUNT
+slot 2  GET_SENSOR_COUNT
+slot 1  GET_SENSOR_CONNECTED index 0
+slot 1  GET_SENSOR_READING   index 0
+        MQTT watering/slot/1/sensor/1
+slot 2  GET_SENSOR_CONNECTED index 0
+slot 2  GET_SENSOR_READING   index 0
+        MQTT watering/slot/2/sensor/1
+```
+
+About 60 seconds after slot 1's reading, slot 1 is due again. When slot 2 is
+still inside a cycle, slot 2 finishes that cycle first and slot 1 runs on
+the following passes. `watering/sensor/read` with payload `2 1` names slot 2.
+Once that slot's count is known, the read is the next sensor query, ahead of
+either module's periodic step.
+
+Health pings stay inside `moduleHost.update()`. The sensor query runs after
+that returns, on the module's assigned address. The same loop can therefore
+carry one enumeration or health transaction and one sensor query. They are
+separate transactions.
+
 ## MQTT topics
 
 Module numbers and sensor numbers in MQTT are 1-based. Module 1 is firmware
@@ -209,7 +266,8 @@ unless the slot is an online Sensor module, count-then-poll ordering, the
 60 second repeat, a module reset that reads the count again, a count of 0,
 busy retries, the immediate read command, malformed commands, a missing
 sensor, publication of an unchanged periodic value, and retained
-`unavailable` after unplug.
+`unavailable` after unplug. Two slots enumerating together are covered by
+the module-host tests. The sensor tests use one Sensor module.
 
 ```text
 pio test -e native

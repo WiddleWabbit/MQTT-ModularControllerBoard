@@ -39,8 +39,10 @@ ESP32 USB CDC plug state to gate serial input and responses.
 pull-up, LOW = present), MOD (open-drain enumeration select), and CS (idle
 pull-up), then runs a nonblocking per-slot state machine from `loop()`.
 Unconfigured modules share address `0x0A`; the host selects one slot at a
-time with MOD, assigns `0x10 + slot`, and identifies the type. At most one
-I2C protocol transaction runs per `ModuleHost::update()`.
+time with MOD, assigns `0x10 + slot`, and identifies the type. Each slot is
+then health-pinged, and a known type receives that type's actions. At most
+one I2C protocol transaction runs per `ModuleHost::update()`. Several
+modules plugged in together are described in [MODULES.md](MODULES.md).
 `ModuleSlotPublisher` publishes a retained MQTT snapshot when a slot's public
 status text changes. `loop()` calls it after `moduleHost.update()`.
 `ModuleHost` does not depend on the MQTT client, and the publisher does not
