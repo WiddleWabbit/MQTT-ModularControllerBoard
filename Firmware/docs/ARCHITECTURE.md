@@ -45,6 +45,13 @@ I2C protocol transaction runs per `ModuleHost::update()`.
 status text changes. `loop()` calls it after `moduleHost.update()`.
 `ModuleHost` does not depend on the MQTT client, and the publisher does not
 call `ping()` or `echo()`.
+A Sensor module (`0x0200`) is polled by `SensorPoller` after
+`moduleHost.update()`. The poller asks for the input count when that module
+is identified, then presence and a raw reading for each input once a minute.
+`SensorMqttBridge` publishes every stored reading, including a repeated
+value, and accepts `watering/sensor/read` as an immediate read. The MQTT
+callback only enqueues the request. Behaviour, topics, and commands are in
+[SENSORMODULE.md](SENSORMODULE.md).
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions
 are bounded by a 50 ms driver timeout.
@@ -62,6 +69,7 @@ publications, inbound messages, persisted settings, USB presence, serial
 bytes, GPIO levels, and I2C slaves. This covers state transitions, retry
 backoff, failures, callbacks, configuration staging, apply failure,
 WiFi-to-MQTT interaction, serial status snapshots, hot-plug enumeration,
-module protocol frames, and retained slot-status publication without hardware.
+module protocol frames, retained slot-status publication, and sensor
+count/presence/reading polls including an immediate MQTT read, without hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

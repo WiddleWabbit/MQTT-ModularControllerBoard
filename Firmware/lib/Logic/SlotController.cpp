@@ -10,6 +10,7 @@ struct ModuleTypeInfo
 
 const ModuleTypeInfo kModuleTypes[] = {
   {module_protocol::kTypeIdentityEcho, "IdentityEcho"},
+  {module_protocol::kTypeSensorModule, "Sensor"},
 };
 
 /**
@@ -452,6 +453,17 @@ uint16_t SlotController::firmwareVersion() const
 }
 
 /**
+ * Reads the identity epoch. Increments each time GET_IDENTITY
+ * succeeds, including after a module restart.
+ *
+ * @return Epoch, or 0 before the first successful identify.
+ */
+uint32_t SlotController::identityEpoch() const
+{
+  return _identityEpoch;
+}
+
+/**
  * Reads the last fault tag.
  *
  * @return Fault, or None.
@@ -706,6 +718,7 @@ void SlotController::_applyIdentity(const ModuleStepResult& result)
   _typeId = module_protocol::identityTypeId(identity);
   _protocolVersion = identity.protocolVersion;
   _firmwareVersion = module_protocol::identityFirmwareVersion(identity);
+  _identityEpoch += 1;
   _lastHealthAt = _clock.millis();
   _healthFails = 0;
   _fault = SlotFault::None;

@@ -64,6 +64,26 @@ pending and is retried on a later `update()`. An unchanged snapshot is not
 sent again, including after a broker reconnect. The publish contract has no
 QoS argument, so slot status uses the client default.
 
+`SensorPoller` reads an online Sensor module (`0x0200`) without going through
+MQTT. The first query after identify, including after the module restarts and
+is identified again, is the input count. Presence and a raw int32 reading for
+every input then run immediately, and again every 60 seconds. One sensor
+query runs per `SensorPoller::update()`, after `moduleHost.update()`.
+
+`SensorMqttBridge` publishes a retained reading at `watering/slot/N/sensor/M`
+(module slot and sensor number are both 1-based) each time a poll or an
+immediate read stores a sample, including when the value is unchanged.
+Another `update()` with no new sample does not publish again. Payloads are
+`connected <value>`, `disconnected`, or retained `unavailable` when that
+input is gone. `watering/sensor/read` with payload `N M` asks for sensor M
+on module slot N immediately. The callback enqueues the read; the next
+poller update performs it and the bridge publishes that result. A failed
+immediate read publishes non-retained `unavailable` and leaves the last
+retained reading in place. Malformed payloads are ignored. The firmware
+subscribes to `watering/sensor/read` at QoS 1 beside the existing command
+topics. Command parsing, poll order, and the publish rules are in
+[SENSORMODULE.md](SENSORMODULE.md).
+
 `IMqttClient` is the narrow client contract. `PubSubClientAdapter` wraps an
 already-constructed PubSubClient and is configured with `setServer`.
 `FakeMqttClient` provides deterministic connection failures, subscription and

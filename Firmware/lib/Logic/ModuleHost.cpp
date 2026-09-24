@@ -169,6 +169,18 @@ uint16_t ModuleHost::firmwareVersion(uint8_t slotIndex) const
 }
 
 /**
+ * Reads one slot's identity epoch.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Epoch, or 0 before the first successful identify.
+ */
+uint32_t ModuleHost::identityEpoch(uint8_t slotIndex) const
+{
+  const SlotController* slot = _slot(slotIndex);
+  return slot == nullptr ? 0 : slot->identityEpoch();
+}
+
+/**
  * Reads one slot's last fault tag.
  *
  * @param slotIndex Firmware slot 0..3.
@@ -293,6 +305,121 @@ bool ModuleHost::echo(uint8_t slotIndex, const uint8_t* in, size_t inLen,
   }
   *outLen = result.payloadLen;
   return true;
+}
+
+/**
+ * Reads how many sensor inputs a Sensor module reports.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * sensor queries. One writeRead when the slot is an Online Sensor.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Ok and a count of 0..kMaxSensorsPerModule, Busy when the
+ *         module is busy, Failed on a bad frame or bus error, or
+ *         Rejected when the slot is not an Online Sensor module.
+ */
+SensorCountResult ModuleHost::querySensorCount(uint8_t slotIndex)
+{
+  SensorCountResult result;
+  result.status = SensorQueryStatus::Failed;
+  result.count = 0;
+  uint8_t payload[module_protocol::kSensorCountPayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = _querySensor(slotIndex, module_protocol::kCmdGetSensorCount,
+                               nullptr, 0, payload, sizeof(payload),
+                               &payloadLen);
+  if (result.status != SensorQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSensorCountPayloadLen ||
+      payload[0] > module_protocol::kMaxSensorsPerModule)
+  {
+    result.status = SensorQueryStatus::Failed;
+    return result;
+  }
+  result.count = payload[0];
+  return result;
+}
+
+/**
+ * Reads whether one sensor input is connected.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * sensor queries.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param sensorIndex Zero-based input on that module.
+ * @return Ok and the connected flag, or Busy, Failed, or Rejected.
+ */
+SensorConnectedResult ModuleHost::querySensorConnected(uint8_t slotIndex,
+                                                       uint8_t sensorIndex)
+{
+  SensorConnectedResult result;
+  result.status = SensorQueryStatus::Rejected;
+  result.connected = false;
+  if (sensorIndex >= module_protocol::kMaxSensorsPerModule)
+  {
+    return result;
+  }
+  const uint8_t request[1] = {sensorIndex};
+  uint8_t payload[module_protocol::kSensorConnectedPayloadLen];
+  uint8_t payloadLen = 0;
+  result.status =
+      _querySensor(slotIndex, module_protocol::kCmdGetSensorConnected, request,
+                   sizeof(request), payload, sizeof(payload), &payloadLen);
+  if (result.status != SensorQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSensorConnectedPayloadLen ||
+      payload[0] != sensorIndex || payload[1] > 1)
+  {
+    result.status = SensorQueryStatus::Failed;
+    return result;
+  }
+  result.connected = payload[1] == 1;
+  return result;
+}
+
+/**
+ * Reads one sensor input.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * sensor queries.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param sensorIndex Zero-based input on that module.
+ * @return Ok, connected, and the raw int32 value, or Busy, Failed,
+ *         or Rejected.
+ */
+SensorReadingResult ModuleHost::querySensorReading(uint8_t slotIndex,
+                                                   uint8_t sensorIndex)
+{
+  SensorReadingResult result;
+  result.status = SensorQueryStatus::Rejected;
+  result.connected = false;
+  result.value = 0;
+  if (sensorIndex >= module_protocol::kMaxSensorsPerModule)
+  {
+    return result;
+  }
+  const uint8_t request[1] = {sensorIndex};
+  uint8_t payload[module_protocol::kSensorReadingPayloadLen];
+  uint8_t payloadLen = 0;
+  result.status =
+      _querySensor(slotIndex, module_protocol::kCmdGetSensorReading, request,
+                   sizeof(request), payload, sizeof(payload), &payloadLen);
+  if (result.status != SensorQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSensorReadingPayloadLen ||
+      payload[0] != sensorIndex || payload[1] > 1)
+  {
+    result.status = SensorQueryStatus::Failed;
+    return result;
+  }
+  result.connected = payload[1] == 1;
+  result.value = module_protocol::readInt32Be(payload + 2);
+  return result;
 }
 
 /**
@@ -490,4 +617,66 @@ ModuleStepResult ModuleHost::_classifyBusError(I2cTxnStatus txn)
   result.status = SlotFault::Timeout;
   _bus.recover();
   return result;
+}
+
+/**
+ * Issues one sensor-module command when the slot is Online.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param cmd Sensor command byte.
+ * @param txPayload Request payload, or nullptr when txLen is 0.
+ * @param txLen Request payload length.
+ * @param rxPayload Destination for a successful payload.
+ * @param rxCap Destination capacity.
+ * @param rxLen Set to the received payload length on Ok.
+ * @return Query status. Ok only means the frame decoded as status Ok.
+ */
+SensorQueryStatus ModuleHost::_querySensor(uint8_t slotIndex, uint8_t cmd,
+                                           const uint8_t* txPayload,
+                                           size_t txLen, uint8_t* rxPayload,
+                                           uint8_t rxCap, uint8_t* rxLen)
+{
+  SlotController* slot = _slot(slotIndex);
+  if (slot == nullptr || rxPayload == nullptr || rxLen == nullptr)
+  {
+    return SensorQueryStatus::Rejected;
+  }
+  if (slot->state() != SlotState::Online ||
+      slot->typeId() != module_protocol::kTypeSensorModule ||
+      slot->address() == 0)
+  {
+    return SensorQueryStatus::Rejected;
+  }
+
+  uint8_t tx[module_protocol::kMaxFrameBytes];
+  uint8_t rx[module_protocol::kMaxFrameBytes];
+  const size_t frameLen = ModuleCodec::encodeCommand(
+      cmd, txPayload, txLen, tx, module_protocol::kMaxFrameBytes);
+  if (frameLen == 0)
+  {
+    return SensorQueryStatus::Rejected;
+  }
+
+  const I2cTxnStatus txn =
+      _bus.writeRead(slot->address(), tx, frameLen, rx,
+                     module_protocol::kMaxFrameBytes);
+  const ModuleStepResult step = _classifyRead(txn, rx, false, false);
+  if (step.status == SlotFault::Busy)
+  {
+    return SensorQueryStatus::Busy;
+  }
+  if (step.status != SlotFault::None)
+  {
+    return SensorQueryStatus::Failed;
+  }
+  if (step.payloadLen > rxCap)
+  {
+    return SensorQueryStatus::Failed;
+  }
+  for (uint8_t i = 0; i < step.payloadLen; ++i)
+  {
+    rxPayload[i] = step.payload[i];
+  }
+  *rxLen = step.payloadLen;
+  return SensorQueryStatus::Ok;
 }

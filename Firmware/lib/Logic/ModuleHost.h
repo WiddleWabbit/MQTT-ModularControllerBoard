@@ -8,6 +8,45 @@
 #include "SlotController.h"
 
 /**
+ * Outcome of one direct sensor-module query.
+ */
+enum class SensorQueryStatus : uint8_t
+{
+  Ok,
+  Rejected,
+  Busy,
+  Failed
+};
+
+/**
+ * Result of GET_SENSOR_COUNT.
+ */
+struct SensorCountResult
+{
+  SensorQueryStatus status;
+  uint8_t count;
+};
+
+/**
+ * Result of GET_SENSOR_CONNECTED.
+ */
+struct SensorConnectedResult
+{
+  SensorQueryStatus status;
+  bool connected;
+};
+
+/**
+ * Result of GET_SENSOR_READING. value is valid when status is Ok.
+ */
+struct SensorReadingResult
+{
+  SensorQueryStatus status;
+  bool connected;
+  int32_t value;
+};
+
+/**
  * One slot's GPIO trio.
  */
 struct SlotPins
@@ -92,6 +131,14 @@ public:
   uint16_t firmwareVersion(uint8_t slotIndex) const;
 
   /**
+   * Reads one slot's identity epoch.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Epoch, or 0 before the first successful identify.
+   */
+  uint32_t identityEpoch(uint8_t slotIndex) const;
+
+  /**
    * Reads one slot's last fault tag.
    *
    * @param slotIndex Firmware slot 0..3.
@@ -136,6 +183,43 @@ public:
    */
   bool echo(uint8_t slotIndex, const uint8_t* in, size_t inLen, uint8_t* out,
             size_t* outLen);
+
+  /**
+   * Reads how many sensor inputs a Sensor module reports.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * sensor queries. One writeRead when the slot is an Online Sensor.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Ok and a count of 0..kMaxSensorsPerModule, Busy when the
+   *         module is busy, Failed on a bad frame or bus error, or
+   *         Rejected when the slot is not an Online Sensor module.
+   */
+  SensorCountResult querySensorCount(uint8_t slotIndex);
+
+  /**
+   * Reads whether one sensor input is connected.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * sensor queries.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param sensorIndex Zero-based input on that module.
+   * @return Ok and the connected flag, or Busy, Failed, or Rejected.
+   */
+  SensorConnectedResult querySensorConnected(uint8_t slotIndex,
+                                             uint8_t sensorIndex);
+
+  /**
+   * Reads one sensor input.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * sensor queries.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param sensorIndex Zero-based input on that module.
+   * @return Ok, connected, and the raw int32 value, or Busy, Failed,
+   *         or Rejected.
+   */
+  SensorReadingResult querySensorReading(uint8_t slotIndex,
+                                         uint8_t sensorIndex);
 
   /**
    * Returns the active host configuration.
@@ -207,4 +291,21 @@ private:
    * @return Classified step result for a non-Ok transaction.
    */
   ModuleStepResult _classifyBusError(I2cTxnStatus txn);
+
+  /**
+   * Issues one sensor-module command when the slot is Online.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param cmd Sensor command byte.
+   * @param txPayload Request payload, or nullptr when txLen is 0.
+   * @param txLen Request payload length.
+   * @param rxPayload Destination for a successful payload.
+   * @param rxCap Destination capacity.
+   * @param rxLen Set to the received payload length on Ok.
+   * @return Query status. Ok only means the frame decoded as status Ok.
+   */
+  SensorQueryStatus _querySensor(uint8_t slotIndex, uint8_t cmd,
+                                 const uint8_t* txPayload, size_t txLen,
+                                 uint8_t* rxPayload, uint8_t rxCap,
+                                 uint8_t* rxLen);
 };

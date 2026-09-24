@@ -190,6 +190,14 @@ public:
   uint16_t firmwareVersion() const;
 
   /**
+   * Reads the identity epoch. Increments each time GET_IDENTITY
+   * succeeds, including after a module restart.
+   *
+   * @return Epoch, or 0 before the first successful identify.
+   */
+  uint32_t identityEpoch() const;
+
+  /**
    * Reads the last fault tag.
    *
    * @return Fault, or None.
@@ -250,6 +258,7 @@ private:
   uint16_t _typeId = 0;
   uint8_t _protocolVersion = 0;
   uint16_t _firmwareVersion = 0;
+  uint32_t _identityEpoch = 0;
   SlotFault _fault = SlotFault::None;
   uint32_t _phaseStartedAt = 0;
   uint32_t _retryAt = 0;

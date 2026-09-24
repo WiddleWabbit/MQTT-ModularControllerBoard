@@ -69,6 +69,9 @@ Commit the new address after STOP, even if MOD then goes HIGH.
 | 0x02 | GET_IDENTITY | writeRead 19, 5-byte identity |
 | 0x03 | SET_ADDRESS | write 4 bytes + STOP |
 | 0x40 | ECHO | IdentityEcho only, 0..16 bytes |
+| 0x41 | GET_SENSOR_COUNT | Sensor `0x0200` only, empty request, 1-byte count |
+| 0x42 | GET_SENSOR_CONNECTED | Sensor `0x0200` only, 1-byte index |
+| 0x43 | GET_SENSOR_READING | Sensor `0x0200` only, 1-byte index |
 
 Identity payload (big-endian): typeId (u16), protocolVersion (u8),
 firmwareVersion (u16). Protocol version 1 is required for `Online`.
@@ -80,10 +83,29 @@ Unsupported 0x05.
 
 | Range | Use |
 | --- | --- |
-| `0x0001` | IdentityEcho (this slice) |
+| `0x0001` | IdentityEcho |
 | `0x0100–0x01FF` | Actuators |
-| `0x0200–0x02FF` | Sensors |
+| `0x0200` | Sensor module |
+| `0x0201–0x02FF` | Further sensor types |
 | `0xF000–0xFFFF` | Experimental |
+
+## Sensor module (`0x0200`)
+
+The host sends these commands only after identify reports type `0x0200` and
+protocol version 1. Sensor indexes on the wire are 0-based. A module reports
+at most 16 inputs. Poll timing and MQTT publication are described in
+[SENSORMODULE.md](SENSORMODULE.md).
+
+| Command | Request payload | Ok response payload |
+| --- | --- | --- |
+| GET_SENSOR_COUNT | empty | `count` (`u8`, 0..16) |
+| GET_SENSOR_CONNECTED | `index` (`u8`) | `index`, `connected` (`u8`, 0 or 1) |
+| GET_SENSOR_READING | `index` (`u8`) | `index`, `connected`, `value` (`i32` big-endian) |
+
+`value` is a raw module unit. The host does not scale it. An index outside
+the reported count is `BadLength`. `Busy` means try the same command again.
+A count above 16, a connected byte other than 0 or 1, or a mismatched index
+is a bad frame.
 
 ## Timing
 

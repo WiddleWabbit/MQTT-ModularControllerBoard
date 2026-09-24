@@ -67,6 +67,17 @@ constexpr uint8_t kCmdGetIdentity = 0x02;
 constexpr uint8_t kCmdSetAddress = 0x03;
 constexpr uint8_t kCmdEcho = 0x40;
 
+// Sensor module (type 0x0200) commands. Other types are not required
+// to implement these. Requests for connected/reading carry a 0-based
+// sensor index. Responses are big-endian.
+constexpr uint8_t kCmdGetSensorCount = 0x41;
+constexpr uint8_t kCmdGetSensorConnected = 0x42;
+constexpr uint8_t kCmdGetSensorReading = 0x43;
+constexpr uint8_t kMaxSensorsPerModule = 16;
+constexpr uint8_t kSensorCountPayloadLen = 1;
+constexpr uint8_t kSensorConnectedPayloadLen = 2;
+constexpr uint8_t kSensorReadingPayloadLen = 6;
+
 // SET_ADDRESS on-wire size. length field = 3 (2 + 1-byte payload);
 // total frame = 4. Do not count the I2C 7-bit address as a frame byte.
 constexpr uint8_t kSetAddressPayloadLen = 1;
@@ -88,6 +99,7 @@ constexpr uint8_t kStatusUnsupported = 0x05;
 
 // ---------- Types ----------
 constexpr uint16_t kTypeIdentityEcho = 0x0001;
+constexpr uint16_t kTypeSensorModule = 0x0200;
 
 // ---------- Packed payloads (wire order = struct order, big-endian) ----------
 struct IdentityPayload
@@ -126,6 +138,37 @@ struct SetAddressPayload
 {
   uint8_t newAddress7bit;
 };
+
+/**
+ * Writes a signed 32-bit value in big-endian wire order.
+ *
+ * @param dest Four-byte destination.
+ * @param value Value to write.
+ * @return Nothing.
+ */
+inline void writeInt32Be(uint8_t* dest, int32_t value)
+{
+  const uint32_t bits = static_cast<uint32_t>(value);
+  dest[0] = static_cast<uint8_t>((bits >> 24) & 0xFF);
+  dest[1] = static_cast<uint8_t>((bits >> 16) & 0xFF);
+  dest[2] = static_cast<uint8_t>((bits >> 8) & 0xFF);
+  dest[3] = static_cast<uint8_t>(bits & 0xFF);
+}
+
+/**
+ * Reads a signed 32-bit value from big-endian wire order.
+ *
+ * @param data Four-byte source.
+ * @return Decoded value.
+ */
+inline int32_t readInt32Be(const uint8_t* data)
+{
+  const uint32_t bits = (static_cast<uint32_t>(data[0]) << 24) |
+                        (static_cast<uint32_t>(data[1]) << 16) |
+                        (static_cast<uint32_t>(data[2]) << 8) |
+                        static_cast<uint32_t>(data[3]);
+  return static_cast<int32_t>(bits);
+}
 
 // SET_ADDRESS request layout (host write, no read):
 //   tx[0] = kSetAddressLengthField  (0x03)

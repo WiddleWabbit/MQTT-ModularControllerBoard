@@ -14,6 +14,8 @@
 #include "ModuleHost.h"
 #include "ModuleSlotPublisher.h"
 #include "MqttService.h"
+#include "SensorMqttBridge.h"
+#include "SensorPoller.h"
 #include "NtpService.h"
 #include "PubSubClientAdapter.h"
 #include "NetworkRuntime.h"
@@ -25,7 +27,8 @@
 
 const MqttSubscription mqttSubscriptions[] = {
   {"watering/solenoids", 1},
-  {"watering/pump", 1}
+  {"watering/pump", 1},
+  {kSensorReadTopic, 1}
 };
 
 const char kSlotStatusTopicPrefix[] = "watering/slot";
@@ -95,6 +98,9 @@ SlotPins slotPins[4] = {
   {sns4, mod4, cs4},
 };
 ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
+SensorPoller sensorPoller(moduleHost, systemClock);
+SensorMqttBridge sensorMqttBridge(
+  sensorPoller, mqttService, kSlotStatusTopicPrefix);
 ModuleSlotPublisher moduleSlotPublisher(
   moduleHost, mqttService, kSlotStatusTopicPrefix);
 SerialStatusReporter serialStatusReporter(
@@ -163,11 +169,13 @@ void setup()
   serialStatusReporter.begin({10000});
   serialStatusReporter.setReportingEnabled(
     networkRuntime.config().statusReporting);
+  mqttService.setMessageHandler(SensorMqttBridge::onMqttMessage,
+                                &sensorMqttBridge);
 }
 
 /**
- * Services WiFi, NTP, MQTT, modules, and serial, publishes slot status,
- * then reports runtime memory.
+ * Services WiFi, NTP, MQTT, modules, and serial, polls sensor modules,
+ * publishes slot status and sensor readings, then reports runtime memory.
  *
  * @return Nothing.
  */
@@ -178,6 +186,8 @@ void loop()
   mqttService.update(wifiManager.isConnected());
   serialConfigController.update();
   moduleHost.update();
+  sensorPoller.update();
+  sensorMqttBridge.update();
   moduleSlotPublisher.update();
   serialStatusReporter.update();
 

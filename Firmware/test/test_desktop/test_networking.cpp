@@ -149,6 +149,19 @@ void testSlotPublisherPublishesUnsupportedType();
 void testSlotPublisherPublishesFaultNack();
 void testSlotPublisherRepublishesEmptyAfterUnplug();
 void testSlotPublisherDoesNotTouchTheBus();
+void testCodecEncodesSensorCommands();
+void testHostReadsSensorCountConnectedAndReading();
+void testHostRejectsSensorQueryUnlessOnlineSensor();
+void testHostRejectsShortSensorPayload();
+void testPollerQueriesCountThenEachSensorAtInterval();
+void testPollerRequeriesCountAfterModuleReset();
+void testPollerIdleWhenSensorCountIsZero();
+void testPollerRetriesBusyThenMovesOn();
+void testSensorReadCommandPublishesWithoutBusUntilUpdate();
+void testSensorReadCommandRepeatsUnchangedReading();
+void testSensorReadCommandRejectsMalformedPayload();
+void testSensorReadCommandUnavailableWhenSensorMissing();
+void testPeriodicSensorPublishEachReadingAndClearOnUnplug();
 
 namespace
 {
@@ -737,5 +750,18 @@ int main()
   RUN_TEST(testSlotPublisherPublishesFaultNack);
   RUN_TEST(testSlotPublisherRepublishesEmptyAfterUnplug);
   RUN_TEST(testSlotPublisherDoesNotTouchTheBus);
+  RUN_TEST(testCodecEncodesSensorCommands);
+  RUN_TEST(testHostReadsSensorCountConnectedAndReading);
+  RUN_TEST(testHostRejectsSensorQueryUnlessOnlineSensor);
+  RUN_TEST(testHostRejectsShortSensorPayload);
+  RUN_TEST(testPollerQueriesCountThenEachSensorAtInterval);
+  RUN_TEST(testPollerRequeriesCountAfterModuleReset);
+  RUN_TEST(testPollerIdleWhenSensorCountIsZero);
+  RUN_TEST(testPollerRetriesBusyThenMovesOn);
+  RUN_TEST(testSensorReadCommandPublishesWithoutBusUntilUpdate);
+  RUN_TEST(testSensorReadCommandRepeatsUnchangedReading);
+  RUN_TEST(testSensorReadCommandRejectsMalformedPayload);
+  RUN_TEST(testSensorReadCommandUnavailableWhenSensorMissing);
+  RUN_TEST(testPeriodicSensorPublishEachReadingAndClearOnUnplug);
   return UNITY_END();
 }

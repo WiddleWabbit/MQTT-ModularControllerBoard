@@ -24,6 +24,10 @@ public:
   bool forceBusy = false;
   bool forceBusyOnIdentity = false;
   bool forceBadCrc = false;
+  bool shortSensorPayload = false;
+  uint8_t sensorCount = 0;
+  bool sensorConnected[module_protocol::kMaxSensorsPerModule] = {};
+  int32_t sensorValue[module_protocol::kMaxSensorsPerModule] = {};
   uint8_t identityLengthField = module_protocol::kIdentityLengthField;
   int nackRemaining = 0;
   bool nackIdentity = false;
@@ -198,6 +202,47 @@ public:
     {
       const uint8_t payloadLen = static_cast<uint8_t>(tx[0] - 2);
       _writeStatus(rx, module_protocol::kStatusOk, tx + 2, payloadLen);
+      return I2cTxnStatus::Ok;
+    }
+    if (cmd == module_protocol::kCmdGetSensorCount ||
+        cmd == module_protocol::kCmdGetSensorConnected ||
+        cmd == module_protocol::kCmdGetSensorReading)
+    {
+      if (shortSensorPayload)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetSensorCount)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, &sensorCount, 1);
+        return I2cTxnStatus::Ok;
+      }
+      if (tx[0] < 3)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      const uint8_t index = tx[2];
+      if (index >= sensorCount ||
+          index >= module_protocol::kMaxSensorsPerModule)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetSensorConnected)
+      {
+        const uint8_t body[2] = {
+          index, static_cast<uint8_t>(sensorConnected[index] ? 1 : 0)};
+        _writeStatus(rx, module_protocol::kStatusOk, body, 2);
+        return I2cTxnStatus::Ok;
+      }
+      uint8_t body[module_protocol::kSensorReadingPayloadLen];
+      body[0] = index;
+      body[1] = static_cast<uint8_t>(sensorConnected[index] ? 1 : 0);
+      module_protocol::writeInt32Be(body + 2, sensorValue[index]);
+      _writeStatus(rx, module_protocol::kStatusOk, body,
+                   module_protocol::kSensorReadingPayloadLen);
       return I2cTxnStatus::Ok;
     }
 
