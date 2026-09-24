@@ -16,6 +16,8 @@
 #include "MqttService.h"
 #include "SensorMqttBridge.h"
 #include "SensorPoller.h"
+#include "SolenoidMqttBridge.h"
+#include "SolenoidPoller.h"
 #include "NtpService.h"
 #include "PubSubClientAdapter.h"
 #include "NetworkRuntime.h"
@@ -26,10 +28,17 @@
 // ========== Network Configuration ==========
 
 const MqttSubscription mqttSubscriptions[] = {
-  {"watering/solenoids", 1},
+  {kSolenoidCommandTopic, 1},
   {"watering/pump", 1},
   {kSensorReadTopic, 1}
 };
+
+// State of each solenoid output is read and published on this period.
+const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
+
+// Accepted watering/solenoids commands must arrive within this window.
+// After 15 minutes with none, every solenoid output is turned off.
+const uint32_t kSolenoidCommandTimeoutMs = 15UL * 60UL * 1000UL;
 
 const char kSlotStatusTopicPrefix[] = "watering/slot";
 
@@ -101,6 +110,10 @@ ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
 SensorPoller sensorPoller(moduleHost, systemClock);
 SensorMqttBridge sensorMqttBridge(
   sensorPoller, mqttService, kSlotStatusTopicPrefix);
+SolenoidPoller solenoidPoller(
+  moduleHost, systemClock, kSolenoidPollIntervalMs, kSolenoidCommandTimeoutMs);
+SolenoidMqttBridge solenoidMqttBridge(
+  solenoidPoller, mqttService, kSlotStatusTopicPrefix);
 ModuleSlotPublisher moduleSlotPublisher(
   moduleHost, mqttService, kSlotStatusTopicPrefix);
 SerialStatusReporter serialStatusReporter(
@@ -108,6 +121,22 @@ SerialStatusReporter serialStatusReporter(
 SerialConfigController serialConfigController(
   serialPort, networkRuntime, serialStatusReporter);
 
+
+/**
+ * Forwards one inbound MQTT payload to the sensor and solenoid bridges.
+ * Each bridge ignores topics it does not own. Does not touch I2C.
+ *
+ * @param topic Received topic.
+ * @param payload Payload bytes.
+ * @param length Payload length.
+ * @return Nothing.
+ */
+void dispatchMqttMessage(const char* topic, const uint8_t* payload,
+                         size_t length, void*)
+{
+  SensorMqttBridge::onMqttMessage(topic, payload, length, &sensorMqttBridge);
+  SolenoidMqttBridge::onMqttMessage(topic, payload, length, &solenoidMqttBridge);
+}
 
 /**
  * Initializes the ESP32 and all functions.
@@ -169,13 +198,13 @@ void setup()
   serialStatusReporter.begin({10000});
   serialStatusReporter.setReportingEnabled(
     networkRuntime.config().statusReporting);
-  mqttService.setMessageHandler(SensorMqttBridge::onMqttMessage,
-                                &sensorMqttBridge);
+  mqttService.setMessageHandler(dispatchMqttMessage, nullptr);
 }
 
 /**
- * Services WiFi, NTP, MQTT, modules, and serial, polls sensor modules,
- * publishes slot status and sensor readings, then reports runtime memory.
+ * Services WiFi, NTP, MQTT, modules, and serial, polls sensor and
+ * solenoid modules, publishes slot status and module readings, then
+ * reports runtime memory.
  *
  * @return Nothing.
  */
@@ -187,7 +216,9 @@ void loop()
   serialConfigController.update();
   moduleHost.update();
   sensorPoller.update();
+  solenoidPoller.update();
   sensorMqttBridge.update();
+  solenoidMqttBridge.update();
   moduleSlotPublisher.update();
   serialStatusReporter.update();
 

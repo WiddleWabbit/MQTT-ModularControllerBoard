@@ -84,6 +84,22 @@ subscribes to `watering/sensor/read` at QoS 1 beside the existing command
 topics. Command parsing, poll order, and the publish rules are in
 [SENSORMODULE.md](SENSORMODULE.md).
 
+`SolenoidPoller` reads an online Solenoid module (`0x0100`) the same way.
+The first query after identify, including after the module restarts and is
+identified again, is the output count. Each output's state (`on`, `off`, or
+`disconnected`) is then read immediately, and again every 60 seconds. One
+solenoid query runs per `SolenoidPoller::update()`, after the sensor poller.
+`SolenoidMqttBridge` publishes a retained state at
+`watering/slot/N/solenoid/M` each time a read or a set stores a state.
+`watering/solenoids` with payload `N on off ...` is the desired state of
+every output on module slot N. The callback records it. Later poller passes
+send `SET_SOLENOID` only for outputs that are not already in that state.
+`kSolenoidCommandTimeoutMs` in `src/main.cpp` is 15 minutes. That long
+without an accepted command turns every solenoid output off. The poll
+interval beside it is `kSolenoidPollIntervalMs` (60 seconds). Command
+parsing, which outputs are skipped, and the cutoff are in
+[SOLENOIDMODULE.md](SOLENOIDMODULE.md).
+
 `IMqttClient` is the narrow client contract. `PubSubClientAdapter` wraps an
 already-constructed PubSubClient and is configured with `setServer`.
 `FakeMqttClient` provides deterministic connection failures, subscription and

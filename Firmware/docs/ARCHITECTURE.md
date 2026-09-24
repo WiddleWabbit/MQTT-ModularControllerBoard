@@ -54,6 +54,15 @@ is identified, then presence and a raw reading for each input once a minute.
 value, and accepts `watering/sensor/read` as an immediate read. The MQTT
 callback only enqueues the request. Behaviour, topics, and commands are in
 [SENSORMODULE.md](SENSORMODULE.md).
+A Solenoid module (`0x0100`) is polled by `SolenoidPoller` after the sensor
+poller. The poller asks for the output count when that module is identified,
+then the on/off/disconnected state of each output once a minute.
+`SolenoidMqttBridge` publishes every stored state. `watering/solenoids`
+names the desired on/off state of each output; the poller sends an on or off
+command only where the module's state differs. If that command is absent for
+`kSolenoidCommandTimeoutMs` in `src/main.cpp` (15 minutes), every output is
+turned off. The MQTT callback only records the desired state. Behaviour,
+topics, and the cutoff are in [SOLENOIDMODULE.md](SOLENOIDMODULE.md).
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions
 are bounded by a 50 ms driver timeout.
@@ -71,7 +80,9 @@ publications, inbound messages, persisted settings, USB presence, serial
 bytes, GPIO levels, and I2C slaves. This covers state transitions, retry
 backoff, failures, callbacks, configuration staging, apply failure,
 WiFi-to-MQTT interaction, serial status snapshots, hot-plug enumeration,
-module protocol frames, retained slot-status publication, and sensor
-count/presence/reading polls including an immediate MQTT read, without hardware.
+module protocol frames, retained slot-status publication, sensor
+count/presence/reading polls including an immediate MQTT read, and solenoid
+count/state polls, desired-state commands, and the command-absence cutoff,
+without hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

@@ -47,6 +47,46 @@ struct SensorReadingResult
 };
 
 /**
+ * Outcome of one direct solenoid-module query.
+ */
+enum class SolenoidQueryStatus : uint8_t
+{
+  Ok,
+  Rejected,
+  Busy,
+  Failed
+};
+
+/**
+ * On-wire solenoid output state, as reported by the module.
+ */
+enum class SolenoidOutputState : uint8_t
+{
+  Off,
+  On,
+  Disconnected
+};
+
+/**
+ * Result of GET_SOLENOID_COUNT.
+ */
+struct SolenoidCountResult
+{
+  SolenoidQueryStatus status;
+  uint8_t count;
+};
+
+/**
+ * Result of GET_SOLENOID_STATE or SET_SOLENOID.
+ * state is valid when status is Ok.
+ */
+struct SolenoidStateResult
+{
+  SolenoidQueryStatus status;
+  SolenoidOutputState state;
+};
+
+/**
  * One slot's GPIO trio.
  */
 struct SlotPins
@@ -187,7 +227,7 @@ public:
   /**
    * Reads how many sensor inputs a Sensor module reports.
    * Not re-entrant with update(), ping(), echo(), or the other
-   * sensor queries. One writeRead when the slot is an Online Sensor.
+   * module queries. One writeRead when the slot is an Online Sensor.
    *
    * @param slotIndex Firmware slot 0..3.
    * @return Ok and a count of 0..kMaxSensorsPerModule, Busy when the
@@ -199,7 +239,7 @@ public:
   /**
    * Reads whether one sensor input is connected.
    * Not re-entrant with update(), ping(), echo(), or the other
-   * sensor queries.
+   * module queries.
    *
    * @param slotIndex Firmware slot 0..3.
    * @param sensorIndex Zero-based input on that module.
@@ -211,7 +251,7 @@ public:
   /**
    * Reads one sensor input.
    * Not re-entrant with update(), ping(), echo(), or the other
-   * sensor queries.
+   * module queries.
    *
    * @param slotIndex Firmware slot 0..3.
    * @param sensorIndex Zero-based input on that module.
@@ -220,6 +260,44 @@ public:
    */
   SensorReadingResult querySensorReading(uint8_t slotIndex,
                                          uint8_t sensorIndex);
+
+  /**
+   * Reads how many solenoid outputs a Solenoid module reports.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries. One writeRead when the slot is an Online Solenoid.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Ok and a count of 0..kMaxSolenoidsPerModule, Busy when the
+   *         module is busy, Failed on a bad frame or bus error, or
+   *         Rejected when the slot is not an Online Solenoid module.
+   */
+  SolenoidCountResult querySolenoidCount(uint8_t slotIndex);
+
+  /**
+   * Reads one solenoid output.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param solenoidIndex Zero-based output on that module.
+   * @return Ok and the output state, or Busy, Failed, or Rejected.
+   */
+  SolenoidStateResult querySolenoidState(uint8_t slotIndex,
+                                         uint8_t solenoidIndex);
+
+  /**
+   * Turns one solenoid output on or off.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries. The returned state is what the module reports
+   * after the command, which may still be Disconnected.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param solenoidIndex Zero-based output on that module.
+   * @param on True to command on, false to command off.
+   * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+   */
+  SolenoidStateResult setSolenoid(uint8_t slotIndex, uint8_t solenoidIndex,
+                                  bool on);
 
   /**
    * Returns the active host configuration.
@@ -293,10 +371,11 @@ private:
   ModuleStepResult _classifyBusError(I2cTxnStatus txn);
 
   /**
-   * Issues one sensor-module command when the slot is Online.
+   * Issues one type-specific command when the slot is Online for typeId.
    *
    * @param slotIndex Firmware slot 0..3.
-   * @param cmd Sensor command byte.
+   * @param typeId Required module type.
+   * @param cmd Command byte.
    * @param txPayload Request payload, or nullptr when txLen is 0.
    * @param txLen Request payload length.
    * @param rxPayload Destination for a successful payload.
@@ -304,8 +383,8 @@ private:
    * @param rxLen Set to the received payload length on Ok.
    * @return Query status. Ok only means the frame decoded as status Ok.
    */
-  SensorQueryStatus _querySensor(uint8_t slotIndex, uint8_t cmd,
-                                 const uint8_t* txPayload, size_t txLen,
-                                 uint8_t* rxPayload, uint8_t rxCap,
-                                 uint8_t* rxLen);
+  SensorQueryStatus _queryOnline(uint8_t slotIndex, uint16_t typeId,
+                                 uint8_t cmd, const uint8_t* txPayload,
+                                 size_t txLen, uint8_t* rxPayload,
+                                 uint8_t rxCap, uint8_t* rxLen);
 };

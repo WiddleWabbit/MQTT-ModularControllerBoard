@@ -162,6 +162,23 @@ void testSensorReadCommandRepeatsUnchangedReading();
 void testSensorReadCommandRejectsMalformedPayload();
 void testSensorReadCommandUnavailableWhenSensorMissing();
 void testPeriodicSensorPublishEachReadingAndClearOnUnplug();
+void testCodecEncodesSolenoidCommands();
+void testHostReadsSolenoidCountStateAndSet();
+void testHostRejectsSolenoidQueryUnlessOnlineSolenoid();
+void testHostRejectsShortSolenoidPayload();
+void testSolenoidTimingDefaultsAreFifteenMinutesAndOneMinute();
+void testPollerQueriesCountThenEachSolenoidAtInterval();
+void testPollerRequeriesSolenoidCountAfterModuleReset();
+void testPollerIdleWhenSolenoidCountIsZero();
+void testPollerRetriesBusySolenoidStateThenMovesOn();
+void testSolenoidCommandSetsOnlyMismatchedOutputs();
+void testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized();
+void testSolenoidCommandBeforeCountReadsStateThenSets();
+void testSolenoidCommandRejectsMalformedPayload();
+void testSolenoidCommandReappliesAfterModuleReset();
+void testSolenoidCommandTimeoutTurnsOutputsOff();
+void testSolenoidCommandRefreshesAbsenceTimeout();
+void testPeriodicSolenoidPublishEachStateAndClearOnUnplug();
 
 namespace
 {
@@ -763,5 +780,22 @@ int main()
   RUN_TEST(testSensorReadCommandRejectsMalformedPayload);
   RUN_TEST(testSensorReadCommandUnavailableWhenSensorMissing);
   RUN_TEST(testPeriodicSensorPublishEachReadingAndClearOnUnplug);
+  RUN_TEST(testCodecEncodesSolenoidCommands);
+  RUN_TEST(testHostReadsSolenoidCountStateAndSet);
+  RUN_TEST(testHostRejectsSolenoidQueryUnlessOnlineSolenoid);
+  RUN_TEST(testHostRejectsShortSolenoidPayload);
+  RUN_TEST(testSolenoidTimingDefaultsAreFifteenMinutesAndOneMinute);
+  RUN_TEST(testPollerQueriesCountThenEachSolenoidAtInterval);
+  RUN_TEST(testPollerRequeriesSolenoidCountAfterModuleReset);
+  RUN_TEST(testPollerIdleWhenSolenoidCountIsZero);
+  RUN_TEST(testPollerRetriesBusySolenoidStateThenMovesOn);
+  RUN_TEST(testSolenoidCommandSetsOnlyMismatchedOutputs);
+  RUN_TEST(testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized);
+  RUN_TEST(testSolenoidCommandBeforeCountReadsStateThenSets);
+  RUN_TEST(testSolenoidCommandRejectsMalformedPayload);
+  RUN_TEST(testSolenoidCommandReappliesAfterModuleReset);
+  RUN_TEST(testSolenoidCommandTimeoutTurnsOutputsOff);
+  RUN_TEST(testSolenoidCommandRefreshesAbsenceTimeout);
+  RUN_TEST(testPeriodicSolenoidPublishEachStateAndClearOnUnplug);
   return UNITY_END();
 }

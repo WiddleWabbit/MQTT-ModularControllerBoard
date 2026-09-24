@@ -72,6 +72,9 @@ Commit the new address after STOP, even if MOD then goes HIGH.
 | 0x41 | GET_SENSOR_COUNT | Sensor `0x0200` only, empty request, 1-byte count |
 | 0x42 | GET_SENSOR_CONNECTED | Sensor `0x0200` only, 1-byte index |
 | 0x43 | GET_SENSOR_READING | Sensor `0x0200` only, 1-byte index |
+| 0x50 | GET_SOLENOID_COUNT | Solenoid `0x0100` only, empty request, 1-byte count |
+| 0x51 | GET_SOLENOID_STATE | Solenoid `0x0100` only, 1-byte index |
+| 0x52 | SET_SOLENOID | Solenoid `0x0100` only, index and off/on |
 
 Identity payload (big-endian): typeId (u16), protocolVersion (u8),
 firmwareVersion (u16). Protocol version 1 is required for `Online`.
@@ -84,7 +87,8 @@ Unsupported 0x05.
 | Range | Use |
 | --- | --- |
 | `0x0001` | IdentityEcho |
-| `0x0100–0x01FF` | Actuators |
+| `0x0100` | Solenoid module |
+| `0x0101–0x01FF` | Further actuator types |
 | `0x0200` | Sensor module |
 | `0x0201–0x02FF` | Further sensor types |
 | `0xF000–0xFFFF` | Experimental |
@@ -129,13 +133,14 @@ for the pass.
 
 `GET_IDENTITY` returns a type id, a protocol version, and a firmware version.
 Protocol version must be 1. The type id is looked up in a fixed table. The
-bands above reserve ids for later modules. Two ids are acted on today:
-IdentityEcho `0x0001` and Sensor `0x0200`. Any other identified id, including
-another id inside those bands, is `Unsupported`.
+bands above reserve ids for later modules. Three ids are acted on today:
+IdentityEcho `0x0001`, Solenoid `0x0100`, and Sensor `0x0200`. Any other
+identified id, including another id inside those bands, is `Unsupported`.
 
 | Identity | Public state | Action for that slot |
 | --- | --- | --- |
 | `0x0001` IdentityEcho, protocol 1 | `Online` | Health `PING` about once a second. Status text `Online IdentityEcho addr=0x1N`. `ECHO` exists for a caller. `loop()` does not poll it. |
+| `0x0100` Solenoid, protocol 1 | `Online` | Health `PING` about once a second, plus the count, state, and on/off commands in [SOLENOIDMODULE.md](SOLENOIDMODULE.md). Status text `Online Solenoid addr=0x1N`. |
 | `0x0200` Sensor, protocol 1 | `Online` | Health `PING` about once a second, plus the count and reading cycle in [SENSORMODULE.md](SENSORMODULE.md). Status text `Online Sensor addr=0x1N`. |
 | Any other type id, or protocol version other than 1 | `Unsupported` | Health `PING` about once a second. Status text `Unsupported type=0xTTTT addr=0x1N`. No type-specific commands. |
 | Address assignment or identify keeps failing | `Fault` | No health ping and no type-specific commands. Enumeration is tried again after 1 s. Status text `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy`. |
@@ -190,6 +195,27 @@ at most 16 inputs. Poll timing and MQTT publication are described in
 the reported count is `BadLength`. `Busy` means try the same command again.
 A count above 16, a connected byte other than 0 or 1, or a mismatched index
 is a bad frame.
+
+## Solenoid module (`0x0100`)
+
+The host sends these commands only after identify reports type `0x0100` and
+protocol version 1. Solenoid indexes on the wire are 0-based. A module
+reports at most 16 outputs. State bytes are off `0`, on `1`, and disconnected
+`2`. `SET_SOLENOID` carries off or on only. Poll timing, the MQTT desired
+state, and the command-absence cutoff are described in
+[SOLENOIDMODULE.md](SOLENOIDMODULE.md). `kSolenoidCommandTimeoutMs` in
+`src/main.cpp` is 15 minutes: that long without an accepted
+`watering/solenoids` command turns every output off.
+
+| Command | Request payload | Ok response payload |
+| --- | --- | --- |
+| GET_SOLENOID_COUNT | empty | `count` (`u8`, 0..16) |
+| GET_SOLENOID_STATE | `index` (`u8`) | `index`, `state` (`u8`) |
+| SET_SOLENOID | `index`, `desired` (`u8`, 0 or 1) | `index`, `state` (`u8`) |
+
+An index outside the reported count is `BadLength`. `Busy` means try the
+same command again. A count above 16, a state byte other than 0, 1, or 2,
+or a mismatched index is a bad frame.
 
 ## Timing
 

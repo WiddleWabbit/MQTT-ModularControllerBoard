@@ -1,6 +1,6 @@
 # Sensor module
 
-Type `0x0200` is the first daughter-module type. One module occupies one of
+Type `0x0200` is the sensor daughter module. One module occupies one of
 the four motherboard slots and reports up to 16 sensor inputs. The controller
 learns that count when the module is identified, then reads presence and a raw
 value for each input. Readings are published over MQTT on every successful

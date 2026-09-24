@@ -78,6 +78,21 @@ constexpr uint8_t kSensorCountPayloadLen = 1;
 constexpr uint8_t kSensorConnectedPayloadLen = 2;
 constexpr uint8_t kSensorReadingPayloadLen = 6;
 
+// Solenoid module (type 0x0100) commands. Other types are not required
+// to implement these. Indexes are 0-based. State bytes are
+// kSolenoidStateOff, kSolenoidStateOn, and kSolenoidStateDisconnected.
+// SET_SOLENOID accepts only off or on.
+constexpr uint8_t kCmdGetSolenoidCount = 0x50;
+constexpr uint8_t kCmdGetSolenoidState = 0x51;
+constexpr uint8_t kCmdSetSolenoid = 0x52;
+constexpr uint8_t kMaxSolenoidsPerModule = 16;
+constexpr uint8_t kSolenoidCountPayloadLen = 1;
+constexpr uint8_t kSolenoidStatePayloadLen = 2;
+constexpr uint8_t kSolenoidSetPayloadLen = 2;
+constexpr uint8_t kSolenoidStateOff = 0;
+constexpr uint8_t kSolenoidStateOn = 1;
+constexpr uint8_t kSolenoidStateDisconnected = 2;
+
 // SET_ADDRESS on-wire size. length field = 3 (2 + 1-byte payload);
 // total frame = 4. Do not count the I2C 7-bit address as a frame byte.
 constexpr uint8_t kSetAddressPayloadLen = 1;
@@ -99,6 +114,7 @@ constexpr uint8_t kStatusUnsupported = 0x05;
 
 // ---------- Types ----------
 constexpr uint16_t kTypeIdentityEcho = 0x0001;
+constexpr uint16_t kTypeSolenoidModule = 0x0100;
 constexpr uint16_t kTypeSensorModule = 0x0200;
 
 // ---------- Packed payloads (wire order = struct order, big-endian) ----------

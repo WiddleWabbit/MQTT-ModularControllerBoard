@@ -28,6 +28,9 @@ public:
   uint8_t sensorCount = 0;
   bool sensorConnected[module_protocol::kMaxSensorsPerModule] = {};
   int32_t sensorValue[module_protocol::kMaxSensorsPerModule] = {};
+  bool shortSolenoidPayload = false;
+  uint8_t solenoidCount = 0;
+  uint8_t solenoidState[module_protocol::kMaxSolenoidsPerModule] = {};
   uint8_t identityLengthField = module_protocol::kIdentityLengthField;
   int nackRemaining = 0;
   bool nackIdentity = false;
@@ -243,6 +246,58 @@ public:
       module_protocol::writeInt32Be(body + 2, sensorValue[index]);
       _writeStatus(rx, module_protocol::kStatusOk, body,
                    module_protocol::kSensorReadingPayloadLen);
+      return I2cTxnStatus::Ok;
+    }
+    if (cmd == module_protocol::kCmdGetSolenoidCount ||
+        cmd == module_protocol::kCmdGetSolenoidState ||
+        cmd == module_protocol::kCmdSetSolenoid)
+    {
+      if (shortSolenoidPayload)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetSolenoidCount)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, &solenoidCount, 1);
+        return I2cTxnStatus::Ok;
+      }
+      if (tx[0] < 3)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      const uint8_t index = tx[2];
+      if (index >= solenoidCount ||
+          index >= module_protocol::kMaxSolenoidsPerModule)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetSolenoidState)
+      {
+        const uint8_t body[2] = {index, solenoidState[index]};
+        _writeStatus(rx, module_protocol::kStatusOk, body, 2);
+        return I2cTxnStatus::Ok;
+      }
+      if (tx[0] < 4)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      const uint8_t desired = tx[3];
+      if (desired != module_protocol::kSolenoidStateOff &&
+          desired != module_protocol::kSolenoidStateOn)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (solenoidState[index] != module_protocol::kSolenoidStateDisconnected)
+      {
+        solenoidState[index] = desired;
+      }
+      const uint8_t body[2] = {index, solenoidState[index]};
+      _writeStatus(rx, module_protocol::kStatusOk, body, 2);
       return I2cTxnStatus::Ok;
     }
 

@@ -310,7 +310,7 @@ bool ModuleHost::echo(uint8_t slotIndex, const uint8_t* in, size_t inLen,
 /**
  * Reads how many sensor inputs a Sensor module reports.
  * Not re-entrant with update(), ping(), echo(), or the other
- * sensor queries. One writeRead when the slot is an Online Sensor.
+ * module queries. One writeRead when the slot is an Online Sensor.
  *
  * @param slotIndex Firmware slot 0..3.
  * @return Ok and a count of 0..kMaxSensorsPerModule, Busy when the
@@ -324,9 +324,9 @@ SensorCountResult ModuleHost::querySensorCount(uint8_t slotIndex)
   result.count = 0;
   uint8_t payload[module_protocol::kSensorCountPayloadLen];
   uint8_t payloadLen = 0;
-  result.status = _querySensor(slotIndex, module_protocol::kCmdGetSensorCount,
-                               nullptr, 0, payload, sizeof(payload),
-                               &payloadLen);
+  result.status = _queryOnline(slotIndex, module_protocol::kTypeSensorModule,
+                               module_protocol::kCmdGetSensorCount, nullptr, 0,
+                               payload, sizeof(payload), &payloadLen);
   if (result.status != SensorQueryStatus::Ok)
   {
     return result;
@@ -344,7 +344,7 @@ SensorCountResult ModuleHost::querySensorCount(uint8_t slotIndex)
 /**
  * Reads whether one sensor input is connected.
  * Not re-entrant with update(), ping(), echo(), or the other
- * sensor queries.
+ * module queries.
  *
  * @param slotIndex Firmware slot 0..3.
  * @param sensorIndex Zero-based input on that module.
@@ -363,9 +363,10 @@ SensorConnectedResult ModuleHost::querySensorConnected(uint8_t slotIndex,
   const uint8_t request[1] = {sensorIndex};
   uint8_t payload[module_protocol::kSensorConnectedPayloadLen];
   uint8_t payloadLen = 0;
-  result.status =
-      _querySensor(slotIndex, module_protocol::kCmdGetSensorConnected, request,
-                   sizeof(request), payload, sizeof(payload), &payloadLen);
+  result.status = _queryOnline(
+      slotIndex, module_protocol::kTypeSensorModule,
+      module_protocol::kCmdGetSensorConnected, request, sizeof(request),
+      payload, sizeof(payload), &payloadLen);
   if (result.status != SensorQueryStatus::Ok)
   {
     return result;
@@ -383,7 +384,7 @@ SensorConnectedResult ModuleHost::querySensorConnected(uint8_t slotIndex,
 /**
  * Reads one sensor input.
  * Not re-entrant with update(), ping(), echo(), or the other
- * sensor queries.
+ * module queries.
  *
  * @param slotIndex Firmware slot 0..3.
  * @param sensorIndex Zero-based input on that module.
@@ -404,9 +405,10 @@ SensorReadingResult ModuleHost::querySensorReading(uint8_t slotIndex,
   const uint8_t request[1] = {sensorIndex};
   uint8_t payload[module_protocol::kSensorReadingPayloadLen];
   uint8_t payloadLen = 0;
-  result.status =
-      _querySensor(slotIndex, module_protocol::kCmdGetSensorReading, request,
-                   sizeof(request), payload, sizeof(payload), &payloadLen);
+  result.status = _queryOnline(
+      slotIndex, module_protocol::kTypeSensorModule,
+      module_protocol::kCmdGetSensorReading, request, sizeof(request), payload,
+      sizeof(payload), &payloadLen);
   if (result.status != SensorQueryStatus::Ok)
   {
     return result;
@@ -419,6 +421,178 @@ SensorReadingResult ModuleHost::querySensorReading(uint8_t slotIndex,
   }
   result.connected = payload[1] == 1;
   result.value = module_protocol::readInt32Be(payload + 2);
+  return result;
+}
+
+namespace
+{
+/**
+ * Maps a shared query status onto the solenoid result enum.
+ *
+ * @param status Status from _queryOnline.
+ * @return Solenoid query status.
+ */
+SolenoidQueryStatus solenoidStatus(SensorQueryStatus status)
+{
+  switch (status)
+  {
+    case SensorQueryStatus::Ok:
+      return SolenoidQueryStatus::Ok;
+    case SensorQueryStatus::Busy:
+      return SolenoidQueryStatus::Busy;
+    case SensorQueryStatus::Rejected:
+      return SolenoidQueryStatus::Rejected;
+    default:
+      return SolenoidQueryStatus::Failed;
+  }
+}
+
+/**
+ * Decodes a solenoid state byte.
+ *
+ * @param wire State byte from the module.
+ * @param state Decoded state, unchanged when the byte is invalid.
+ * @return True when wire is off, on, or disconnected.
+ */
+bool decodeSolenoidState(uint8_t wire, SolenoidOutputState* state)
+{
+  if (wire == module_protocol::kSolenoidStateOff)
+  {
+    *state = SolenoidOutputState::Off;
+    return true;
+  }
+  if (wire == module_protocol::kSolenoidStateOn)
+  {
+    *state = SolenoidOutputState::On;
+    return true;
+  }
+  if (wire == module_protocol::kSolenoidStateDisconnected)
+  {
+    *state = SolenoidOutputState::Disconnected;
+    return true;
+  }
+  return false;
+}
+}
+
+/**
+ * Reads how many solenoid outputs a Solenoid module reports.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries. One writeRead when the slot is an Online Solenoid.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Ok and a count of 0..kMaxSolenoidsPerModule, Busy when the
+ *         module is busy, Failed on a bad frame or bus error, or
+ *         Rejected when the slot is not an Online Solenoid module.
+ */
+SolenoidCountResult ModuleHost::querySolenoidCount(uint8_t slotIndex)
+{
+  SolenoidCountResult result;
+  result.status = SolenoidQueryStatus::Failed;
+  result.count = 0;
+  uint8_t payload[module_protocol::kSolenoidCountPayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = solenoidStatus(_queryOnline(
+      slotIndex, module_protocol::kTypeSolenoidModule,
+      module_protocol::kCmdGetSolenoidCount, nullptr, 0, payload,
+      sizeof(payload), &payloadLen));
+  if (result.status != SolenoidQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSolenoidCountPayloadLen ||
+      payload[0] > module_protocol::kMaxSolenoidsPerModule)
+  {
+    result.status = SolenoidQueryStatus::Failed;
+    return result;
+  }
+  result.count = payload[0];
+  return result;
+}
+
+/**
+ * Reads one solenoid output.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param solenoidIndex Zero-based output on that module.
+ * @return Ok and the output state, or Busy, Failed, or Rejected.
+ */
+SolenoidStateResult ModuleHost::querySolenoidState(uint8_t slotIndex,
+                                                   uint8_t solenoidIndex)
+{
+  SolenoidStateResult result;
+  result.status = SolenoidQueryStatus::Rejected;
+  result.state = SolenoidOutputState::Off;
+  if (solenoidIndex >= module_protocol::kMaxSolenoidsPerModule)
+  {
+    return result;
+  }
+  const uint8_t request[1] = {solenoidIndex};
+  uint8_t payload[module_protocol::kSolenoidStatePayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = solenoidStatus(_queryOnline(
+      slotIndex, module_protocol::kTypeSolenoidModule,
+      module_protocol::kCmdGetSolenoidState, request, sizeof(request), payload,
+      sizeof(payload), &payloadLen));
+  if (result.status != SolenoidQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSolenoidStatePayloadLen ||
+      payload[0] != solenoidIndex ||
+      !decodeSolenoidState(payload[1], &result.state))
+  {
+    result.status = SolenoidQueryStatus::Failed;
+    return result;
+  }
+  return result;
+}
+
+/**
+ * Turns one solenoid output on or off.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries. The returned state is what the module reports
+ * after the command, which may still be Disconnected.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param solenoidIndex Zero-based output on that module.
+ * @param on True to command on, false to command off.
+ * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+ */
+SolenoidStateResult ModuleHost::setSolenoid(uint8_t slotIndex,
+                                            uint8_t solenoidIndex, bool on)
+{
+  SolenoidStateResult result;
+  result.status = SolenoidQueryStatus::Rejected;
+  result.state = SolenoidOutputState::Off;
+  if (solenoidIndex >= module_protocol::kMaxSolenoidsPerModule)
+  {
+    return result;
+  }
+  const uint8_t request[module_protocol::kSolenoidSetPayloadLen] = {
+    solenoidIndex,
+    static_cast<uint8_t>(on ? module_protocol::kSolenoidStateOn
+                            : module_protocol::kSolenoidStateOff),
+  };
+  uint8_t payload[module_protocol::kSolenoidStatePayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = solenoidStatus(_queryOnline(
+      slotIndex, module_protocol::kTypeSolenoidModule,
+      module_protocol::kCmdSetSolenoid, request, sizeof(request), payload,
+      sizeof(payload), &payloadLen));
+  if (result.status != SolenoidQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kSolenoidStatePayloadLen ||
+      payload[0] != solenoidIndex ||
+      !decodeSolenoidState(payload[1], &result.state))
+  {
+    result.status = SolenoidQueryStatus::Failed;
+    return result;
+  }
   return result;
 }
 
@@ -620,10 +794,11 @@ ModuleStepResult ModuleHost::_classifyBusError(I2cTxnStatus txn)
 }
 
 /**
- * Issues one sensor-module command when the slot is Online.
+ * Issues one type-specific command when the slot is Online for typeId.
  *
  * @param slotIndex Firmware slot 0..3.
- * @param cmd Sensor command byte.
+ * @param typeId Required module type.
+ * @param cmd Command byte.
  * @param txPayload Request payload, or nullptr when txLen is 0.
  * @param txLen Request payload length.
  * @param rxPayload Destination for a successful payload.
@@ -631,7 +806,8 @@ ModuleStepResult ModuleHost::_classifyBusError(I2cTxnStatus txn)
  * @param rxLen Set to the received payload length on Ok.
  * @return Query status. Ok only means the frame decoded as status Ok.
  */
-SensorQueryStatus ModuleHost::_querySensor(uint8_t slotIndex, uint8_t cmd,
+SensorQueryStatus ModuleHost::_queryOnline(uint8_t slotIndex, uint16_t typeId,
+                                           uint8_t cmd,
                                            const uint8_t* txPayload,
                                            size_t txLen, uint8_t* rxPayload,
                                            uint8_t rxCap, uint8_t* rxLen)
@@ -641,8 +817,7 @@ SensorQueryStatus ModuleHost::_querySensor(uint8_t slotIndex, uint8_t cmd,
   {
     return SensorQueryStatus::Rejected;
   }
-  if (slot->state() != SlotState::Online ||
-      slot->typeId() != module_protocol::kTypeSensorModule ||
+  if (slot->state() != SlotState::Online || slot->typeId() != typeId ||
       slot->address() == 0)
   {
     return SensorQueryStatus::Rejected;
