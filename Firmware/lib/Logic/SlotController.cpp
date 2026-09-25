@@ -12,6 +12,7 @@ const ModuleTypeInfo kModuleTypes[] = {
   {module_protocol::kTypeIdentityEcho, "IdentityEcho"},
   {module_protocol::kTypeSolenoidModule, "Solenoid"},
   {module_protocol::kTypeSensorModule, "Sensor"},
+  {module_protocol::kTypePumpModule, "Pump"},
 };
 
 /**

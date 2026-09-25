@@ -20,8 +20,10 @@ state and publishes each output. `loop()` calls them after the sensor poller:
 moduleHost.update()
 sensorPoller.update()
 solenoidPoller.update()
+pumpPoller.update()
 sensorMqttBridge.update()
 solenoidMqttBridge.update()
+pumpMqttBridge.update()
 ```
 
 The MQTT callback only records the desired state. It does not touch I2C.

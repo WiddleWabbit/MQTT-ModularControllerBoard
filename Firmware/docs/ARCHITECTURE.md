@@ -64,6 +64,16 @@ command only where the module's state differs. If that command is absent for
 `kSolenoidCommandTimeoutMs` in `src/main.cpp` (15 minutes), every output is
 turned off. The MQTT callback only records the desired state. Behaviour,
 topics, and the cutoff are in [SOLENOIDMODULE.md](SOLENOIDMODULE.md).
+A Pump module (`0x0300`) is polled by `PumpPoller` after the solenoid
+poller. The poller reads the pump when that module is identified, then
+again every `kPumpPollIntervalMs` in `src/main.cpp` (60 seconds).
+`PumpMqttBridge` publishes every stored state (`on`, `off`, or `fault`).
+`watering/pump` names the desired on/off state, or asks for a reset. The
+poller sends on or off only when the known state differs, and it resets the
+pump only after that reset command. If an on/off command is absent for
+`kPumpCommandTimeoutMs` in `src/main.cpp` (3 minutes), a pump that is on is
+turned off. A reset does not refresh that window. Behaviour, topics, and
+the cutoff are in [PUMPMODULE.md](PUMPMODULE.md).
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions
 are bounded by a 50 ms driver timeout.
@@ -84,6 +94,7 @@ WiFi-to-MQTT interaction, serial status snapshots, hot-plug enumeration,
 module protocol frames, retained slot-status publication, sensor
 count/presence/reading polls including an immediate MQTT read, and solenoid
 count/state polls, desired-state commands, and the command-absence cutoff,
-without hardware.
+and pump state polls, on/off and reset commands, and the 3-minute
+command-absence cutoff, without hardware.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

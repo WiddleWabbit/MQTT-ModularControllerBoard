@@ -93,6 +93,19 @@ constexpr uint8_t kSolenoidStateOff = 0;
 constexpr uint8_t kSolenoidStateOn = 1;
 constexpr uint8_t kSolenoidStateDisconnected = 2;
 
+// Pump module (type 0x0300) commands. Other types are not required to
+// implement these. One pump per module. State bytes are
+// kPumpStateOff, kPumpStateOn, and kPumpStateFault.
+// SET_PUMP accepts only off or on. RESET_PUMP is a separate command.
+constexpr uint8_t kCmdGetPumpState = 0x60;
+constexpr uint8_t kCmdSetPump = 0x61;
+constexpr uint8_t kCmdResetPump = 0x62;
+constexpr uint8_t kPumpStatePayloadLen = 1;
+constexpr uint8_t kPumpSetPayloadLen = 1;
+constexpr uint8_t kPumpStateOff = 0;
+constexpr uint8_t kPumpStateOn = 1;
+constexpr uint8_t kPumpStateFault = 2;
+
 // SET_ADDRESS on-wire size. length field = 3 (2 + 1-byte payload);
 // total frame = 4. Do not count the I2C 7-bit address as a frame byte.
 constexpr uint8_t kSetAddressPayloadLen = 1;
@@ -116,6 +129,7 @@ constexpr uint8_t kStatusUnsupported = 0x05;
 constexpr uint16_t kTypeIdentityEcho = 0x0001;
 constexpr uint16_t kTypeSolenoidModule = 0x0100;
 constexpr uint16_t kTypeSensorModule = 0x0200;
+constexpr uint16_t kTypePumpModule = 0x0300;
 
 // ---------- Packed payloads (wire order = struct order, big-endian) ----------
 struct IdentityPayload

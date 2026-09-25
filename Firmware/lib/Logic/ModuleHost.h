@@ -87,6 +87,37 @@ struct SolenoidStateResult
 };
 
 /**
+ * Outcome of one direct pump-module query.
+ */
+enum class PumpQueryStatus : uint8_t
+{
+  Ok,
+  Rejected,
+  Busy,
+  Failed
+};
+
+/**
+ * On-wire pump state, as reported by the module.
+ */
+enum class PumpState : uint8_t
+{
+  Off,
+  On,
+  Fault
+};
+
+/**
+ * Result of GET_PUMP_STATE, SET_PUMP, or RESET_PUMP.
+ * state is valid when status is Ok.
+ */
+struct PumpStateResult
+{
+  PumpQueryStatus status;
+  PumpState state;
+};
+
+/**
  * One slot's GPIO trio.
  */
 struct SlotPins
@@ -298,6 +329,41 @@ public:
    */
   SolenoidStateResult setSolenoid(uint8_t slotIndex, uint8_t solenoidIndex,
                                   bool on);
+
+  /**
+   * Reads the pump on a Pump module.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries. One writeRead when the slot is an Online Pump.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Ok and the pump state, Busy when the module is busy,
+   *         Failed on a bad frame or bus error, or Rejected when the
+   *         slot is not an Online Pump module.
+   */
+  PumpStateResult queryPumpState(uint8_t slotIndex);
+
+  /**
+   * Turns the pump on or off.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries. The returned state is what the module reports
+   * after the command, which may still be Fault.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @param on True to command on, false to command off.
+   * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+   */
+  PumpStateResult setPump(uint8_t slotIndex, bool on);
+
+  /**
+   * Resets the pump. Sent only when a caller asks for a reset.
+   * Not re-entrant with update(), ping(), echo(), or the other
+   * module queries. The returned state is what the module reports
+   * after the reset.
+   *
+   * @param slotIndex Firmware slot 0..3.
+   * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+   */
+  PumpStateResult resetPump(uint8_t slotIndex);
 
   /**
    * Returns the active host configuration.

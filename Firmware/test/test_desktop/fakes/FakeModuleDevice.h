@@ -31,6 +31,9 @@ public:
   bool shortSolenoidPayload = false;
   uint8_t solenoidCount = 0;
   uint8_t solenoidState[module_protocol::kMaxSolenoidsPerModule] = {};
+  bool shortPumpPayload = false;
+  uint8_t pumpState = module_protocol::kPumpStateOff;
+  bool pumpResetLeavesFault = false;
   uint8_t identityLengthField = module_protocol::kIdentityLengthField;
   int nackRemaining = 0;
   bool nackIdentity = false;
@@ -298,6 +301,49 @@ public:
       }
       const uint8_t body[2] = {index, solenoidState[index]};
       _writeStatus(rx, module_protocol::kStatusOk, body, 2);
+      return I2cTxnStatus::Ok;
+    }
+    if (cmd == module_protocol::kCmdGetPumpState ||
+        cmd == module_protocol::kCmdSetPump ||
+        cmd == module_protocol::kCmdResetPump)
+    {
+      if (shortPumpPayload)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdResetPump)
+      {
+        if (!(pumpResetLeavesFault &&
+              pumpState == module_protocol::kPumpStateFault))
+        {
+          pumpState = module_protocol::kPumpStateOff;
+        }
+        _writeStatus(rx, module_protocol::kStatusOk, &pumpState, 1);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetPumpState)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, &pumpState, 1);
+        return I2cTxnStatus::Ok;
+      }
+      if (tx[0] < 3)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      const uint8_t desired = tx[2];
+      if (desired != module_protocol::kPumpStateOff &&
+          desired != module_protocol::kPumpStateOn)
+      {
+        _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (pumpState != module_protocol::kPumpStateFault)
+      {
+        pumpState = desired;
+      }
+      _writeStatus(rx, module_protocol::kStatusOk, &pumpState, 1);
       return I2cTxnStatus::Ok;
     }
 

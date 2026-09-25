@@ -17,6 +17,8 @@
 #include "NtpService.h"
 #include "PreferenceNetworkConfigStore.h"
 #include "PubSubClientAdapter.h"
+#include "PumpMqttBridge.h"
+#include "PumpPoller.h"
 #include "SensorMqttBridge.h"
 #include "SensorPoller.h"
 #include "SerialConfigController.h"
@@ -42,6 +44,14 @@ const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
 // After 15 minutes with none, every solenoid output is turned off.
 const uint32_t kSolenoidCommandTimeoutMs = 15UL * 60UL * 1000UL;
 
+// State of the pump is read and published on this period.
+const uint32_t kPumpPollIntervalMs = 60UL * 1000UL;
+
+// Accepted watering/pump on/off commands must arrive within this window.
+// After 3 minutes with none, a pump that is on is turned off.
+// A reset command does not refresh this window.
+const uint32_t kPumpCommandTimeoutMs = 3UL * 60UL * 1000UL;
+
 // USB serial status snapshot. Reboot restores this; it is not stored.
 const uint32_t kSerialStatusIntervalMs = 10UL * 1000UL;
 
@@ -53,7 +63,7 @@ const uint32_t kMemoryReportIntervalMs = 30UL * 1000UL;
 
 const MqttSubscription mqttSubscriptions[] = {
   {kSolenoidCommandTopic, 1},
-  {"watering/pump", 1},
+  {kPumpCommandTopic, 1},
   {kSensorReadTopic, 1}
 };
 
@@ -133,6 +143,10 @@ SolenoidPoller solenoidPoller(
   moduleHost, systemClock, kSolenoidPollIntervalMs, kSolenoidCommandTimeoutMs);
 SolenoidMqttBridge solenoidMqttBridge(
   solenoidPoller, mqttService, kSlotStatusTopicPrefix);
+PumpPoller pumpPoller(
+  moduleHost, systemClock, kPumpPollIntervalMs, kPumpCommandTimeoutMs);
+PumpMqttBridge pumpMqttBridge(
+  pumpPoller, mqttService, kSlotStatusTopicPrefix);
 ModuleSlotPublisher moduleSlotPublisher(
   moduleHost, mqttService, kSlotStatusTopicPrefix);
 
@@ -147,8 +161,8 @@ SerialConfigController serialConfigController(
 
 
 /**
- * Forwards one inbound MQTT payload to the sensor and solenoid bridges.
- * Each bridge ignores topics it does not own. Does not touch I2C.
+ * Forwards one inbound MQTT payload to the sensor, solenoid, and pump
+ * bridges. Each bridge ignores topics it does not own. Does not touch I2C.
  *
  * @param topic Received topic.
  * @param payload Payload bytes.
@@ -160,6 +174,7 @@ void dispatchMqttMessage(const char* topic, const uint8_t* payload,
 {
   SensorMqttBridge::onMqttMessage(topic, payload, length, &sensorMqttBridge);
   SolenoidMqttBridge::onMqttMessage(topic, payload, length, &solenoidMqttBridge);
+  PumpMqttBridge::onMqttMessage(topic, payload, length, &pumpMqttBridge);
 }
 
 
@@ -250,11 +265,16 @@ void loop()
   // At most one solenoid query: output count, a changed on/off, the
   // command-absence failsafe, or the next state read.
   solenoidPoller.update();
+  // At most one pump query: a first state read, a reset, a changed
+  // on/off, the command-absence failsafe, or the next state read.
+  pumpPoller.update();
 
   // Publish sensor readings stored above, including an unchanged value.
   sensorMqttBridge.update();
   // Publish solenoid states stored above, including an unchanged value.
   solenoidMqttBridge.update();
+  // Publish the pump state stored above, including an unchanged value.
+  pumpMqttBridge.update();
   // Publish a slot status line only when its text changed.
   moduleSlotPublisher.update();
 

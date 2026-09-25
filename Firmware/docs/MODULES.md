@@ -75,6 +75,9 @@ Commit the new address after STOP, even if MOD then goes HIGH.
 | 0x50 | GET_SOLENOID_COUNT | Solenoid `0x0100` only, empty request, 1-byte count |
 | 0x51 | GET_SOLENOID_STATE | Solenoid `0x0100` only, 1-byte index |
 | 0x52 | SET_SOLENOID | Solenoid `0x0100` only, index and off/on |
+| 0x60 | GET_PUMP_STATE | Pump `0x0300` only, empty request, 1-byte state |
+| 0x61 | SET_PUMP | Pump `0x0300` only, off or on |
+| 0x62 | RESET_PUMP | Pump `0x0300` only, empty request, 1-byte state |
 
 Identity payload (big-endian): typeId (u16), protocolVersion (u8),
 firmwareVersion (u16). Protocol version 1 is required for `Online`.
@@ -91,6 +94,8 @@ Unsupported 0x05.
 | `0x0101–0x01FF` | Further actuator types |
 | `0x0200` | Sensor module |
 | `0x0201–0x02FF` | Further sensor types |
+| `0x0300` | Pump module |
+| `0x0301–0x03FF` | Further types in that block |
 | `0xF000–0xFFFF` | Experimental |
 
 ## Several modules
@@ -133,15 +138,17 @@ for the pass.
 
 `GET_IDENTITY` returns a type id, a protocol version, and a firmware version.
 Protocol version must be 1. The type id is looked up in a fixed table. The
-bands above reserve ids for later modules. Three ids are acted on today:
-IdentityEcho `0x0001`, Solenoid `0x0100`, and Sensor `0x0200`. Any other
-identified id, including another id inside those bands, is `Unsupported`.
+bands above reserve ids for later modules. Four ids are acted on today:
+IdentityEcho `0x0001`, Solenoid `0x0100`, Sensor `0x0200`, and Pump `0x0300`.
+Any other identified id, including another id inside those bands, is
+`Unsupported`.
 
 | Identity | Public state | Action for that slot |
 | --- | --- | --- |
 | `0x0001` IdentityEcho, protocol 1 | `Online` | Health `PING` about once a second. Status text `Online IdentityEcho addr=0x1N`. `ECHO` exists for a caller. `loop()` does not poll it. |
 | `0x0100` Solenoid, protocol 1 | `Online` | Health `PING` about once a second, plus the count, state, and on/off commands in [SOLENOIDMODULE.md](SOLENOIDMODULE.md). Status text `Online Solenoid addr=0x1N`. |
 | `0x0200` Sensor, protocol 1 | `Online` | Health `PING` about once a second, plus the count and reading cycle in [SENSORMODULE.md](SENSORMODULE.md). Status text `Online Sensor addr=0x1N`. |
+| `0x0300` Pump, protocol 1 | `Online` | Health `PING` about once a second, plus the state, on/off, and reset commands in [PUMPMODULE.md](PUMPMODULE.md). Status text `Online Pump addr=0x1N`. |
 | Any other type id, or protocol version other than 1 | `Unsupported` | Health `PING` about once a second. Status text `Unsupported type=0xTTTT addr=0x1N`. No type-specific commands. |
 | Address assignment or identify keeps failing | `Fault` | No health ping and no type-specific commands. Enumeration is tried again after 1 s. Status text `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy`. |
 
@@ -216,6 +223,26 @@ state, and the command-absence cutoff are described in
 An index outside the reported count is `BadLength`. `Busy` means try the
 same command again. A count above 16, a state byte other than 0, 1, or 2,
 or a mismatched index is a bad frame.
+
+## Pump module (`0x0300`)
+
+The host sends these commands only after identify reports type `0x0300` and
+protocol version 1. One module drives one pump. State bytes are off `0`,
+on `1`, and fault `2`. `SET_PUMP` carries off or on only. `RESET_PUMP` is
+sent only after an MQTT reset. Poll timing, the MQTT desired state, and the
+command-absence cutoff are described in [PUMPMODULE.md](PUMPMODULE.md).
+`kPumpCommandTimeoutMs` in `src/main.cpp` is 3 minutes: that long without an
+accepted `watering/pump` on/off command turns a pump that is on off. A reset
+does not refresh that window.
+
+| Command | Request payload | Ok response payload |
+| --- | --- | --- |
+| GET_PUMP_STATE | empty | `state` (`u8`) |
+| SET_PUMP | `desired` (`u8`, 0 or 1) | `state` (`u8`) |
+| RESET_PUMP | empty | `state` (`u8`) |
+
+`Busy` means try the same command again. A state byte other than 0, 1, or 2
+is a bad frame.
 
 ## Timing
 

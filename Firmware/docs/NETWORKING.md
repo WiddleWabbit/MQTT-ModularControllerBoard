@@ -101,6 +101,22 @@ interval beside it is `kSolenoidPollIntervalMs` (60 seconds). Command
 parsing, which outputs are skipped, and the cutoff are in
 [SOLENOIDMODULE.md](SOLENOIDMODULE.md).
 
+`PumpPoller` reads an online Pump module (`0x0300`) the same way. The first
+query after identify, including after the module restarts and is identified
+again, is the pump state (`on`, `off`, or `fault`). That state is read again
+every 60 seconds. One pump query runs per `PumpPoller::update()`, after the
+solenoid poller. `PumpMqttBridge` publishes a retained state at
+`watering/slot/N/pump` each time a read, set, or reset stores a state.
+`watering/pump` with payload `N on` or `N off` is the desired state.
+`N reset` resets the pump and does not, by itself, turn it on. The callback
+records the request. Later poller passes send `SET_PUMP` only when the known
+state differs, and they do not send it while the pump is faulted.
+`kPumpCommandTimeoutMs` in `src/main.cpp` is 3 minutes. That long without an
+accepted on/off command turns a pump that is on off. A reset does not
+refresh that window. The poll interval beside it is `kPumpPollIntervalMs`
+(60 seconds). Command parsing and the cutoff are in
+[PUMPMODULE.md](PUMPMODULE.md).
+
 `IMqttClient` is the narrow client contract. `PubSubClientAdapter` wraps an
 already-constructed PubSubClient and is configured with `setServer`.
 `FakeMqttClient` provides deterministic connection failures, subscription and

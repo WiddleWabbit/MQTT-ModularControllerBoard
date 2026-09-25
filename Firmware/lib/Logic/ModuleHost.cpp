@@ -473,6 +473,54 @@ bool decodeSolenoidState(uint8_t wire, SolenoidOutputState* state)
   }
   return false;
 }
+
+/**
+ * Maps a shared query status onto the pump result enum.
+ *
+ * @param status Status from _queryOnline.
+ * @return Pump query status.
+ */
+PumpQueryStatus pumpStatus(SensorQueryStatus status)
+{
+  switch (status)
+  {
+    case SensorQueryStatus::Ok:
+      return PumpQueryStatus::Ok;
+    case SensorQueryStatus::Busy:
+      return PumpQueryStatus::Busy;
+    case SensorQueryStatus::Rejected:
+      return PumpQueryStatus::Rejected;
+    default:
+      return PumpQueryStatus::Failed;
+  }
+}
+
+/**
+ * Decodes a pump state byte.
+ *
+ * @param wire State byte from the module.
+ * @param state Decoded state, unchanged when the byte is invalid.
+ * @return True when wire is off, on, or fault.
+ */
+bool decodePumpState(uint8_t wire, PumpState* state)
+{
+  if (wire == module_protocol::kPumpStateOff)
+  {
+    *state = PumpState::Off;
+    return true;
+  }
+  if (wire == module_protocol::kPumpStateOn)
+  {
+    *state = PumpState::On;
+    return true;
+  }
+  if (wire == module_protocol::kPumpStateFault)
+  {
+    *state = PumpState::Fault;
+    return true;
+  }
+  return false;
+}
 }
 
 /**
@@ -591,6 +639,110 @@ SolenoidStateResult ModuleHost::setSolenoid(uint8_t slotIndex,
       !decodeSolenoidState(payload[1], &result.state))
   {
     result.status = SolenoidQueryStatus::Failed;
+    return result;
+  }
+  return result;
+}
+
+/**
+ * Reads the pump on a Pump module.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries. One writeRead when the slot is an Online Pump.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Ok and the pump state, Busy when the module is busy,
+ *         Failed on a bad frame or bus error, or Rejected when the
+ *         slot is not an Online Pump module.
+ */
+PumpStateResult ModuleHost::queryPumpState(uint8_t slotIndex)
+{
+  PumpStateResult result;
+  result.status = PumpQueryStatus::Failed;
+  result.state = PumpState::Off;
+  uint8_t payload[module_protocol::kPumpStatePayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = pumpStatus(_queryOnline(
+      slotIndex, module_protocol::kTypePumpModule,
+      module_protocol::kCmdGetPumpState, nullptr, 0, payload, sizeof(payload),
+      &payloadLen));
+  if (result.status != PumpQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kPumpStatePayloadLen ||
+      !decodePumpState(payload[0], &result.state))
+  {
+    result.status = PumpQueryStatus::Failed;
+    return result;
+  }
+  return result;
+}
+
+/**
+ * Turns the pump on or off.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries. The returned state is what the module reports
+ * after the command, which may still be Fault.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @param on True to command on, false to command off.
+ * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+ */
+PumpStateResult ModuleHost::setPump(uint8_t slotIndex, bool on)
+{
+  PumpStateResult result;
+  result.status = PumpQueryStatus::Rejected;
+  result.state = PumpState::Off;
+  const uint8_t request[module_protocol::kPumpSetPayloadLen] = {
+    static_cast<uint8_t>(on ? module_protocol::kPumpStateOn
+                            : module_protocol::kPumpStateOff),
+  };
+  uint8_t payload[module_protocol::kPumpStatePayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = pumpStatus(_queryOnline(
+      slotIndex, module_protocol::kTypePumpModule, module_protocol::kCmdSetPump,
+      request, sizeof(request), payload, sizeof(payload), &payloadLen));
+  if (result.status != PumpQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kPumpStatePayloadLen ||
+      !decodePumpState(payload[0], &result.state))
+  {
+    result.status = PumpQueryStatus::Failed;
+    return result;
+  }
+  return result;
+}
+
+/**
+ * Resets the pump. Sent only when a caller asks for a reset.
+ * Not re-entrant with update(), ping(), echo(), or the other
+ * module queries. The returned state is what the module reports
+ * after the reset.
+ *
+ * @param slotIndex Firmware slot 0..3.
+ * @return Ok and the resulting state, or Busy, Failed, or Rejected.
+ */
+PumpStateResult ModuleHost::resetPump(uint8_t slotIndex)
+{
+  PumpStateResult result;
+  result.status = PumpQueryStatus::Failed;
+  result.state = PumpState::Off;
+  uint8_t payload[module_protocol::kPumpStatePayloadLen];
+  uint8_t payloadLen = 0;
+  result.status = pumpStatus(_queryOnline(
+      slotIndex, module_protocol::kTypePumpModule,
+      module_protocol::kCmdResetPump, nullptr, 0, payload, sizeof(payload),
+      &payloadLen));
+  if (result.status != PumpQueryStatus::Ok)
+  {
+    return result;
+  }
+  if (payloadLen != module_protocol::kPumpStatePayloadLen ||
+      !decodePumpState(payload[0], &result.state))
+  {
+    result.status = PumpQueryStatus::Failed;
     return result;
   }
   return result;
