@@ -67,8 +67,9 @@ QoS argument, so slot status uses the client default.
 `SensorPoller` reads an online Sensor module (`0x0200`) without going through
 MQTT. The first query after identify, including after the module restarts and
 is identified again, is the input count. Presence and a raw int32 reading for
-every input then run immediately, and again every 60 seconds. One sensor
-query runs per `SensorPoller::update()`, after `moduleHost.update()`.
+every input then run immediately, and again every `kSensorPollIntervalMs`
+(60 seconds, set in `src/main.cpp`). One sensor query runs per
+`SensorPoller::update()`, after `moduleHost.update()`.
 
 `SensorMqttBridge` publishes a retained reading at `watering/slot/N/sensor/M`
 (module slot and sensor number are both 1-based) each time a poll or an

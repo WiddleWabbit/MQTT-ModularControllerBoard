@@ -58,17 +58,21 @@ with `GET_SENSOR_COUNT`. The poller treats each successful identify as a new
 session and forgets the previous count and samples.
 
 After the count is known, the first presence/reading cycle starts on the
-following poller pass. It does not wait out the minute first. The cycle walks
-inputs from index 0 upward. Each input is `GET_SENSOR_CONNECTED`, then
-`GET_SENSOR_READING`. One command runs per pass, so a module with two inputs
-takes four passes for a full cycle. When the last reading of the cycle
-finishes, the next cycle is due 60 seconds later.
+following poller pass. It does not wait out the poll interval first. The
+cycle walks inputs from index 0 upward. Each input is `GET_SENSOR_CONNECTED`,
+then `GET_SENSOR_READING`. One command runs per pass, so a module with two
+inputs takes four passes for a full cycle. When the last reading of the cycle
+finishes, the next cycle is due `kSensorPollIntervalMs` later.
 
 A count of 0 stores that count and does not start a presence/reading cycle.
 
 `Busy` or a failed query is tried up to three times for that step. The cycle
-then moves to the next step. Three failed count queries wait 60 seconds
-before the count is tried again.
+then moves to the next step. Three failed count queries wait
+`kSensorPollIntervalMs` before the count is tried again.
+
+That interval is `kSensorPollIntervalMs` in `src/main.cpp`
+(`60UL * 1000UL`, 60 seconds). Changing the constant changes both waits.
+A zero argument to `SensorPoller` selects the poller's own 60 second default.
 
 An immediate read, described below, runs before the count query and before
 the periodic cycle. While the module is still enumerating, or the count is
@@ -87,9 +91,10 @@ module then gets the cycle below. An IdentityEcho module gets health pings.
 An unsupported type gets health pings and no sensor commands. An empty or
 faulted slot gets no sensor commands.
 
-Each Sensor slot has its own count, samples, and minute timer. Unplugging
-one Sensor module drops that slot's cache and publishes `unavailable` on its
-sensor topics. Another module in another slot keeps its count and its timer.
+Each Sensor slot has its own count, samples, and poll-interval timer.
+Unplugging one Sensor module drops that slot's cache and publishes
+`unavailable` on its sensor topics. Another module in another slot keeps
+its count and its timer.
 
 The poller still runs one sensor query per pass, for one slot, in this order:
 
@@ -102,11 +107,11 @@ The poller still runs one sensor query per pass, for one slot, in this order:
 3. The next presence or reading step. A slot that has started a cycle
    finishes every input before another slot starts a cycle. When no cycle
    is underway, the lowest due slot starts. A slot is due when its count is
-   known, the count is greater than 0, and its own 60 s timer has elapsed.
+   known, the count is greater than 0, and its own poll interval has elapsed.
    The timer is clear after the count is stored, so the first cycle starts
-   on the following pass. It is set to 60 s when that slot's last reading
-   finishes. Two modules therefore repeat on their own minutes, offset by
-   the time the earlier cycle took.
+   on the following pass. It is set to `kSensorPollIntervalMs` when that
+   slot's last reading finishes. Two modules therefore repeat on their own
+   intervals, offset by the time the earlier cycle took.
 
 A count query for a module that has just come online is step 2, so it runs
 before the next step of another module's cycle. That other cycle continues
@@ -125,7 +130,7 @@ slot 2  GET_SENSOR_READING   index 0
         MQTT watering/slot/2/sensor/1
 ```
 
-About 60 seconds after slot 1's reading, slot 1 is due again. When slot 2 is
+About one poll interval after slot 1's reading, slot 1 is due again. When slot 2 is
 still inside a cycle, slot 2 finishes that cycle first and slot 1 runs on
 the following passes. `watering/sensor/read` with payload `2 1` names slot 2.
 Once that slot's count is known, the read is the next sensor query, ahead of
@@ -245,7 +250,7 @@ I2C  GET_SENSOR_READING    index 1
 MQTT watering/slot/1/sensor/2  retained  "disconnected"
 ```
 
-About 60 seconds after that second reading, the four I2C queries run again.
+About one poll interval after that second reading, the four I2C queries run again.
 Both sensor topics are published again, even when 2500 and `disconnected`
 are unchanged.
 
@@ -263,7 +268,7 @@ periodic cycle resumes on later passes.
 Desktop tests in `test/test_desktop/test_sensor.cpp` drive `FakeModuleDevice`
 and `FakeMqttClient`. They cover the three command frames, host rejection
 unless the slot is an online Sensor module, count-then-poll ordering, the
-60 second repeat, a module reset that reads the count again, a count of 0,
+poll-interval repeat, a module reset that reads the count again, a count of 0,
 busy retries, the immediate read command, malformed commands, a missing
 sensor, publication of an unchanged periodic value, and retained
 `unavailable` after unplug. Two slots enumerating together are covered by

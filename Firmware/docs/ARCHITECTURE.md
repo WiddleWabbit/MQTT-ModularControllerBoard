@@ -49,7 +49,8 @@ status text changes. `loop()` calls it after `moduleHost.update()`.
 call `ping()` or `echo()`.
 A Sensor module (`0x0200`) is polled by `SensorPoller` after
 `moduleHost.update()`. The poller asks for the input count when that module
-is identified, then presence and a raw reading for each input once a minute.
+is identified, then presence and a raw reading for each input every
+`kSensorPollIntervalMs` in `src/main.cpp` (60 seconds).
 `SensorMqttBridge` publishes every stored reading, including a repeated
 value, and accepts `watering/sensor/read` as an immediate read. The MQTT
 callback only enqueues the request. Behaviour, topics, and commands are in
