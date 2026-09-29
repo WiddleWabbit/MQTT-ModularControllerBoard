@@ -166,6 +166,8 @@ index 0.
 | `watering/slot/N` | publish | Slot status, such as `Online Solenoid addr=0x10` |
 | `watering/slot/N/solenoid/M` | publish | One output: `on`, `off`, or `disconnected` |
 | `watering/solenoids` | subscribe, QoS 1 | `N on off ...` |
+| `watering/solenoids/connected` | subscribe, QoS 1 | `N` |
+| `watering/slot/N/solenoids` | publish | `count` then connected indexes, such as `4 1 2 4` |
 
 `watering/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not
 a solenoid state.
@@ -185,6 +187,8 @@ bridge pass, with no new state, does not publish that output again.
 | Periodic `GET_SOLENOID_STATE` succeeds | `watering/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
 | `SET_SOLENOID` returns a state | `watering/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
 | Slot is no longer an online Solenoid module, or the new count no longer includes an output that had a state | `watering/slot/N/solenoid/M` | `unavailable` | yes, once |
+| Count and every output state are known, the connected set changes, or `watering/solenoids/connected` asks again | `watering/slot/N/solenoids` | count, then each connected index: `4 1 2 4` | yes |
+| Slot is no longer an online Solenoid module after an inventory was published | `watering/slot/N/solenoids` | `unavailable` | yes, once |
 | Count query, malformed command, or a command that is still waiting for the count | — | nothing | — |
 | Bridge pass with no new state | — | nothing | — |
 

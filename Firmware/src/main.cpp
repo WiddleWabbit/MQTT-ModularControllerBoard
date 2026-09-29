@@ -28,7 +28,7 @@
 #include "WifiManager.h"
 
 // TODO/NOTES
-// ID for multiple board/s
+// set mqtt prefix via serial
 
 
 // ========== Timing ==========
@@ -63,6 +63,7 @@ const uint32_t kMemoryReportIntervalMs = 30UL * 1000UL;
 
 const MqttSubscription mqttSubscriptions[] = {
   {kSolenoidCommandTopic, 1},
+  {kSolenoidConnectedTopic, 1},
   {kPumpCommandTopic, 1},
   {kSensorReadTopic, 1}
 };

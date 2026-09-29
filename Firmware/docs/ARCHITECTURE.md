@@ -58,7 +58,8 @@ callback only enqueues the request. Behaviour, topics, and commands are in
 A Solenoid module (`0x0100`) is polled by `SolenoidPoller` after the sensor
 poller. The poller asks for the output count when that module is identified,
 then the on/off/disconnected state of each output once a minute.
-`SolenoidMqttBridge` publishes every stored state. `watering/solenoids`
+`SolenoidMqttBridge` publishes every stored state, and the retained list
+of connected outputs on `watering/slot/N/solenoids`. `watering/solenoids`
 names the desired on/off state of each output; the poller sends an on or off
 command only where the module's state differs. If that command is absent for
 `kSolenoidCommandTimeoutMs` in `src/main.cpp` (15 minutes), every output is

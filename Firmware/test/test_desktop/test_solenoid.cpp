@@ -648,3 +648,89 @@ void testPeriodicSolenoidPublishEachStateAndClearOnUnplug()
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
                              "unavailable", true));
 }
+
+void testConnectedQueryPublishesIndexesWithoutRefreshingSilence()
+{
+  SolenoidHarness harness(60000, 5000);
+  harness.device.solenoidCount = 4;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  harness.device.solenoidState[1] = module_protocol::kSolenoidStateOff;
+  harness.device.solenoidState[2] = module_protocol::kSolenoidStateDisconnected;
+  harness.device.solenoidState[3] = module_protocol::kSolenoidStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 4);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
+                             "4 1 2 4", true));
+
+  const size_t learned = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(4999);
+  harness.client.deliver(kSolenoidConnectedTopic, "1");
+  harness.bridge.update();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+}
+
+void testConnectedQueryWaitsUntilEveryStateIsKnown()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 4;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  harness.device.solenoidState[1] = module_protocol::kSolenoidStateOff;
+  harness.device.solenoidState[2] = module_protocol::kSolenoidStateDisconnected;
+  harness.device.solenoidState[3] = module_protocol::kSolenoidStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.client.deliver(kSolenoidConnectedTopic, "1");
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/solenoids",
+                              "4 1 2 4", true));
+
+  learnOutputs(harness, 4);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
+                             "4 1 2 4", true));
+}
+
+void testConnectedQueryRejectsMalformedPayload()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 1;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 1);
+  harness.bridge.update();
+  harness.client.publishedMessages.clear();
+  const size_t learned = harness.modules.bus.protocolOpCount();
+
+  harness.client.deliver(kSolenoidConnectedTopic, "1 2");
+  harness.client.deliver(kSolenoidConnectedTopic, "5");
+  harness.client.deliver(kSolenoidConnectedTopic, "on");
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+}
+
+void testConnectedInventoryClearsWhenModuleUnplugged()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 1;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 1);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
+                             "1 1", true));
+
+  harness.modules.sense(0).setPresent(false);
+  pumpMs(harness.modules, 80);
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
+                             "unavailable", true));
+}

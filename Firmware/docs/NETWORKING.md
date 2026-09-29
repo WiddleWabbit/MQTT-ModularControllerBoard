@@ -93,7 +93,11 @@ solenoid query runs per `SolenoidPoller::update()`, after the sensor poller.
 `SolenoidMqttBridge` publishes a retained state at
 `watering/slot/N/solenoid/M` each time a read or a set stores a state.
 `watering/solenoids` with payload `N on off ...` is the desired state of
-every output on module slot N. The callback records it. Later poller passes
+every output on module slot N. The callback records it. `watering/solenoids/connected`
+with payload `N` asks for the output list and does not record desired state
+or restart the silence window. Once every output state is known, the bridge
+publishes retained `watering/slot/N/solenoids` as the count followed by the
+connected indexes (`4 1 2 4`). Later poller passes
 send `SET_SOLENOID` only for outputs that are not already in that state.
 `kSolenoidCommandTimeoutMs` in `src/main.cpp` is 15 minutes. That long
 without an accepted command turns every solenoid output off. The poll

@@ -21,6 +21,9 @@ SolenoidMqttBridge::SolenoidMqttBridge(SolenoidPoller& poller,
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
     }
+    _inventoryPending[slot] = false;
+    _inventoryOk[slot] = false;
+    _inventoryPayload[slot][0] = '\0';
   }
 }
 
@@ -59,6 +62,7 @@ void SolenoidMqttBridge::onMqttMessage(const char* topic,
 void SolenoidMqttBridge::update()
 {
   _publishSnapshots();
+  _publishInventories();
 }
 
 
@@ -150,7 +154,16 @@ bool readOnOff(const char*& cursor, const char* end, bool* on)
 void SolenoidMqttBridge::_handleMessage(const char* topic,
                                         const uint8_t* payload, size_t length)
 {
-  if (topic == nullptr || std::strcmp(topic, kSolenoidCommandTopic) != 0)
+  if (topic == nullptr)
+  {
+    return;
+  }
+  if (std::strcmp(topic, kSolenoidConnectedTopic) == 0)
+  {
+    _handleConnectedQuery(payload, length);
+    return;
+  }
+  if (std::strcmp(topic, kSolenoidCommandTopic) != 0)
   {
     return;
   }
@@ -197,6 +210,41 @@ void SolenoidMqttBridge::_handleMessage(const char* topic,
   }
   _poller.commandStates(static_cast<uint8_t>(moduleNumber - 1), desiredOn,
                         count);
+}
+
+/**
+ * Records a request to publish one slot's connected outputs.
+ * Does not record desired state and does not touch the silence window.
+ *
+ * @param payload Payload bytes.
+ * @param length Payload length.
+ * @return Nothing.
+ */
+void SolenoidMqttBridge::_handleConnectedQuery(const uint8_t* payload,
+                                               size_t length)
+{
+  if (payload == nullptr && length > 0)
+  {
+    return;
+  }
+  const char* cursor = reinterpret_cast<const char*>(payload);
+  const char* end = cursor + length;
+  skipSpace(cursor, end);
+  unsigned moduleNumber = 0;
+  if (!readUnsigned(cursor, end, &moduleNumber))
+  {
+    return;
+  }
+  if (moduleNumber < 1 || moduleNumber > module_protocol::kSlotCount)
+  {
+    return;
+  }
+  skipSpace(cursor, end);
+  if (cursor != end)
+  {
+    return;
+  }
+  _inventoryPending[moduleNumber - 1] = true;
 }
 
 
@@ -246,6 +294,108 @@ void SolenoidMqttBridge::_publishSnapshots()
       _publishedRevision[slot][index] = revision;
     }
   }
+}
+
+/**
+ * Publishes the retained output list for each slot that can answer.
+ * A slot that could answer and no longer can publishes unavailable.
+ *
+ * @return Nothing.
+ */
+void SolenoidMqttBridge::_publishInventories()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    char text[80];
+    if (!_formatInventory(slot, text, sizeof(text)))
+    {
+      if (_inventoryOk[slot] && _publishInventory(slot, "unavailable"))
+      {
+        _inventoryOk[slot] = false;
+        _inventoryPayload[slot][0] = '\0';
+        _inventoryPending[slot] = false;
+      }
+      continue;
+    }
+    const bool changed = !_inventoryOk[slot] ||
+                         std::strcmp(_inventoryPayload[slot], text) != 0;
+    if (!changed && !_inventoryPending[slot])
+    {
+      continue;
+    }
+    if (!_publishInventory(slot, text))
+    {
+      continue;
+    }
+    std::snprintf(_inventoryPayload[slot], sizeof(_inventoryPayload[slot]), "%s",
+                  text);
+    _inventoryOk[slot] = true;
+    _inventoryPending[slot] = false;
+  }
+}
+
+/**
+ * Formats "<count> <connected indexes...>" for one slot.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param out Destination buffer.
+ * @param outCap Destination capacity.
+ * @return False until the count and every output state are known.
+ */
+bool SolenoidMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
+                                         size_t outCap) const
+{
+  if (!_poller.countKnown(moduleSlot) || out == nullptr || outCap < 2)
+  {
+    return false;
+  }
+  const uint8_t count = _poller.solenoidCount(moduleSlot);
+  if (count > module_protocol::kMaxSolenoidsPerModule)
+  {
+    return false;
+  }
+  int used = std::snprintf(out, outCap, "%u", static_cast<unsigned>(count));
+  if (used < 0 || static_cast<size_t>(used) >= outCap)
+  {
+    return false;
+  }
+  for (uint8_t index = 0; index < count; ++index)
+  {
+    SolenoidOutputState state = SolenoidOutputState::Off;
+    if (!_poller.solenoidState(moduleSlot, index, &state))
+    {
+      return false;
+    }
+    if (state == SolenoidOutputState::Disconnected)
+    {
+      continue;
+    }
+    const int next = std::snprintf(out + used, outCap - static_cast<size_t>(used),
+                                   " %u", static_cast<unsigned>(index) + 1U);
+    if (next < 0 || static_cast<size_t>(next) >= outCap - static_cast<size_t>(used))
+    {
+      return false;
+    }
+    used += next;
+  }
+  return true;
+}
+
+/**
+ * Publishes the retained inventory topic for one slot.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param payload Text payload.
+ * @return True when publication was accepted.
+ */
+bool SolenoidMqttBridge::_publishInventory(uint8_t moduleSlot,
+                                          const char* payload)
+{
+  char topic[96];
+  const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
+  std::snprintf(topic, sizeof(topic), "%s/%u/solenoids",
+                _slotTopicPrefix.c_str(), moduleNumber);
+  return _mqttService.publish(topic, payload, true);
 }
 
 /**
