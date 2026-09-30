@@ -5,7 +5,8 @@
 namespace
 {
 const uint32_t kProgrammingLatchMagic = 0x49535031UL;
-RTC_DATA_ATTR uint32_t programmingLatchStorage = 0;
+// No initializer: .rtc_noinit is left as it was across a restart.
+RTC_NOINIT_ATTR uint32_t programmingLatchStorage;
 }
 
 

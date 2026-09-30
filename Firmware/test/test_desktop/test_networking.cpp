@@ -225,6 +225,8 @@ void testIspProgramEepromUsesEepromOpcode();
 void testIspChipEraseWaits();
 void testIspSetParameterDoesNotChangeSpiClock();
 void testProgrammingSessionQuiescesHostUntilIdleTimeout();
+void testProgrammingSessionStaysUpWhilePortUnseen();
+void testProgrammingSessionSurvivesBriefUnplug();
 void testProgrammingSessionEndsWhenUnplugged();
 void testHostQuiesceReleasesModAndStopsI2cUntilResume();
 void testProgramCommandRequestsIsp();
@@ -893,6 +895,8 @@ int main()
   RUN_TEST(testIspChipEraseWaits);
   RUN_TEST(testIspSetParameterDoesNotChangeSpiClock);
   RUN_TEST(testProgrammingSessionQuiescesHostUntilIdleTimeout);
+  RUN_TEST(testProgrammingSessionStaysUpWhilePortUnseen);
+  RUN_TEST(testProgrammingSessionSurvivesBriefUnplug);
   RUN_TEST(testProgrammingSessionEndsWhenUnplugged);
   RUN_TEST(testHostQuiesceReleasesModAndStopsI2cUntilResume);
   RUN_TEST(testProgramCommandRequestsIsp);

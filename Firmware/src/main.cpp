@@ -66,6 +66,10 @@ const uint32_t kMemoryReportIntervalMs = 30UL * 1000UL;
 // module host. Solenoid and pump absence windows keep counting.
 const uint32_t kProgrammingIdleTimeoutMs = 60UL * 1000UL;
 
+// After the USB link has been seen, this long with no frames ends the
+// ISP session. A monitor close or open can stop frames for less than this.
+const uint32_t kProgrammingUnplugTimeoutMs = 1000UL;
+
 
 // ========== Network services ==========
 
@@ -172,7 +176,7 @@ IspProgrammer ispProgrammer(serialPort, ispSpi, cs1, systemClock);
 Esp32ProgrammingLatch programmingLatch;
 ProgrammingSession programmingSession(
   ispProgrammer, moduleHost, cs1, serialPort, systemClock,
-  kProgrammingIdleTimeoutMs);
+  kProgrammingIdleTimeoutMs, kProgrammingUnplugTimeoutMs);
 bool startupAttempted = false;
 
 

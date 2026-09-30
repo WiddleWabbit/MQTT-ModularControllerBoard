@@ -538,7 +538,7 @@ void testProgrammingSessionQuiescesHostUntilIdleTimeout()
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
   ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000);
+    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
   session.begin();
   TEST_ASSERT_TRUE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
@@ -578,6 +578,61 @@ void testProgrammingSessionQuiescesHostUntilIdleTimeout()
   TEST_ASSERT_TRUE(fixture.bus.protocolOpCount() > ops);
 }
 
+void testProgrammingSessionStaysUpWhilePortUnseen()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  fixture.host.begin();
+  FakeBytePort port;
+  port.plugged = false;
+  FakeSpiMaster spi;
+  IspProgrammer programmer(port, spi, fixture.cs1, clock);
+  ProgrammingSession session(
+    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
+  session.begin();
+
+  clock.set(59999);
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
+
+  clock.set(60000);
+  session.update();
+  TEST_ASSERT_FALSE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, fixture.cs1.mode);
+}
+
+void testProgrammingSessionSurvivesBriefUnplug()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  fixture.host.begin();
+  FakeBytePort port;
+  FakeSpiMaster spi;
+  IspProgrammer programmer(port, spi, fixture.cs1, clock);
+  ProgrammingSession session(
+    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
+  session.begin();
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+
+  port.plugged = false;
+  session.update();
+  clock.advance(999);
+  const uint8_t sync[] = {0x30, kEop};
+  port.feed(sync, sizeof(sync));
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
+  const uint8_t syncReply[] = {kInsync, kOk};
+  assertBytes(port.output, syncReply, sizeof(syncReply));
+
+  port.plugged = true;
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
+}
+
 void testProgrammingSessionEndsWhenUnplugged()
 {
   FakeClock clock;
@@ -587,14 +642,27 @@ void testProgrammingSessionEndsWhenUnplugged()
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
   ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000);
+    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
   session.begin();
+  session.update();
   TEST_ASSERT_TRUE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
 
   port.plugged = false;
+  session.update();
+  clock.advance(999);
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
+
   clock.advance(1);
   session.update();
   TEST_ASSERT_FALSE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, fixture.cs1.mode);
+
+  session.begin();
+  clock.advance(1000);
+  session.update();
+  TEST_ASSERT_TRUE(session.active());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
 }

@@ -80,9 +80,11 @@ session on firmware slot 1. `ProgrammingSession` quiesces `ModuleHost` for
 that time, and `IspProgrammer` speaks the STK500v1 subset avrdude uses.
 Pollers are not called, so solenoid and pump commands wait until the session
 ends; their absence windows keep counting. The idle timeout is
-`kProgrammingIdleTimeoutMs` in `src/main.cpp` (60 seconds). An RTC marker
-brings the session back after the USB-open restart and is cleared when the
-session ends. Pins, the jumper map, and the reset sequence are in
+`kProgrammingIdleTimeoutMs` in `src/main.cpp` (60 seconds). After the USB
+link has been seen in that session, `kProgrammingUnplugTimeoutMs`
+(1 second) of absent frames ends it too. A missing frame before the port
+has been seen does not. An RTC slow-memory marker in `.rtc_noinit` brings the session back
+after the USB-open restart and is cleared when the session ends. Pins, the jumper map, and the reset sequence are in
 [PROGRAMMING.md](PROGRAMMING.md).
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions

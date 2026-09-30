@@ -5,13 +5,15 @@
 ProgrammingSession::ProgrammingSession(IspProgrammer& programmer,
                                        ModuleHost& host, IDigitalPin& resetPin,
                                        IBytePort& port, IClock& clock,
-                                       uint32_t idleTimeoutMs)
+                                       uint32_t idleTimeoutMs,
+                                       uint32_t unplugTimeoutMs)
   : _programmer(programmer),
     _host(host),
     _reset(resetPin),
     _port(port),
     _clock(clock),
-    _idleTimeoutMs(idleTimeoutMs)
+    _idleTimeoutMs(idleTimeoutMs),
+    _unplugTimeoutMs(unplugTimeoutMs)
 {
 }
 
@@ -32,13 +34,18 @@ void ProgrammingSession::begin()
   _host.quiesce();
   _reset.setMode(PinMode::DigitalOutput);
   _reset.write(true);
+  _seenPlugged = false;
+  _unplugTiming = false;
   _idleMark = _clock.millis();
   _lastActivity = _programmer.activityCount();
   _active = true;
 }
 
 /**
- * Services the programmer, then ends on unplug or idle timeout.
+ * Services the programmer. Ends after a confirmed unplug or idle timeout.
+ * A missing link ends the session only after the port has been seen in
+ * this session and has then stayed absent for the unplug interval.
+ * Until then, silence is the only end.
  *
  * @return Nothing.
  */
@@ -48,19 +55,35 @@ void ProgrammingSession::update()
   {
     return;
   }
-  if (!_port.isPlugged())
+
+  const uint32_t now = _clock.millis();
+  if (_port.isPlugged())
   {
-    _finish();
-    return;
+    _seenPlugged = true;
+    _unplugTiming = false;
   }
+  else if (_seenPlugged)
+  {
+    if (!_unplugTiming)
+    {
+      _unplugTiming = true;
+      _unplugMark = now;
+    }
+    if (static_cast<uint32_t>(now - _unplugMark) >= _unplugTimeoutMs)
+    {
+      _finish();
+      return;
+    }
+  }
+
   _programmer.update();
   const uint32_t activity = _programmer.activityCount();
   if (activity != _lastActivity)
   {
     _lastActivity = activity;
-    _idleMark = _clock.millis();
+    _idleMark = now;
   }
-  if (static_cast<uint32_t>(_clock.millis() - _idleMark) >= _idleTimeoutMs)
+  if (static_cast<uint32_t>(now - _idleMark) >= _idleTimeoutMs)
   {
     _finish();
   }

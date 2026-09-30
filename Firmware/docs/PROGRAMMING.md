@@ -72,13 +72,21 @@ session leaves outputs as they were.
 
 The session ends 60 seconds after the last STK500 byte, or 60 seconds after
 it started when none arrive (`kProgrammingIdleTimeoutMs` in `src/main.cpp`).
-Unplugging USB ends it the same way. Leaving programming mode does not end
-the session by itself: closing the port can still reset the chip, and the
-session has to be there when it boots. When the session ends, slot 1 CS
-returns to an input with pull-up, SPI is released, the RTC marker is
-cleared, and the normal loop resumes.
 
-A power cycle clears the RTC marker. A software restart keeps it.
+After the USB link has been present in this session, it also ends once that
+link has stayed absent for 1 second (`kProgrammingUnplugTimeoutMs`). A session
+that has not seen the link yet stays up until the silence timer. Closing or
+opening the serial monitor can reset the chip and stop USB frames while the
+port enumerates again. The session and the RTC marker survive that gap. Setup
+on the restarted chip starts STK500 with no banner.
+
+When the session ends, slot 1 CS returns to an input with pull-up, SPI is
+released, the RTC marker is cleared, and the normal loop resumes.
+
+The marker is one word in the `.rtc_noinit` part of RTC slow memory.
+That section is not reloaded from the firmware image, so a USB-open
+reset or a software restart keeps it. The reset button pulls `CHIP_PU`
+low, and a power cycle removes RTC power, so both clear it.
 
 ## USB-open restart
 
@@ -125,9 +133,12 @@ are not routed for that. This firmware does not drive them.
 
 Native tests in `test/test_desktop/test_isp.cpp` cover the STK500 subset,
 the reset-before-SPI order, the fixed 125 kHz clock, and the session idle
-and unplug paths. `test_modules.cpp` covers host quiesce. `test_configuration.cpp`
-covers `program`, `program isp`, and `program updi`. The RTC marker is
-ESP32-only and is not part of the desktop tests.
+path. They also cover an unplug before the port has been seen, a sub-second
+unplug that leaves STK500 running, and a full one-second unplug. A second
+`begin()` after that confirmed unplug starts a new seen-port count.
+`test_modules.cpp` covers host quiesce. `test_configuration.cpp`
+covers `program`, `program isp`, and `program updi`. The `.rtc_noinit`
+marker is ESP32-only and is not part of the desktop tests.
 
 ```text
 pio test -e native

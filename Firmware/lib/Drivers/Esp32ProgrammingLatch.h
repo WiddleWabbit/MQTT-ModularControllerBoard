@@ -1,9 +1,10 @@
 #pragma once
 
 /**
- * Remembers that an ISP session should resume after a software restart.
- * The flag lives in RTC memory: a USB-open reset keeps it, a power cycle
- * clears it.
+ * Remembers that an ISP session should resume after a restart.
+ * The marker is one word in the unloaded part of RTC slow memory
+ * (.rtc_noinit). A USB-open reset or a software restart keeps it.
+ * The reset button and a power cycle clear it.
  */
 class Esp32ProgrammingLatch
 {
