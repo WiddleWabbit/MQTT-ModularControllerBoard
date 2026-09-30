@@ -86,6 +86,25 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
   link is unplugged.
 - Fakes must provide queued input and inspectable output.
 
+## `IBytePort`
+
+- Raw bytes for programming traffic. Line framing stays on `ISerialPort`.
+- `isPlugged()`, `available()`, and `read()` match the serial port.
+- `write(data, length)` sends a buffer. A null pointer or a zero length
+  writes nothing.
+- The ESP32 adapter is the same USB CDC object as `ISerialPort`.
+- Fakes queue input and record every written byte.
+
+## `ISpiMaster`
+
+- `begin(clockHz)` starts mode 0, MSB first, with SCK idle low.
+- `end()` releases the bus.
+- `transfer()` clocks one byte and returns the byte shifted in.
+- The programmer calls `begin()` before it drives reset low, and it keeps
+  the clock at 125 kHz.
+- Fakes record the clock, the order `begin()` was called, and every byte,
+  and they return a scripted MISO stream.
+
 ## `IDigitalPin`
 
 - `setMode()` selects `DigitalInput`, `DigitalInputPullup`, `DigitalOutput`,

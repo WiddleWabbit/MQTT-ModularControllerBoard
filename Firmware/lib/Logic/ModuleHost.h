@@ -153,6 +153,21 @@ public:
   void begin();
 
   /**
+   * Releases every MOD line and ignores update() and direct queries
+   * until resume(). Safe to call before begin().
+   *
+   * @return Nothing.
+   */
+  void quiesce();
+
+  /**
+   * Allows update() and direct queries again.
+   *
+   * @return Nothing.
+   */
+  void resume();
+
+  /**
    * Advances debounce, enumeration, and health. No-op until begin().
    * Issues at most one write/read/writeRead. May call recover() once
    * after Timeout or BusError.
@@ -378,6 +393,7 @@ private:
   ModuleHostConfig _config;
   SlotController _slots[4];
   bool _started = false;
+  bool _quiesced = false;
   int8_t _lockOwner = -1;
   uint8_t _nextHealthSlot = 0;
 

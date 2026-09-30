@@ -31,11 +31,19 @@ public:
    */
   void update();
 
+  /**
+   * Reports and clears a pending `program` / `program isp` request.
+   *
+   * @return True once after that command is accepted.
+   */
+  bool takeProgrammingRequest();
+
 private:
   ISerialPort& _serial;
   NetworkRuntime& _runtime;
   ISerialStatusControl& _status;
   std::string _line;
+  bool _programmingRequested = false;
   NetworkConfig _staged{};
   std::string _ssid;
   std::string _wifiPassword;

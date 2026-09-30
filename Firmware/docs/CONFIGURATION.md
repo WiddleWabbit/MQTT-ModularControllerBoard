@@ -23,6 +23,8 @@ set mqtt.username user
 set mqtt.password password
 apply
 status
+program
+program isp
 ```
 
 `set` commands update a staging copy only. `apply` writes just the fields set
@@ -49,6 +51,12 @@ printing. A missing key leaves reporting on and is not written until applied.
 `status`, which is not a `set` command, prints one live WiFi, NTP, and MQTT
 snapshot immediately, including while periodic reporting is off and while a
 status change is still staged.
+
+`program` and `program isp` reply `OK programming` and a one-line jumper
+reminder, then hand the USB byte stream to the ISP session described in
+[PROGRAMMING.md](PROGRAMMING.md). The console does not read further lines
+until that session ends. `program updi` and any other `program ...` line
+reply `ERR program`.
 
 Serial input and responses are suppressed when the USB serial link is
 unplugged.

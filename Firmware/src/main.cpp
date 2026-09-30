@@ -8,14 +8,18 @@
 #include "Esp32I2cMaster.h"
 #include "Esp32NtpAdapter.h"
 #include "Esp32PreferenceStore.h"
+#include "Esp32ProgrammingLatch.h"
 #include "Esp32SerialPort.h"
+#include "Esp32SpiMaster.h"
 #include "Esp32Wifi.h"
+#include "IspProgrammer.h"
 #include "ModuleHost.h"
 #include "ModuleSlotPublisher.h"
 #include "MqttService.h"
 #include "NetworkRuntime.h"
 #include "NtpService.h"
 #include "PreferenceNetworkConfigStore.h"
+#include "ProgrammingSession.h"
 #include "PubSubClientAdapter.h"
 #include "PumpMqttBridge.h"
 #include "PumpPoller.h"
@@ -57,6 +61,10 @@ const uint32_t kSerialStatusIntervalMs = 10UL * 1000UL;
 
 // Heap and PSRAM lines on the USB serial port.
 const uint32_t kMemoryReportIntervalMs = 30UL * 1000UL;
+
+// No STK500 byte for this long ends the ISP session and resumes the
+// module host. Solenoid and pump absence windows keep counting.
+const uint32_t kProgrammingIdleTimeoutMs = 60UL * 1000UL;
 
 
 // ========== Network services ==========
@@ -159,6 +167,13 @@ SerialStatusReporter serialStatusReporter(
   serialPort, systemClock, wifiManager, ntpService, mqttService, moduleHost);
 SerialConfigController serialConfigController(
   serialPort, networkRuntime, serialStatusReporter);
+Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
+IspProgrammer ispProgrammer(serialPort, ispSpi, cs1, systemClock);
+Esp32ProgrammingLatch programmingLatch;
+ProgrammingSession programmingSession(
+  ispProgrammer, moduleHost, cs1, serialPort, systemClock,
+  kProgrammingIdleTimeoutMs);
+bool startupAttempted = false;
 
 
 /**
@@ -180,14 +195,15 @@ void dispatchMqttMessage(const char* topic, const uint8_t* payload,
 
 
 /**
- * Initializes the ESP32 and all functions.
+ * Starts PSRAM, the module host, and network services once.
+ * A programming session that began from the RTC latch calls this
+ * after the session ends. A failed PSRAM init does not try again.
  *
  * @return Nothing.
  */
-void setup()
+void startController()
 {
-  Serial.begin(115200);
-  delay(2000);
+  startupAttempted = true;
 
   if (serialPort.isPlugged())
   {
@@ -239,24 +255,69 @@ void setup()
 
 
 /**
- * One pass of the controller. Network and serial commands run first.
- * The host then takes at most one I2C transaction, and each poller
- * at most one query. MQTT publishes follow from what those pollers
- * stored. USB status lines are last.
+ * Opens USB serial. A latched ISP session starts immediately so an
+ * avrdude port-open restart reaches STK500 before the banner delay.
+ *
+ * @return Nothing.
+ */
+void setup()
+{
+  Serial.begin(115200);
+  if (programmingLatch.isSet())
+  {
+    programmingSession.begin();
+    return;
+  }
+  delay(2000);
+  startController();
+}
+
+
+/**
+ * One pass of the controller. Network services always run. While an
+ * ISP session is active the USB byte stream belongs to STK500, and
+ * the module host, pollers, and status lines wait. Otherwise serial
+ * commands run, then the host takes at most one I2C transaction and
+ * each poller at most one query. MQTT publishes follow from what
+ * those pollers stored. USB status lines are last.
  *
  * @return Nothing.
  */
 void loop()
 {
   // Advance connect, connected, or backoff. Does not block.
+  // Idle until startController(), including during a latched session.
   wifiManager.update();
   // Record NTP sync, or retry configuration when its interval elapses.
   ntpService.update();
   // Keep the broker session once Wi-Fi is up. Inbound commands are
-  // queued here for the pollers below.
+  // queued here. Pollers below apply them once programming ends.
   mqttService.update(wifiManager.isConnected());
-  // Read complete USB serial lines (set, apply, status).
+
+  if (programmingSession.active())
+  {
+    // STK500 only. No console lines, I2C, pollers, or status.
+    programmingSession.update();
+    if (programmingSession.active())
+    {
+      return;
+    }
+    programmingLatch.clear();
+    if (!startupAttempted)
+    {
+      startController();
+    }
+  }
+
+  // Read complete USB serial lines (set, apply, status, program).
   serialConfigController.update();
+  if (serialConfigController.takeProgrammingRequest())
+  {
+    // Store the latch before the session so a USB restart re-enters.
+    programmingLatch.set();
+    programmingSession.begin();
+    return;
+  }
 
   // At most one I2C transaction: enumerate a slot or health-ping one.
   moduleHost.update();

@@ -48,15 +48,43 @@ void ModuleHost::begin()
 }
 
 /**
- * Advances debounce, enumeration, and health. No-op until begin().
- * Issues at most one write/read/writeRead. May call recover() once
- * after Timeout or BusError.
+ * Releases every MOD line and stops bus traffic until resume().
+ *
+ * @return Nothing.
+ */
+void ModuleHost::quiesce()
+{
+  _quiesced = true;
+  if (!_started)
+  {
+    return;
+  }
+  for (uint8_t i = 0; i < module_protocol::kSlotCount; ++i)
+  {
+    _slots[i].releaseMod();
+  }
+}
+
+/**
+ * Allows update() and direct queries again.
+ *
+ * @return Nothing.
+ */
+void ModuleHost::resume()
+{
+  _quiesced = false;
+}
+
+/**
+ * Advances debounce, enumeration, and health. No-op until begin()
+ * and while quiesced. Issues at most one write/read/writeRead.
+ * May call recover() once after Timeout or BusError.
  *
  * @return Nothing.
  */
 void ModuleHost::update()
 {
-  if (!_started)
+  if (!_started || _quiesced)
   {
     return;
   }
@@ -223,6 +251,10 @@ int8_t ModuleHost::enumLockOwner() const
  */
 bool ModuleHost::ping(uint8_t slotIndex)
 {
+  if (_quiesced)
+  {
+    return false;
+  }
   SlotController* slot = _slot(slotIndex);
   if (slot == nullptr)
   {
@@ -260,6 +292,10 @@ bool ModuleHost::ping(uint8_t slotIndex)
 bool ModuleHost::echo(uint8_t slotIndex, const uint8_t* in, size_t inLen,
                       uint8_t* out, size_t* outLen)
 {
+  if (_quiesced)
+  {
+    return false;
+  }
   SlotController* slot = _slot(slotIndex);
   if (slot == nullptr)
   {
@@ -964,6 +1000,10 @@ SensorQueryStatus ModuleHost::_queryOnline(uint8_t slotIndex, uint16_t typeId,
                                            size_t txLen, uint8_t* rxPayload,
                                            uint8_t rxCap, uint8_t* rxLen)
 {
+  if (_quiesced)
+  {
+    return SensorQueryStatus::Rejected;
+  }
   SlotController* slot = _slot(slotIndex);
   if (slot == nullptr || rxPayload == nullptr || rxLen == nullptr)
   {

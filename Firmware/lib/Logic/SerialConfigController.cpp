@@ -19,6 +19,18 @@ SerialConfigController::SerialConfigController(ISerialPort& serial,
   _refreshStagedPointers();
 }
 
+/**
+ * Reports and clears a pending programming request.
+ *
+ * @return True once after `program` or `program isp`.
+ */
+bool SerialConfigController::takeProgrammingRequest()
+{
+  const bool requested = _programmingRequested;
+  _programmingRequested = false;
+  return requested;
+}
+
 void SerialConfigController::update()
 {
   if (!_serial.isPlugged())
@@ -50,6 +62,21 @@ void SerialConfigController::_handleLine(const std::string& line)
   if (line == "status")
   {
     _status.printStatus();
+    return;
+  }
+
+  if (line == "program" || line == "program isp")
+  {
+    _programmingRequested = true;
+    _respond("OK programming");
+    _respond("ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, "
+             "RESET GPIO6, 3V3, GND");
+    return;
+  }
+
+  if (line.size() >= 8 && line.compare(0, 8, "program ") == 0)
+  {
+    _respond("ERR program");
     return;
   }
 

@@ -967,3 +967,40 @@ void testSetAddressNackRetries()
   pumpMs(fixture, 800);
   TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(0));
 }
+
+void testHostQuiesceReleasesModAndStopsI2cUntilResume()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice device(clock, fixture.mod1);
+  fixture.bus.attach(device);
+  fixture.host.begin();
+  fixture.sns1.setPresent(true);
+  bool sawMod = false;
+  for (uint32_t i = 0; i < 400; ++i)
+  {
+    clock.advance(1);
+    fixture.host.update();
+    if (fixture.mod1.mode == PinMode::DigitalOutputOpenDrain)
+    {
+      sawMod = true;
+      break;
+    }
+  }
+  TEST_ASSERT_TRUE(sawMod);
+  const size_t ops = fixture.bus.protocolOpCount();
+
+  fixture.host.quiesce();
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, fixture.mod1.mode);
+  for (uint32_t i = 0; i < 200; ++i)
+  {
+    clock.advance(1);
+    fixture.host.update();
+  }
+  TEST_ASSERT_EQUAL(ops, fixture.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, fixture.mod1.mode);
+
+  fixture.host.resume();
+  pumpMs(fixture, 100);
+  TEST_ASSERT_TRUE(fixture.bus.protocolOpCount() > ops);
+}

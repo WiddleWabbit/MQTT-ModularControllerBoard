@@ -71,6 +71,16 @@ void SlotController::configureIdlePins()
 }
 
 /**
+ * Releases MOD to an input.
+ *
+ * @return Nothing.
+ */
+void SlotController::releaseMod()
+{
+  _releaseMod();
+}
+
+/**
  * Advances GPIO, debounce, timers, and MOD. No I2C.
  *
  * @return Nothing.

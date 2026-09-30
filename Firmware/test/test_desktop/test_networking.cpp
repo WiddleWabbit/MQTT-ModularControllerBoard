@@ -209,6 +209,26 @@ void testPumpComingOnlineAfterTimeoutIsTurnedOff();
 void testPumpTimeoutDoesNotResetFault();
 void testPumpCommandWaitsThroughEnumeration();
 void testPeriodicPumpPublishEachStateAndClearOnUnplug();
+void testIspSyncAndSignOn();
+void testIspResyncAfterNoise();
+void testIspUnknownCommandDoesNotUseSpi();
+void testIspPartialCommandWaitsForEnd();
+void testIspEnterProgrammingEnableAfterResetSettle();
+void testIspEnterFailsAfterThreeEnables();
+void testIspLeaveReleasesReset();
+void testIspReadSignature();
+void testIspUniversalReturnsFourthByte();
+void testIspLoadAddressIsLittleEndianWord();
+void testIspProgramPageWaitsBeforeNextTransfer();
+void testIspReadPageAssemblesFlashBytes();
+void testIspProgramEepromUsesEepromOpcode();
+void testIspChipEraseWaits();
+void testIspSetParameterDoesNotChangeSpiClock();
+void testProgrammingSessionQuiescesHostUntilIdleTimeout();
+void testProgrammingSessionEndsWhenUnplugged();
+void testHostQuiesceReleasesModAndStopsI2cUntilResume();
+void testProgramCommandRequestsIsp();
+void testProgramUpdiIsRejected();
 
 namespace
 {
@@ -857,5 +877,25 @@ int main()
   RUN_TEST(testPumpTimeoutDoesNotResetFault);
   RUN_TEST(testPumpCommandWaitsThroughEnumeration);
   RUN_TEST(testPeriodicPumpPublishEachStateAndClearOnUnplug);
+  RUN_TEST(testIspSyncAndSignOn);
+  RUN_TEST(testIspResyncAfterNoise);
+  RUN_TEST(testIspUnknownCommandDoesNotUseSpi);
+  RUN_TEST(testIspPartialCommandWaitsForEnd);
+  RUN_TEST(testIspEnterProgrammingEnableAfterResetSettle);
+  RUN_TEST(testIspEnterFailsAfterThreeEnables);
+  RUN_TEST(testIspLeaveReleasesReset);
+  RUN_TEST(testIspReadSignature);
+  RUN_TEST(testIspUniversalReturnsFourthByte);
+  RUN_TEST(testIspLoadAddressIsLittleEndianWord);
+  RUN_TEST(testIspProgramPageWaitsBeforeNextTransfer);
+  RUN_TEST(testIspReadPageAssemblesFlashBytes);
+  RUN_TEST(testIspProgramEepromUsesEepromOpcode);
+  RUN_TEST(testIspChipEraseWaits);
+  RUN_TEST(testIspSetParameterDoesNotChangeSpiClock);
+  RUN_TEST(testProgrammingSessionQuiescesHostUntilIdleTimeout);
+  RUN_TEST(testProgrammingSessionEndsWhenUnplugged);
+  RUN_TEST(testHostQuiesceReleasesModAndStopsI2cUntilResume);
+  RUN_TEST(testProgramCommandRequestsIsp);
+  RUN_TEST(testProgramUpdiIsRejected);
   return UNITY_END();
 }

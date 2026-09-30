@@ -25,7 +25,10 @@ unconfigured address `0x0A`, then releases it to input. After address
 assignment a type handler may reuse MOD. Module firmware must not require MOD
 low after `SET_ADDRESS`.
 
-CS is input-pull-up (idle HIGH). SPI is unsupported in this firmware slice.
+CS is input-pull-up (idle HIGH) in normal operation. The module protocol
+does not use SPI. An ISP session can drive slot 1 CS (GPIO6) as AVR RESET
+and clock the shared SPI pins as Arduino as ISP. Remove the other modules
+first, because that bus is shared. See [PROGRAMMING.md](PROGRAMMING.md).
 
 ## Addressing
 

@@ -10,8 +10,8 @@ not include Arduino headers. Hardware adapters are isolated in
 - `lib/Interfaces/` contains pure abstract hardware contracts only.
 - `lib/Drivers/` contains ESP32/Arduino implementations of those contracts.
 - `lib/Logic/` contains nonblocking WiFi, NTP, MQTT, and four-slot module
-  host state machines, USB-gated serial status reporting, and retained MQTT
-  publication of slot snapshots.
+  host state machines, USB-gated serial status reporting, retained MQTT
+  publication of slot snapshots, and the STK500 ISP programmer.
 - `test/test_desktop/fakes/` contains controllable implementations for native
   tests.
 - `test/test_desktop/` contains Unity unit and interaction tests.
@@ -75,6 +75,15 @@ pump only after that reset command. If an on/off command is absent for
 `kPumpCommandTimeoutMs` in `src/main.cpp` (3 minutes), a pump that is on is
 turned off. A reset does not refresh that window. Behaviour, topics, and
 the cutoff are in [PUMPMODULE.md](PUMPMODULE.md).
+`program` or `program isp` on the USB console starts an Arduino-as-ISP
+session on firmware slot 1. `ProgrammingSession` quiesces `ModuleHost` for
+that time, and `IspProgrammer` speaks the STK500v1 subset avrdude uses.
+Pollers are not called, so solenoid and pump commands wait until the session
+ends; their absence windows keep counting. The idle timeout is
+`kProgrammingIdleTimeoutMs` in `src/main.cpp` (60 seconds). An RTC marker
+brings the session back after the USB-open restart and is cleared when the
+session ends. Pins, the jumper map, and the reset sequence are in
+[PROGRAMMING.md](PROGRAMMING.md).
 `update()` methods never wait for a network operation. WiFi and MQTT retries
 use wrap-safe elapsed-time checks and exponential backoff. I2C transactions
 are bounded by a 50 ms driver timeout.
@@ -96,6 +105,7 @@ module protocol frames, retained slot-status publication, sensor
 count/presence/reading polls including an immediate MQTT read, and solenoid
 count/state polls, desired-state commands, and the command-absence cutoff,
 and pump state polls, on/off and reset commands, and the 3-minute
-command-absence cutoff, without hardware.
+command-absence cutoff, and the STK500 ISP session including host quiesce,
+without hardware. The RTC programming marker is ESP32-only.
 Production ESP32 builds use only `lib/Drivers/`; test code and fakes are not
 included.

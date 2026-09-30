@@ -725,3 +725,36 @@ void testStoredStatusOffLoadsDisabled()
   reporter.update();
   TEST_ASSERT_EQUAL(0, serial.output.size());
 }
+
+void testProgramCommandRequestsIsp()
+{
+  CommandStack stack;
+  stack.serial.feed("program\n");
+  stack.controller.update();
+  TEST_ASSERT_TRUE(stack.controller.takeProgrammingRequest());
+  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest());
+  TEST_ASSERT_EQUAL(2, stack.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("OK programming", stack.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND",
+    stack.serial.output[1].c_str());
+
+  CommandStack isp;
+  isp.serial.feed("program isp\n");
+  isp.controller.update();
+  TEST_ASSERT_TRUE(isp.controller.takeProgrammingRequest());
+  TEST_ASSERT_EQUAL_STRING("OK programming", isp.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND",
+    isp.serial.output[1].c_str());
+}
+
+void testProgramUpdiIsRejected()
+{
+  CommandStack stack;
+  stack.serial.feed("program updi\n");
+  stack.controller.update();
+  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest());
+  TEST_ASSERT_EQUAL(1, stack.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("ERR program", stack.serial.output[0].c_str());
+}

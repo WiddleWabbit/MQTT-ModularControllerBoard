@@ -111,6 +111,13 @@ public:
   void configureIdlePins();
 
   /**
+   * Releases MOD to an input. Used while the host is quiesced.
+   *
+   * @return Nothing.
+   */
+  void releaseMod();
+
+  /**
    * Advances GPIO, debounce, timers, and MOD. No I2C.
    *
    * @return Nothing.
