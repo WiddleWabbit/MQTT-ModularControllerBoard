@@ -43,11 +43,33 @@ broker connection and uses the normal reconnect backoff. `publish` is rejected
 while disconnected.
 Inbound payloads are forwarded through `MqttMessageCallback`.
 
+`{id}` in the topics below is the board's device id. It is one path segment.
+`kMqttDeviceId` in `src/main.cpp` supplies it when NVS has no `mqtt_prefix`
+key; that constant is `watering`, so an unset board still uses
+`watering/slot/1` and `watering/solenoids`. `set mqtt.prefix` stores a
+different id and restarts MQTT only. The hostname and the MQTT client id
+stay independent. Two boards on one broker need different client ids as
+well as different prefixes.
+
+Publishers remember the payload the broker has already accepted. Slot status
+and the solenoid inventory compare that text. Sensor, solenoid, and pump
+state compare the poller's revision, so a repeated value is sent again only
+after a new sample is stored. `MqttTopicLayout` keeps a generation counter,
+starting at 1, and adds 1 only when the id text changes. Each publisher
+remembers the generation it last published under. The next `update()` sees
+a newer count, forgets those accepted-payload notes, and sends the current
+values once on the new topics. A note is stored again only after that
+publish is accepted, so a reconnect retries whatever the broker has not
+taken. Later passes with the same readings go quiet. Retained messages
+already stored under the previous id are left on the broker. The serial
+command, the character rules, and a commissioning example are in
+[CONFIGURATION.md](CONFIGURATION.md).
+
 `ModuleSlotPublisher` reads `ModuleHost` public snapshots and publishes one
 retained message per slot when that text changes. `loop()` calls `update()`
 after `moduleHost.update()`. The host does not depend on MQTT, and the
-publisher does not call `ping()` or `echo()`. Topics are `watering/slot/1`
-through `watering/slot/4` (firmware index 0 is topic 1). Payloads use the
+publisher does not call `ping()` or `echo()`. Topics are `{id}/slot/1`
+through `{id}/slot/4` (firmware index 0 is topic 1). Payloads use the
 same words as the serial slot line, without the `Slot N:` prefix:
 
 ```text
@@ -61,7 +83,9 @@ Fault Nack
 
 Publication waits until `MqttService` is connected. A rejected publish stays
 pending and is retried on a later `update()`. An unchanged snapshot is not
-sent again, including after a broker reconnect. The publish contract has no
+sent again, including after a broker reconnect. A new device id is the
+exception: the generation change makes the current text count as unpublished,
+so each slot is sent once under the new prefix. The publish contract has no
 QoS argument, so slot status uses the client default.
 
 `SensorPoller` reads an online Sensor module (`0x0200`) without going through
@@ -71,17 +95,17 @@ every input then run immediately, and again every `kSensorPollIntervalMs`
 (60 seconds, set in `src/main.cpp`). One sensor query runs per
 `SensorPoller::update()`, after `moduleHost.update()`.
 
-`SensorMqttBridge` publishes a retained reading at `watering/slot/N/sensor/M`
+`SensorMqttBridge` publishes a retained reading at `{id}/slot/N/sensor/M`
 (module slot and sensor number are both 1-based) each time a poll or an
 immediate read stores a sample, including when the value is unchanged.
 Another `update()` with no new sample does not publish again. Payloads are
 `connected <value>`, `disconnected`, or retained `unavailable` when that
-input is gone. `watering/sensor/read` with payload `N M` asks for sensor M
+input is gone. `{id}/sensor/read` with payload `N M` asks for sensor M
 on module slot N immediately. The callback enqueues the read; the next
 poller update performs it and the bridge publishes that result. A failed
 immediate read publishes non-retained `unavailable` and leaves the last
 retained reading in place. Malformed payloads are ignored. The firmware
-subscribes to `watering/sensor/read` at QoS 1 beside the existing command
+subscribes to `{id}/sensor/read` at QoS 1 beside the existing command
 topics. Command parsing, poll order, and the publish rules are in
 [SENSORMODULE.md](SENSORMODULE.md).
 
@@ -91,12 +115,12 @@ identified again, is the output count. Each output's state (`on`, `off`, or
 `disconnected`) is then read immediately, and again every 60 seconds. One
 solenoid query runs per `SolenoidPoller::update()`, after the sensor poller.
 `SolenoidMqttBridge` publishes a retained state at
-`watering/slot/N/solenoid/M` each time a read or a set stores a state.
-`watering/solenoids` with payload `N on off ...` is the desired state of
-every output on module slot N. The callback records it. `watering/solenoids/connected`
+`{id}/slot/N/solenoid/M` each time a read or a set stores a state.
+`{id}/solenoids` with payload `N on off ...` is the desired state of
+every output on module slot N. The callback records it. `{id}/solenoids/connected`
 with payload `N` asks for the output list and does not record desired state
 or restart the silence window. Once every output state is known, the bridge
-publishes retained `watering/slot/N/solenoids` as the count followed by the
+publishes retained `{id}/slot/N/solenoids` as the count followed by the
 connected indexes (`4 1 2 4`). Later poller passes
 send `SET_SOLENOID` only for outputs that are not already in that state.
 `kSolenoidCommandTimeoutMs` in `src/main.cpp` is 15 minutes. That long
@@ -110,8 +134,8 @@ query after identify, including after the module restarts and is identified
 again, is the pump state (`on`, `off`, or `fault`). That state is read again
 every 60 seconds. One pump query runs per `PumpPoller::update()`, after the
 solenoid poller. `PumpMqttBridge` publishes a retained state at
-`watering/slot/N/pump` each time a read, set, or reset stores a state.
-`watering/pump` with payload `N on` or `N off` is the desired state.
+`{id}/slot/N/pump` each time a read, set, or reset stores a state.
+`{id}/pump` with payload `N on` or `N off` is the desired state.
 `N reset` resets the pump and does not, by itself, turn it on. The callback
 records the request. Later poller passes send `SET_PUMP` only when the known
 state differs, and they do not send it while the pump is faulted.

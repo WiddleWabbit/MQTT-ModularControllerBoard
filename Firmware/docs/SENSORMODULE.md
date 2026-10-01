@@ -124,15 +124,15 @@ slot 1  GET_SENSOR_COUNT
 slot 2  GET_SENSOR_COUNT
 slot 1  GET_SENSOR_CONNECTED index 0
 slot 1  GET_SENSOR_READING   index 0
-        MQTT watering/slot/1/sensor/1
+        MQTT {id}/slot/1/sensor/1
 slot 2  GET_SENSOR_CONNECTED index 0
 slot 2  GET_SENSOR_READING   index 0
-        MQTT watering/slot/2/sensor/1
+        MQTT {id}/slot/2/sensor/1
 ```
 
 About one poll interval after slot 1's reading, slot 1 is due again. When slot 2 is
 still inside a cycle, slot 2 finishes that cycle first and slot 1 runs on
-the following passes. `watering/sensor/read` with payload `2 1` names slot 2.
+the following passes. `{id}/sensor/read` with payload `2 1` names slot 2.
 Once that slot's count is known, the read is the next sensor query, ahead of
 either module's periodic step.
 
@@ -143,21 +143,25 @@ separate transactions.
 
 ## MQTT topics
 
+`{id}` is the device id from [CONFIGURATION.md](CONFIGURATION.md). It is
+`watering` until `set mqtt.prefix` is applied. A new id publishes the current
+readings once under the new topics, then goes quiet again until the next sample.
+
 Module numbers and sensor numbers in MQTT are 1-based. Module 1 is firmware
 slot 0, schematic slot 1, I2C address `0x10`. Sensor 1 is wire index 0.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `watering/slot/N` | publish | Slot status, such as `Online Sensor addr=0x10` |
-| `watering/slot/N/sensor/M` | publish | One sensor input |
-| `watering/sensor/read` | subscribe, QoS 1 | `N M` |
+| `{id}/slot/N` | publish | Slot status, such as `Online Sensor addr=0x10` |
+| `{id}/slot/N/sensor/M` | publish | One sensor input |
+| `{id}/sensor/read` | subscribe, QoS 1 | `N M` |
 
-`watering/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It changes
+`{id}/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It changes
 when the slot text changes (`Empty`, `Enumerating`, `Online Sensor addr=0x10`,
 `Fault Nack`, and the other slot states). It is not a sensor reading.
 
-The firmware subscribes to `watering/sensor/read` together with
-`watering/solenoids` and `watering/pump`. Outbound sensor publishes use the
+The firmware subscribes to `{id}/sensor/read` together with
+`{id}/solenoids` and `{id}/pump`. Outbound sensor publishes use the
 client default QoS. Publication waits until MQTT is connected. A rejected
 publish stays pending and is retried on a later bridge pass.
 
@@ -166,7 +170,7 @@ publish stays pending and is retried on a later bridge pass.
 The only sensor command is an immediate reading:
 
 ```text
-topic:   watering/sensor/read
+topic:   {id}/sensor/read
 payload: 1 2
 ```
 
@@ -179,7 +183,7 @@ ignored command publishes nothing.
 The callback enqueues the request. Up to four requests can wait. A fifth
 request, while four are still waiting, is dropped and publishes nothing. On
 a later poller pass the host sends `GET_SENSOR_READING` for that input. The
-bridge then publishes the result on `watering/slot/N/sensor/M`.
+bridge then publishes the result on `{id}/slot/N/sensor/M`.
 
 If the named input is outside the module's reported count, the host does not
 send I2C. The bridge publishes non-retained `unavailable` on that sensor
@@ -209,10 +213,10 @@ is the same `loop()` pass as a successful read.
 
 | Event | Topic | Payload | Retained |
 | --- | --- | --- | --- |
-| Periodic `GET_SENSOR_READING` succeeds | `watering/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
-| Immediate read succeeds | `watering/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
-| Immediate read fails, or the sensor number is outside the reported count | `watering/slot/N/sensor/M` | `unavailable` | no |
-| Slot is no longer an online Sensor module, or the new count no longer includes an input that had a reading | `watering/slot/N/sensor/M` | `unavailable` | yes, once |
+| Periodic `GET_SENSOR_READING` succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
+| Immediate read succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
+| Immediate read fails, or the sensor number is outside the reported count | `{id}/slot/N/sensor/M` | `unavailable` | no |
+| Slot is no longer an online Sensor module, or the new count no longer includes an input that had a reading | `{id}/slot/N/sensor/M` | `unavailable` | yes, once |
 | Count query, presence query, malformed command, or a dropped extra command | — | nothing | — |
 | Bridge pass with no new reading | — | nothing | — |
 
@@ -244,10 +248,10 @@ Sensor module in slot 1, two inputs, first input connected with raw value
 I2C  GET_SENSOR_COUNT                         (no MQTT)
 I2C  GET_SENSOR_CONNECTED  index 0            (no MQTT)
 I2C  GET_SENSOR_READING    index 0
-MQTT watering/slot/1/sensor/1  retained  "connected 2500"
+MQTT {id}/slot/1/sensor/1  retained  "connected 2500"
 I2C  GET_SENSOR_CONNECTED  index 1            (no MQTT)
 I2C  GET_SENSOR_READING    index 1
-MQTT watering/slot/1/sensor/2  retained  "disconnected"
+MQTT {id}/slot/1/sensor/2  retained  "disconnected"
 ```
 
 About one poll interval after that second reading, the four I2C queries run again.
@@ -255,9 +259,9 @@ Both sensor topics are published again, even when 2500 and `disconnected`
 are unchanged.
 
 ```text
-MQTT watering/sensor/read  payload "1 1"
+MQTT {id}/sensor/read  payload "1 1"
 I2C  GET_SENSOR_READING    index 0
-MQTT watering/slot/1/sensor/1  retained  "connected 2500"
+MQTT {id}/slot/1/sensor/1  retained  "connected 2500"
 ```
 
 That immediate publish happens on the loop that performs the read. The

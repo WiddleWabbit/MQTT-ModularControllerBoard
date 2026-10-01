@@ -21,7 +21,8 @@ namespace
 {
 NetworkConfig config()
 {
-  return {"old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr};
+  return {"old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr,
+          nullptr, false, "watering"};
 }
 
 WifiManagerConfig wifiConfig()
@@ -46,6 +47,7 @@ struct CommandStack
   WifiManager wifiManager;
   NtpService ntpService;
   MqttService mqttService;
+  MqttTopicLayout topics;
   NetworkRuntime runtime;
   SerialStatusReporter reporter;
   SerialConfigController controller;
@@ -56,14 +58,15 @@ struct CommandStack
       ntpService(ntpAdapter, clock,
                  {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000}),
       mqttService(mqttClient, clock, mqttConfig()),
-      runtime(store, wifiManager, mqttService),
+      topics("watering"),
+      runtime(store, wifiManager, mqttService, topics),
       reporter(serial, clock, wifiManager, ntpService, mqttService,
                modules.host),
       controller(serial, runtime, reporter)
   {
     const NetworkConfig defaults = {
       "old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr,
-      "watering-controller", true};
+      "watering-controller", true, "watering"};
     runtime.begin(defaults);
     reporter.begin({1000});
     reporter.setReportingEnabled(runtime.config().statusReporting);
@@ -80,7 +83,8 @@ void testRuntimeLoadsPersistedConfiguration()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
 
   TEST_ASSERT_TRUE(runtime.begin(config()));
   TEST_ASSERT_EQUAL_STRING("saved", runtime.config().wifiSsid);
@@ -95,7 +99,8 @@ void testSerialStagesUntilApplyAndGatesOnPlugState()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
   FakeSerialStatusControl statusControl;
@@ -131,7 +136,8 @@ void testRuntimeApplyFailureDoesNotChangeActiveConfiguration()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   store.saveResult = false;
 
@@ -149,7 +155,8 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
   FakeSerialStatusControl statusControl;
@@ -173,7 +180,8 @@ void testApplyWithNoChangesDoesNotSave()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
   FakeSerialStatusControl statusControl;
@@ -197,7 +205,8 @@ void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   FakeSerialPort serial;
   FakeSerialStatusControl statusControl;
   SerialConfigController controller(serial, runtime, statusControl);
@@ -248,7 +257,8 @@ void testApplyRetriesDirtyFieldsAfterSaveFailure()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   FakeSerialPort serial;
   FakeSerialStatusControl statusControl;
   SerialConfigController controller(serial, runtime, statusControl);
@@ -679,7 +689,8 @@ void testRuntimeRejectsInvalidHostnameWithoutSaving()
   FakeMqttClient client;
   WifiManager wifiManager(wifi, clock, wifiConfig());
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   NetworkConfig update = config();
   update.wifiHostname = "-bad";
@@ -707,7 +718,8 @@ void testStoredStatusOffLoadsDisabled()
   NtpService ntpService(
     ntpAdapter, clock, {"pool.ntp.org", "time.nist.gov", nullptr, 0, 0, 60000});
   MqttService mqtt(client, clock, mqttConfig());
-  NetworkRuntime runtime(store, wifiManager, mqtt);
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
   const NetworkConfig defaults = {
@@ -757,4 +769,225 @@ void testProgramUpdiIsRejected()
   TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest());
   TEST_ASSERT_EQUAL(1, stack.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("ERR program", stack.serial.output[0].c_str());
+}
+
+void testMqttPrefixStagesUntilApplyAndRestartsMqttOnly()
+{
+  CommandStack stack;
+  const int wifiBegins = stack.wifi.beginCallCount;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+  const uint32_t generation = stack.topics.generation();
+
+  stack.serial.feed("set mqtt.prefix plant-room\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("OK staged", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("watering", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.topics.deviceId());
+  TEST_ASSERT_EQUAL(wifiBegins, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.store.mqttPrefix().c_str());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.topics.deviceId());
+  TEST_ASSERT_EQUAL(generation + 1, stack.topics.generation());
+  TEST_ASSERT_EQUAL_STRING("controller", stack.runtime.config().mqttClientId);
+  TEST_ASSERT_EQUAL_STRING("watering-controller",
+                           stack.runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL_STRING("old", stack.runtime.config().wifiSsid);
+  TEST_ASSERT_TRUE(stack.store.lastFields.mqttPrefix);
+  TEST_ASSERT_FALSE(stack.store.lastFields.mqttHost);
+  TEST_ASSERT_FALSE(stack.store.lastFields.mqttClientId);
+  TEST_ASSERT_FALSE(stack.store.lastFields.wifiHostname);
+  TEST_ASSERT_EQUAL(wifiBegins, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects + 1, stack.mqttClient.disconnectCallCount);
+
+  const MqttConfig& mqtt = stack.mqttService.config();
+  TEST_ASSERT_EQUAL(4, mqtt.subscriptionCount);
+  TEST_ASSERT_EQUAL_STRING("plant-room/solenoids", mqtt.subscriptions[0].topic);
+  TEST_ASSERT_EQUAL(1, mqtt.subscriptions[0].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/solenoids/connected",
+                           mqtt.subscriptions[1].topic);
+  TEST_ASSERT_EQUAL(1, mqtt.subscriptions[1].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/pump", mqtt.subscriptions[2].topic);
+  TEST_ASSERT_EQUAL(1, mqtt.subscriptions[2].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor/read", mqtt.subscriptions[3].topic);
+  TEST_ASSERT_EQUAL(1, mqtt.subscriptions[3].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/slot", stack.topics.slotPrefix());
+}
+
+void testInvalidMqttPrefixIsRejectedBeforeStaging()
+{
+  CommandStack stack;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+  const std::string tooLong(32, 'a');
+  stack.serial.feed("set mqtt.prefix -bad\n");
+  stack.serial.feed("set mqtt.prefix bad-\n");
+  stack.serial.feed("set mqtt.prefix plant/room\n");
+  stack.serial.feed("set mqtt.prefix a+b\n");
+  stack.serial.feed("set mqtt.prefix a#b\n");
+  stack.serial.feed("set mqtt.prefix plant room\n");
+  stack.serial.feed("set mqtt.prefix " + tooLong + "\n");
+  stack.serial.feed("set mqtt.prefix \n");
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+
+  for (int index = 0; index < 8; ++index)
+  {
+    TEST_ASSERT_EQUAL_STRING("ERR prefix", stack.serial.output[index].c_str());
+  }
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[8].c_str());
+  TEST_ASSERT_EQUAL(0, stack.store.saveCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.topics.deviceId());
+}
+
+void testMqttPrefixApplyFailureKeepsOldPrefix()
+{
+  CommandStack stack;
+  stack.store.saveResult = false;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+  const uint32_t generation = stack.topics.generation();
+  stack.serial.feed("set mqtt.prefix plant-room\napply\n");
+  stack.controller.update();
+
+  TEST_ASSERT_EQUAL_STRING("ERR apply", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("watering", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.topics.deviceId());
+  TEST_ASSERT_EQUAL(generation, stack.topics.generation());
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+
+  stack.store.saveResult = true;
+  stack.serial.feed("apply\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("plant-room", stack.store.mqttPrefix().c_str());
+  TEST_ASSERT_EQUAL(generation + 1, stack.topics.generation());
+  TEST_ASSERT_EQUAL(mqttDisconnects + 1, stack.mqttClient.disconnectCallCount);
+}
+
+void testRecordKeepsDefaultPrefixWhenMissing()
+{
+  FakePreferenceStore store;
+  store.strings[NetworkConfigKeys::wifiSsid] = "garden";
+  NetworkConfig defaults = {"", "", "", 1883, "watering-controller", nullptr,
+                            nullptr, "watering-controller", true, "watering"};
+  NetworkConfigData data;
+
+  TEST_ASSERT_TRUE(NetworkConfigRecord::load(store, defaults, data));
+  TEST_ASSERT_EQUAL_STRING("watering", data.mqttPrefix.c_str());
+  TEST_ASSERT_EQUAL(0, store.writeCounts[NetworkConfigKeys::mqttPrefix]);
+  TEST_ASSERT_FALSE(store.contains(NetworkConfigKeys::mqttPrefix));
+}
+
+void testRecordLoadsAndSavesPrefixOnly()
+{
+  FakePreferenceStore store;
+  store.strings[NetworkConfigKeys::wifiSsid] = "garden";
+  store.strings[NetworkConfigKeys::mqttPrefix] = "plant-room";
+  NetworkConfig defaults = {"", "", "", 1883, "watering-controller", nullptr,
+                            nullptr, "watering-controller", true, "watering"};
+  NetworkConfigData data;
+
+  TEST_ASSERT_TRUE(NetworkConfigRecord::load(store, defaults, data));
+  TEST_ASSERT_EQUAL_STRING("plant-room", data.mqttPrefix.c_str());
+  TEST_ASSERT_EQUAL_STRING("garden", data.wifiSsid.c_str());
+
+  NetworkConfig update = {"ignored", "ignored", "ignored", 1883, "ignored",
+                          nullptr, nullptr, "ignored", true, "shed"};
+  NetworkConfigFieldMask fields;
+  fields.mqttPrefix = true;
+  TEST_ASSERT_TRUE(NetworkConfigRecord::save(store, update, fields));
+  TEST_ASSERT_EQUAL_STRING("shed",
+                           store.strings[NetworkConfigKeys::mqttPrefix].c_str());
+  TEST_ASSERT_EQUAL_STRING("garden",
+                           store.strings[NetworkConfigKeys::wifiSsid].c_str());
+  TEST_ASSERT_EQUAL(0, store.writeCounts[NetworkConfigKeys::wifiSsid]);
+  TEST_ASSERT_EQUAL(1, store.writeCounts[NetworkConfigKeys::mqttPrefix]);
+}
+
+void testRuntimeRejectsInvalidPrefixWithoutSaving()
+{
+  FakeNetworkConfigStore store;
+  FakeClock clock;
+  FakeWifi wifi;
+  FakeMqttClient client;
+  WifiManager wifiManager(wifi, clock, wifiConfig());
+  MqttService mqtt(client, clock, mqttConfig());
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
+  runtime.begin(config());
+  NetworkConfig update = config();
+  update.mqttPrefix = "plant/room";
+  NetworkConfigFieldMask fields;
+  fields.mqttPrefix = true;
+
+  TEST_ASSERT_FALSE(runtime.apply(update, fields));
+  TEST_ASSERT_EQUAL(0, store.saveCallCount);
+  TEST_ASSERT_EQUAL_STRING("watering", runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering", topics.deviceId());
+  TEST_ASSERT_EQUAL(1, topics.generation());
+}
+
+void testPasswordAndHostApplyLeavePrefix()
+{
+  CommandStack stack;
+  const int wifiBegins = stack.wifi.beginCallCount;
+  const int mqttDisconnects = stack.mqttClient.disconnectCallCount;
+
+  stack.serial.feed("set wifi.password new-password\napply\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("watering", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering/solenoids",
+                           stack.mqttService.config().subscriptions[0].topic);
+  TEST_ASSERT_EQUAL(wifiBegins + 1, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects, stack.mqttClient.disconnectCallCount);
+
+  stack.serial.feed("set mqtt.host other-broker\napply\n");
+  stack.controller.update();
+  TEST_ASSERT_EQUAL_STRING("other-broker", stack.runtime.config().mqttHost);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("watering", stack.topics.deviceId());
+  TEST_ASSERT_EQUAL_STRING("watering/sensor/read",
+                           stack.mqttService.config().subscriptions[3].topic);
+  TEST_ASSERT_EQUAL(wifiBegins + 1, stack.wifi.beginCallCount);
+  TEST_ASSERT_EQUAL(mqttDisconnects + 1, stack.mqttClient.disconnectCallCount);
+  TEST_ASSERT_FALSE(stack.store.lastFields.mqttPrefix);
+}
+
+void testBootAppliesStoredPrefixToSubscriptions()
+{
+  FakeNetworkConfigStore store;
+  store.seed({"garden", "pw", "broker", 1883, "controller", nullptr, nullptr,
+              "plant-room", true, "plant-room"});
+  FakeClock clock;
+  FakeWifi wifi;
+  FakeMqttClient client;
+  WifiManager wifiManager(wifi, clock, wifiConfig());
+  MqttService mqtt(client, clock, mqttConfig());
+  MqttTopicLayout topics("watering");
+  NetworkRuntime runtime(store, wifiManager, mqtt, topics);
+  const NetworkConfig defaults = {
+    "", "", "", 1883, "watering-controller", nullptr, nullptr,
+    "watering-controller", true, "watering"};
+
+  TEST_ASSERT_TRUE(runtime.begin(defaults));
+  TEST_ASSERT_EQUAL_STRING("plant-room", runtime.config().mqttPrefix);
+  TEST_ASSERT_EQUAL_STRING("controller", runtime.config().mqttClientId);
+  TEST_ASSERT_EQUAL_STRING("plant-room", runtime.config().wifiHostname);
+  TEST_ASSERT_EQUAL_STRING("plant-room", topics.deviceId());
+  TEST_ASSERT_EQUAL(2, topics.generation());
+  TEST_ASSERT_EQUAL_STRING("plant-room/slot", topics.slotPrefix());
+  const MqttConfig& active = mqtt.config();
+  TEST_ASSERT_EQUAL(4, active.subscriptionCount);
+  TEST_ASSERT_EQUAL_STRING("plant-room/solenoids", active.subscriptions[0].topic);
+  TEST_ASSERT_EQUAL_STRING("plant-room/solenoids/connected",
+                           active.subscriptions[1].topic);
+  TEST_ASSERT_EQUAL_STRING("plant-room/pump", active.subscriptions[2].topic);
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor/read",
+                           active.subscriptions[3].topic);
 }

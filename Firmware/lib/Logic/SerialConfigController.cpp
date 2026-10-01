@@ -15,6 +15,7 @@ SerialConfigController::SerialConfigController(ISerialPort& serial,
   _mqttClientId = active.mqttClientId == nullptr ? "" : active.mqttClientId;
   _mqttUsername = active.mqttUsername == nullptr ? "" : active.mqttUsername;
   _mqttPassword = active.mqttPassword == nullptr ? "" : active.mqttPassword;
+  _mqttPrefix = active.mqttPrefix == nullptr ? "" : active.mqttPrefix;
   _staged = active;
   _refreshStagedPointers();
 }
@@ -164,6 +165,16 @@ void SerialConfigController::_handleLine(const std::string& line)
     _mqttClientId = value;
     _fields.mqttClientId = true;
   }
+  else if (key == "mqtt.prefix")
+  {
+    if (!NetworkRuntime::isValidHostname(value.c_str()))
+    {
+      _respond("ERR prefix");
+      return;
+    }
+    _mqttPrefix = value;
+    _fields.mqttPrefix = true;
+  }
   else if (key == "mqtt.username")
   {
     _mqttUsername = value;
@@ -212,4 +223,5 @@ void SerialConfigController::_refreshStagedPointers()
   _staged.mqttClientId = _mqttClientId.c_str();
   _staged.mqttUsername = _mqttUsername.empty() ? nullptr : _mqttUsername.c_str();
   _staged.mqttPassword = _mqttPassword.empty() ? nullptr : _mqttPassword.c_str();
+  _staged.mqttPrefix = _mqttPrefix.c_str();
 }

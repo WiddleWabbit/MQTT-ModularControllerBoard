@@ -94,6 +94,7 @@ struct SensorHarness
   FakeMqttClient client;
   MqttService mqtt;
   SensorPoller poller;
+  MqttTopicLayout topics;
   SensorMqttBridge bridge;
 
   /**
@@ -104,7 +105,8 @@ struct SensorHarness
       device(clock, modules.mod1),
       mqtt(client, clock, sensorMqttConfig()),
       poller(modules.host, clock),
-      bridge(poller, mqtt, "watering/slot")
+      topics("watering"),
+      bridge(poller, mqtt, topics)
   {
     device.typeId = module_protocol::kTypeSensorModule;
     modules.host.begin();
@@ -489,4 +491,40 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
                              "unavailable", true));
+}
+
+void testSensorBridgeFollowsDeviceId()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = true;
+  harness.device.sensorValue[0] = 2500;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "connected 2500", true));
+  harness.client.publishedMessages.clear();
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+
+  harness.topics.setDeviceId("shed");
+  const size_t learned = harness.modules.bus.protocolOpCount();
+  harness.client.deliver(kSensorReadTopic, "1 1");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/sensor/1",
+                             "connected 2500", true));
+
+  harness.client.publishedMessages.clear();
+  harness.client.deliver(harness.topics.sensorRead(), "1 1");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/sensor/1",
+                             "connected 2500", true));
 }

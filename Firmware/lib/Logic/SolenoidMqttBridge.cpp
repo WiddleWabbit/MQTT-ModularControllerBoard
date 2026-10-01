@@ -7,10 +7,11 @@
 
 SolenoidMqttBridge::SolenoidMqttBridge(SolenoidPoller& poller,
                                        MqttService& mqttService,
-                                       const char* slotTopicPrefix)
+                                       MqttTopicLayout& topics)
   : _poller(poller),
     _mqttService(mqttService),
-    _slotTopicPrefix(slotTopicPrefix == nullptr ? "" : slotTopicPrefix)
+    _topics(topics),
+    _seenGeneration(topics.generation())
 {
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
@@ -61,8 +62,37 @@ void SolenoidMqttBridge::onMqttMessage(const char* topic,
  */
 void SolenoidMqttBridge::update()
 {
+  _syncTopicGeneration();
   _publishSnapshots();
   _publishInventories();
+}
+
+
+/**
+ * Forgets accepted states when the device id has changed.
+ *
+ * @return Nothing.
+ */
+void SolenoidMqttBridge::_syncTopicGeneration()
+{
+  const uint32_t generation = _topics.generation();
+  if (generation == _seenGeneration)
+  {
+    return;
+  }
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    for (uint8_t index = 0; index < module_protocol::kMaxSolenoidsPerModule;
+         ++index)
+    {
+      _publishedOk[slot][index] = false;
+      _publishedRevision[slot][index] = 0;
+      _published[slot][index][0] = '\0';
+    }
+    _inventoryOk[slot] = false;
+    _inventoryPayload[slot][0] = '\0';
+  }
+  _seenGeneration = generation;
 }
 
 
@@ -158,12 +188,12 @@ void SolenoidMqttBridge::_handleMessage(const char* topic,
   {
     return;
   }
-  if (std::strcmp(topic, kSolenoidConnectedTopic) == 0)
+  if (std::strcmp(topic, _topics.solenoidConnected()) == 0)
   {
     _handleConnectedQuery(payload, length);
     return;
   }
-  if (std::strcmp(topic, kSolenoidCommandTopic) != 0)
+  if (std::strcmp(topic, _topics.solenoidCommand()) != 0)
   {
     return;
   }
@@ -394,7 +424,7 @@ bool SolenoidMqttBridge::_publishInventory(uint8_t moduleSlot,
   char topic[96];
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/solenoids",
-                _slotTopicPrefix.c_str(), moduleNumber);
+                _topics.slotPrefix(), moduleNumber);
   return _mqttService.publish(topic, payload, true);
 }
 
@@ -414,7 +444,7 @@ bool SolenoidMqttBridge::_publish(uint8_t moduleSlot, uint8_t solenoidIndex,
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   const unsigned solenoidNumber = static_cast<unsigned>(solenoidIndex) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/solenoid/%u",
-                _slotTopicPrefix.c_str(), moduleNumber, solenoidNumber);
+                _topics.slotPrefix(), moduleNumber, solenoidNumber);
   return _mqttService.publish(topic, payload, retained);
 }
 

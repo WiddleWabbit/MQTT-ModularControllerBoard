@@ -32,6 +32,7 @@ struct SlotPublishHarness
   EmptyModuleHostFixture modules;
   FakeMqttClient client;
   MqttService mqtt;
+  MqttTopicLayout topics;
   ModuleSlotPublisher publisher;
 
   /**
@@ -40,7 +41,8 @@ struct SlotPublishHarness
   SlotPublishHarness()
     : modules(clock),
       mqtt(client, clock, publisherMqttConfig()),
-      publisher(modules.host, mqtt, "watering/slot")
+      topics("watering"),
+      publisher(modules.host, mqtt, topics)
   {
   }
 
@@ -338,4 +340,29 @@ void testSlotPublisherDoesNotTouchTheBus()
   TEST_ASSERT_EQUAL(beforeOnline, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_TRUE(publishedRetained(
     harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10"));
+}
+
+void testSlotPublisherRepublishesWhenDeviceIdChanges()
+{
+  SlotPublishHarness harness;
+  harness.modules.host.begin();
+  harness.connect();
+  harness.publisher.update();
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+                                      "Empty"));
+  harness.client.publishedMessages.clear();
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+
+  harness.topics.setDeviceId("shed");
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(4, harness.client.publishedMessages.size());
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/1", "Empty"));
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/2", "Empty"));
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/3", "Empty"));
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/4", "Empty"));
+
+  harness.client.publishedMessages.clear();
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
 }

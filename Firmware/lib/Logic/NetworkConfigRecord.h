@@ -20,6 +20,7 @@ constexpr const char* mqttUsername = "mqtt_user";
 constexpr const char* mqttPassword = "mqtt_password";
 constexpr const char* wifiHostname = "wifi_hostname";
 constexpr const char* statusReport = "status_report";
+constexpr const char* mqttPrefix = "mqtt_prefix";
 }
 
 /**
@@ -36,6 +37,7 @@ struct NetworkConfigData
   std::string mqttPassword;
   std::string wifiHostname;
   bool statusReporting = true;
+  std::string mqttPrefix;
   std::string warning;
 };
 
@@ -49,8 +51,9 @@ public:
    * Loads stored fields over the supplied defaults.
    *
    * Missing keys keep the matching default. A missing client id uses the
-   * default, records a warning, and stores that default. Returns false when
-   * the store cannot be opened or contains no network keys.
+   * default, records a warning, and stores that default. A missing prefix
+   * keeps the default and is not written. Returns false when the store
+   * cannot be opened or contains no network keys.
    *
    * @param store Key-value store.
    * @param defaults Values used for keys that are not stored.

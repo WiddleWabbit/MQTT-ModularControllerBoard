@@ -60,8 +60,9 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 ## `INetworkConfigStore`
 
 - `load()` overlays stored fields onto the defaults already in the destination.
-  Missing keys keep those defaults. It returns false when no network key is
-  stored.
+  Missing keys keep those defaults. A missing client id is stored. A missing
+  `mqtt_prefix` keeps the supplied default and is not written. It returns
+  false when no network key is stored.
 - `save(config, fields)` writes only the selected fields. An empty string is a
   successful write when the key exists afterwards. Other stored fields stay
   unchanged.

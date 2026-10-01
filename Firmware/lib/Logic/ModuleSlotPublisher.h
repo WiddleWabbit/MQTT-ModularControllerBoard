@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 #include "ModuleHost.h"
 #include "ModuleProtocol.h"
 #include "MqttService.h"
+#include "MqttTopicLayout.h"
 #include "SlotStatusText.h"
 
 /**
@@ -21,16 +21,16 @@ public:
    *
    * @param moduleHost Slot snapshots to read.
    * @param mqttService Connected-only publication path.
-   * @param topicPrefix Topic stem. Slot 1 is published at
-   *        "{topicPrefix}/1". A null prefix is treated as empty.
+   * @param topics Topic tree. Slot 1 is published at "{id}/slot/1".
    */
   ModuleSlotPublisher(ModuleHost& moduleHost, MqttService& mqttService,
-                      const char* topicPrefix);
+                      MqttTopicLayout& topics);
 
   /**
    * Publishes each slot whose public status text differs from the last
    * accepted payload. A rejected publish stays pending. Does nothing
-   * when every accepted snapshot still matches.
+   * when every accepted snapshot still matches. A new device id sends
+   * the current text once on the new topics.
    *
    * @return Nothing.
    */
@@ -39,9 +39,17 @@ public:
 private:
   ModuleHost& _moduleHost;
   MqttService& _mqttService;
-  std::string _topicPrefix;
+  MqttTopicLayout& _topics;
+  uint32_t _seenGeneration;
   char _published[module_protocol::kSlotCount][kSlotStatusBodyBytes];
   bool _publishedOk[module_protocol::kSlotCount];
+
+  /**
+   * Forgets accepted payloads when the device id has changed.
+   *
+   * @return Nothing.
+   */
+  void _syncTopicGeneration();
 
   /**
    * Publishes one slot when its snapshot text is not the last success.

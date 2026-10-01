@@ -13,7 +13,7 @@ Framing, CRC, addressing, and the commands every module must answer are in
 ## Roles
 
 `ModuleHost` is the only I2C caller. `SolenoidPoller` decides which solenoid
-query to run. `SolenoidMqttBridge` turns `watering/solenoids` into a desired
+query to run. `SolenoidMqttBridge` turns `{id}/solenoids` into a desired
 state and publishes each output. `loop()` calls them after the sensor poller:
 
 ```text
@@ -95,7 +95,7 @@ leaves the slot `Online` keeps the cache.
 Desired states arrive on the existing subscription:
 
 ```text
-topic:   watering/solenoids
+topic:   {id}/solenoids
 payload: 1 on on off off
 ```
 
@@ -134,7 +134,7 @@ when the new count is the same length.
 
 ## Command absence
 
-`watering/solenoids` is expected about once a minute. If no accepted command
+`{id}/solenoids` is expected about once a minute. If no accepted command
 arrives for 15 minutes, the controller turns every solenoid output off.
 
 That 15 minute window is `kSolenoidCommandTimeoutMs` in `src/main.cpp`
@@ -158,18 +158,22 @@ tries off again.
 
 ## MQTT topics
 
+`{id}` is the device id from [CONFIGURATION.md](CONFIGURATION.md). It is
+`watering` until `set mqtt.prefix` is applied. A new id publishes the current
+output states and the connected-output list once under the new topics.
+
 Module numbers and solenoid numbers in MQTT are 1-based. Solenoid 1 is wire
 index 0.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `watering/slot/N` | publish | Slot status, such as `Online Solenoid addr=0x10` |
-| `watering/slot/N/solenoid/M` | publish | One output: `on`, `off`, or `disconnected` |
-| `watering/solenoids` | subscribe, QoS 1 | `N on off ...` |
-| `watering/solenoids/connected` | subscribe, QoS 1 | `N` |
-| `watering/slot/N/solenoids` | publish | `count` then connected indexes, such as `4 1 2 4` |
+| `{id}/slot/N` | publish | Slot status, such as `Online Solenoid addr=0x10` |
+| `{id}/slot/N/solenoid/M` | publish | One output: `on`, `off`, or `disconnected` |
+| `{id}/solenoids` | subscribe, QoS 1 | `N on off ...` |
+| `{id}/solenoids/connected` | subscribe, QoS 1 | `N` |
+| `{id}/slot/N/solenoids` | publish | `count` then connected indexes, such as `4 1 2 4` |
 
-`watering/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not
+`{id}/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not
 a solenoid state.
 
 Outbound state publishes use the client default QoS. Publication waits until
@@ -184,11 +188,11 @@ bridge pass, with no new state, does not publish that output again.
 
 | Event | Topic | Payload | Retained |
 | --- | --- | --- | --- |
-| Periodic `GET_SOLENOID_STATE` succeeds | `watering/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
-| `SET_SOLENOID` returns a state | `watering/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
-| Slot is no longer an online Solenoid module, or the new count no longer includes an output that had a state | `watering/slot/N/solenoid/M` | `unavailable` | yes, once |
-| Count and every output state are known, the connected set changes, or `watering/solenoids/connected` asks again | `watering/slot/N/solenoids` | count, then each connected index: `4 1 2 4` | yes |
-| Slot is no longer an online Solenoid module after an inventory was published | `watering/slot/N/solenoids` | `unavailable` | yes, once |
+| Periodic `GET_SOLENOID_STATE` succeeds | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
+| `SET_SOLENOID` returns a state | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
+| Slot is no longer an online Solenoid module, or the new count no longer includes an output that had a state | `{id}/slot/N/solenoid/M` | `unavailable` | yes, once |
+| Count and every output state are known, the connected set changes, or `{id}/solenoids/connected` asks again | `{id}/slot/N/solenoids` | count, then each connected index: `4 1 2 4` | yes |
+| Slot is no longer an online Solenoid module after an inventory was published | `{id}/slot/N/solenoids` | `unavailable` | yes, once |
 | Count query, malformed command, or a command that is still waiting for the count | — | nothing | — |
 | Bridge pass with no new state | — | nothing | — |
 
@@ -217,24 +221,24 @@ and leaves the other two alone:
 ```text
 I2C  GET_SOLENOID_COUNT
 I2C  GET_SOLENOID_STATE index 0
-MQTT watering/slot/1/solenoid/1  retained  "off"
+MQTT {id}/slot/1/solenoid/1  retained  "off"
 I2C  GET_SOLENOID_STATE index 1
-MQTT watering/slot/1/solenoid/2  retained  "off"
+MQTT {id}/slot/1/solenoid/2  retained  "off"
 I2C  GET_SOLENOID_STATE index 2
-MQTT watering/slot/1/solenoid/3  retained  "off"
+MQTT {id}/slot/1/solenoid/3  retained  "off"
 I2C  GET_SOLENOID_STATE index 3
-MQTT watering/slot/1/solenoid/4  retained  "off"
+MQTT {id}/slot/1/solenoid/4  retained  "off"
 
-MQTT watering/solenoids  payload "1 on on off off"
+MQTT {id}/solenoids  payload "1 on on off off"
 I2C  SET_SOLENOID index 0 on
-MQTT watering/slot/1/solenoid/1  retained  "on"
+MQTT {id}/slot/1/solenoid/1  retained  "on"
 I2C  SET_SOLENOID index 1 on
-MQTT watering/slot/1/solenoid/2  retained  "on"
+MQTT {id}/slot/1/solenoid/2  retained  "on"
 ```
 
 About 60 seconds after the last state read, the four reads run again and
 publish again, even when the text is unchanged. If no accepted
-`watering/solenoids` command arrives for `kSolenoidCommandTimeoutMs`
+`{id}/solenoids` command arrives for `kSolenoidCommandTimeoutMs`
 (15 minutes in `src/main.cpp`), outputs that are on are commanded off.
 
 ## Testing

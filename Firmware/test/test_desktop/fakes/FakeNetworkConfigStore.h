@@ -53,6 +53,7 @@ public:
       _username.clear();
       _mqttPassword.clear();
       _hostname.clear();
+      _prefix.clear();
       _statusReporting = false;
       _port = 1883;
       _hasRecord = true;
@@ -93,6 +94,10 @@ public:
     {
       _statusReporting = config.statusReporting;
     }
+    if (fields.mqttPrefix)
+    {
+      _prefix = text(config.mqttPrefix);
+    }
     _bind();
     return true;
   }
@@ -126,6 +131,7 @@ public:
     _mqttPassword = text(config.mqttPassword);
     _hostname = text(config.wifiHostname);
     _statusReporting = config.statusReporting;
+    _prefix = text(config.mqttPrefix);
     _bind();
   }
 
@@ -186,6 +192,16 @@ public:
     return _statusReporting;
   }
 
+  /**
+   * Returns the stored MQTT device id.
+   *
+   * @return Stored prefix.
+   */
+  const std::string& mqttPrefix() const
+  {
+    return _prefix;
+  }
+
 private:
   /**
    * Copies a possibly null C string.
@@ -209,7 +225,7 @@ private:
              _clientId.c_str(),
              _username.empty() ? nullptr : _username.c_str(),
              _mqttPassword.empty() ? nullptr : _mqttPassword.c_str(),
-             _hostname.c_str(), _statusReporting};
+             _hostname.c_str(), _statusReporting, _prefix.c_str()};
   }
 
   bool _hasRecord = false;
@@ -220,6 +236,7 @@ private:
   std::string _username;
   std::string _mqttPassword;
   std::string _hostname;
+  std::string _prefix;
   bool _statusReporting = false;
   uint16_t _port = 1883;
   NetworkConfig _view{};

@@ -4,6 +4,7 @@
 
 #include "INetworkConfigStore.h"
 #include "MqttService.h"
+#include "MqttTopicLayout.h"
 #include "WifiManager.h"
 
 /**
@@ -18,9 +19,10 @@ public:
    * @param store Persistent configuration store.
    * @param wifi WiFi state machine.
    * @param mqtt MQTT state machine.
+   * @param topics Topic tree updated when the device id is applied.
    */
   NetworkRuntime(INetworkConfigStore& store, WifiManager& wifi,
-                 MqttService& mqtt);
+                 MqttService& mqtt, MqttTopicLayout& topics);
 
   /**
    * Loads and applies persisted settings, or applies supplied defaults.
@@ -64,6 +66,7 @@ private:
   INetworkConfigStore& _store;
   WifiManager& _wifi;
   MqttService& _mqtt;
+  MqttTopicLayout& _topics;
   std::string _wifiSsid;
   std::string _wifiPassword;
   std::string _mqttHost;
@@ -71,6 +74,7 @@ private:
   std::string _mqttUsername;
   std::string _mqttPassword;
   std::string _wifiHostname;
+  std::string _mqttPrefix;
   bool _statusReporting = true;
   NetworkConfig _config{};
 

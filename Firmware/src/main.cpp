@@ -16,6 +16,7 @@
 #include "ModuleHost.h"
 #include "ModuleSlotPublisher.h"
 #include "MqttService.h"
+#include "MqttTopicLayout.h"
 #include "NetworkRuntime.h"
 #include "NtpService.h"
 #include "PreferenceNetworkConfigStore.h"
@@ -30,10 +31,6 @@
 #include "SolenoidMqttBridge.h"
 #include "SolenoidPoller.h"
 #include "WifiManager.h"
-
-// TODO/NOTES
-// set mqtt prefix via serial
-
 
 // ========== Timing ==========
 
@@ -73,14 +70,8 @@ const uint32_t kProgrammingUnplugTimeoutMs = 1000UL;
 
 // ========== Network services ==========
 
-const MqttSubscription mqttSubscriptions[] = {
-  {kSolenoidCommandTopic, 1},
-  {kSolenoidConnectedTopic, 1},
-  {kPumpCommandTopic, 1},
-  {kSensorReadTopic, 1}
-};
-
-const char kSlotStatusTopicPrefix[] = "watering/slot";
+// Topic root used when mqtt_prefix is not stored. One path segment.
+const char kMqttDeviceId[] = "watering";
 
 Esp32Clock systemClock;
 Esp32Wifi wifiDriver;
@@ -88,6 +79,7 @@ Esp32NtpAdapter ntpDriver;
 WiFiClient mqttTransport;
 PubSubClient pubSubClient(mqttTransport);
 PubSubClientAdapter mqttDriver(pubSubClient);
+MqttTopicLayout mqttTopics(kMqttDeviceId);
 
 WifiManager wifiManager(
   wifiDriver, systemClock,
@@ -97,12 +89,12 @@ NtpService ntpService(
   {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 0, 60000});
 MqttService mqttService(
   mqttDriver, systemClock,
-  {"watering-controller", nullptr, nullptr, mqttSubscriptions,
-   sizeof(mqttSubscriptions) / sizeof(mqttSubscriptions[0]), 1000, 30000});
+  {"watering-controller", nullptr, nullptr, mqttTopics.subscriptions(),
+   mqttTopics.subscriptionCount(), 1000, 30000});
 Esp32PreferenceStore networkPreferences("network");
 PreferenceNetworkConfigStore networkConfigStore(networkPreferences);
 NetworkRuntime networkRuntime(
-  networkConfigStore, wifiManager, mqttService);
+  networkConfigStore, wifiManager, mqttService, mqttTopics);
 
 
 // ========== Board pins ==========
@@ -151,17 +143,17 @@ SlotPins slotPins[4] = {
 ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
 SensorPoller sensorPoller(moduleHost, systemClock, kSensorPollIntervalMs);
 SensorMqttBridge sensorMqttBridge(
-  sensorPoller, mqttService, kSlotStatusTopicPrefix);
+  sensorPoller, mqttService, mqttTopics);
 SolenoidPoller solenoidPoller(
   moduleHost, systemClock, kSolenoidPollIntervalMs, kSolenoidCommandTimeoutMs);
 SolenoidMqttBridge solenoidMqttBridge(
-  solenoidPoller, mqttService, kSlotStatusTopicPrefix);
+  solenoidPoller, mqttService, mqttTopics);
 PumpPoller pumpPoller(
   moduleHost, systemClock, kPumpPollIntervalMs, kPumpCommandTimeoutMs);
 PumpMqttBridge pumpMqttBridge(
-  pumpPoller, mqttService, kSlotStatusTopicPrefix);
+  pumpPoller, mqttService, mqttTopics);
 ModuleSlotPublisher moduleSlotPublisher(
-  moduleHost, mqttService, kSlotStatusTopicPrefix);
+  moduleHost, mqttService, mqttTopics);
 
 
 // ========== Serial console ==========
@@ -241,7 +233,7 @@ void startController()
 
   networkRuntime.begin(
     {"", "", "", 1883, "watering-controller", nullptr, nullptr,
-     "watering-controller", true});
+     "watering-controller", true, kMqttDeviceId});
   if (serialPort.isPlugged())
   {
     const char* warning = networkConfigStore.loadWarning();

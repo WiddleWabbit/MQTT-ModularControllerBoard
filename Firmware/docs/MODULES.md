@@ -161,7 +161,9 @@ failed health pings start recovery on that slot. The other slots stay as
 they are. A sense gap shorter than the 50 ms absence debounce leaves the
 slot in its current public state.
 
-`watering/slot/N` is published when that slot's status text changes. Serial
+`{id}` is the device id from [CONFIGURATION.md](CONFIGURATION.md). It is
+`watering` until `set mqtt.prefix` is applied.
+`{id}/slot/N` is published when that slot's status text changes. Serial
 status prints one line per slot. One module's line does not replace the
 other's topic.
 
@@ -215,7 +217,7 @@ reports at most 16 outputs. State bytes are off `0`, on `1`, and disconnected
 state, and the command-absence cutoff are described in
 [SOLENOIDMODULE.md](SOLENOIDMODULE.md). `kSolenoidCommandTimeoutMs` in
 `src/main.cpp` is 15 minutes: that long without an accepted
-`watering/solenoids` command turns every output off.
+`{id}/solenoids` command turns every output off.
 
 | Command | Request payload | Ok response payload |
 | --- | --- | --- |
@@ -235,7 +237,7 @@ on `1`, and fault `2`. `SET_PUMP` carries off or on only. `RESET_PUMP` is
 sent only after an MQTT reset. Poll timing, the MQTT desired state, and the
 command-absence cutoff are described in [PUMPMODULE.md](PUMPMODULE.md).
 `kPumpCommandTimeoutMs` in `src/main.cpp` is 3 minutes: that long without an
-accepted `watering/pump` on/off command turns a pump that is on off. A reset
+accepted `{id}/pump` on/off command turns a pump that is on off. A reset
 does not refresh that window.
 
 | Command | Request payload | Ok response payload |

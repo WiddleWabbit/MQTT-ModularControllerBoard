@@ -70,7 +70,8 @@ bool hasNetworkKey(IPreferenceStore& store)
          store.contains(NetworkConfigKeys::mqttUsername) ||
          store.contains(NetworkConfigKeys::mqttPassword) ||
          store.contains(NetworkConfigKeys::wifiHostname) ||
-         store.contains(NetworkConfigKeys::statusReport);
+         store.contains(NetworkConfigKeys::statusReport) ||
+         store.contains(NetworkConfigKeys::mqttPrefix);
 }
 }
 
@@ -122,6 +123,8 @@ bool NetworkConfigRecord::load(IPreferenceStore& store,
       ? store.readUShort(NetworkConfigKeys::statusReport,
                          defaults.statusReporting ? 1 : 0) != 0
       : defaults.statusReporting;
+  data.mqttPrefix = readOptional(store, NetworkConfigKeys::mqttPrefix,
+                                 defaults.mqttPrefix);
   data.warning.clear();
   store.close();
 
@@ -203,6 +206,12 @@ bool NetworkConfigRecord::save(IPreferenceStore& store,
   {
     succeeded = (store.writeUShort(NetworkConfigKeys::statusReport,
                                    config.statusReporting ? 1 : 0) == 2) &&
+                succeeded;
+  }
+  if (fields.mqttPrefix)
+  {
+    succeeded = writeText(store, NetworkConfigKeys::mqttPrefix,
+                          config.mqttPrefix) &&
                 succeeded;
   }
   store.close();

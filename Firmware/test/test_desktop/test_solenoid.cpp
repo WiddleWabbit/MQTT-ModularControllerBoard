@@ -96,6 +96,7 @@ struct SolenoidHarness
   FakeMqttClient client;
   MqttService mqtt;
   SolenoidPoller poller;
+  MqttTopicLayout topics;
   SolenoidMqttBridge bridge;
 
   /**
@@ -110,7 +111,8 @@ struct SolenoidHarness
       device(clock, modules.mod1),
       mqtt(client, clock, solenoidMqttConfig()),
       poller(modules.host, clock, pollIntervalMs, commandTimeoutMs),
-      bridge(poller, mqtt, "watering/slot")
+      topics("watering"),
+      bridge(poller, mqtt, topics)
   {
     device.typeId = module_protocol::kTypeSolenoidModule;
     modules.host.begin();
@@ -733,4 +735,40 @@ void testConnectedInventoryClearsWhenModuleUnplugged()
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
                              "unavailable", true));
+}
+
+void testSolenoidBridgeFollowsDeviceId()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 1;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 1);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
+                             "off", true));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
+                             "1 1", true));
+  harness.client.publishedMessages.clear();
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+
+  harness.topics.setDeviceId("shed");
+  const size_t learned = harness.modules.bus.protocolOpCount();
+  harness.client.deliver(kSolenoidCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
+                             "off", true));
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoids",
+                             "1 1", true));
+
+  harness.client.deliver(harness.topics.solenoidCommand(), "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
+                             "on", true));
 }

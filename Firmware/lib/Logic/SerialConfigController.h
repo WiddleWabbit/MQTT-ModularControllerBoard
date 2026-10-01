@@ -52,6 +52,7 @@ private:
   std::string _mqttClientId;
   std::string _mqttUsername;
   std::string _mqttPassword;
+  std::string _mqttPrefix;
   NetworkConfigFieldMask _fields{};
 
   /**

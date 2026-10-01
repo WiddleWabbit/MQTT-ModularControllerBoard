@@ -13,7 +13,7 @@ Framing, CRC, addressing, and the commands every module must answer are in
 ## Roles
 
 `ModuleHost` is the only I2C caller. `PumpPoller` decides which pump query
-to run. `PumpMqttBridge` turns `watering/pump` into a desired state or a
+to run. `PumpMqttBridge` turns `{id}/pump` into a desired state or a
 reset, and publishes the pump state. `loop()` calls them after the solenoid
 poller:
 
@@ -90,7 +90,7 @@ slot `Online` keeps the cache.
 Commands arrive on the existing subscription:
 
 ```text
-topic:   watering/pump
+topic:   {id}/pump
 payload: 1 on
 ```
 
@@ -136,7 +136,7 @@ returns fault, the host publishes `fault` and does not send `SET_PUMP`.
 
 ## Command absence
 
-`watering/pump` on/off commands are expected about once a minute. If no
+`{id}/pump` on/off commands are expected about once a minute. If no
 accepted on/off command arrives for 3 minutes, the controller turns off
 every pump that is on.
 
@@ -165,15 +165,19 @@ off again.
 
 ## MQTT topics
 
+`{id}` is the device id from [CONFIGURATION.md](CONFIGURATION.md). It is
+`watering` until `set mqtt.prefix` is applied. A new id publishes the current
+pump state once under the new topic.
+
 Module numbers in MQTT are 1-based.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `watering/slot/N` | publish | Slot status, such as `Online Pump addr=0x10` |
-| `watering/slot/N/pump` | publish | `on`, `off`, or `fault` |
-| `watering/pump` | subscribe, QoS 1 | `N on`, `N off`, or `N reset` |
+| `{id}/slot/N` | publish | Slot status, such as `Online Pump addr=0x10` |
+| `{id}/slot/N/pump` | publish | `on`, `off`, or `fault` |
+| `{id}/pump` | subscribe, QoS 1 | `N on`, `N off`, or `N reset` |
 
-`watering/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not
+`{id}/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not
 the pump state.
 
 Outbound state publishes use the client default QoS. Publication waits until
@@ -188,9 +192,9 @@ bridge pass, with no new state, does not publish that pump again.
 
 | Event | Topic | Payload | Retained |
 | --- | --- | --- | --- |
-| `GET_PUMP_STATE` succeeds | `watering/slot/N/pump` | `on`, `off`, or `fault` | yes |
-| `SET_PUMP` or `RESET_PUMP` returns a state | `watering/slot/N/pump` | `on`, `off`, or `fault` | yes |
-| Slot is no longer an online Pump module | `watering/slot/N/pump` | `unavailable` | yes, once |
+| `GET_PUMP_STATE` succeeds | `{id}/slot/N/pump` | `on`, `off`, or `fault` | yes |
+| `SET_PUMP` or `RESET_PUMP` returns a state | `{id}/slot/N/pump` | `on`, `off`, or `fault` | yes |
+| Slot is no longer an online Pump module | `{id}/slot/N/pump` | `unavailable` | yes, once |
 | State query, malformed command, or a command that is still waiting for the state | — | nothing | — |
 | Bridge pass with no new state | — | nothing | — |
 
@@ -214,24 +218,24 @@ Pump module in slot 1, off. The first read publishes `off`. The command
 
 ```text
 I2C  GET_PUMP_STATE
-MQTT watering/slot/1/pump  retained  "off"
+MQTT {id}/slot/1/pump  retained  "off"
 
-MQTT watering/pump  payload "1 on"
+MQTT {id}/pump  payload "1 on"
 I2C  SET_PUMP on
-MQTT watering/slot/1/pump  retained  "on"
+MQTT {id}/slot/1/pump  retained  "on"
 
 I2C  GET_PUMP_STATE
-MQTT watering/slot/1/pump  retained  "fault"
+MQTT {id}/slot/1/pump  retained  "fault"
 
-MQTT watering/pump  payload "1 reset"
+MQTT {id}/pump  payload "1 reset"
 I2C  RESET_PUMP
-MQTT watering/slot/1/pump  retained  "off"
+MQTT {id}/slot/1/pump  retained  "off"
 I2C  SET_PUMP on
-MQTT watering/slot/1/pump  retained  "on"
+MQTT {id}/slot/1/pump  retained  "on"
 ```
 
 About 60 seconds after the last state read, the read runs again and publishes
-again, even when the text is unchanged. If no accepted `watering/pump` on/off
+again, even when the text is unchanged. If no accepted `{id}/pump` on/off
 command arrives for `kPumpCommandTimeoutMs` (3 minutes in `src/main.cpp`), a
 pump that is on is commanded off.
 

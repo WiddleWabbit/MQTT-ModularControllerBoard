@@ -4,8 +4,8 @@
 #include <cstring>
 
 NetworkRuntime::NetworkRuntime(INetworkConfigStore& store, WifiManager& wifi,
-                               MqttService& mqtt)
-  : _store(store), _wifi(wifi), _mqtt(mqtt)
+                               MqttService& mqtt, MqttTopicLayout& topics)
+  : _store(store), _wifi(wifi), _mqtt(mqtt), _topics(topics)
 {
 }
 
@@ -27,6 +27,10 @@ bool NetworkRuntime::apply(const NetworkConfig& config,
     return true;
   }
   if (fields.wifiHostname && !isValidHostname(config.wifiHostname))
+  {
+    return false;
+  }
+  if (fields.mqttPrefix && !isValidHostname(config.mqttPrefix))
   {
     return false;
   }
@@ -138,6 +142,11 @@ void NetworkRuntime::_assign(const NetworkConfig& source,
   {
     _statusReporting = source.statusReporting;
   }
+  if (fields.mqttPrefix)
+  {
+    _mqttPrefix = _text(source.mqttPrefix);
+    _topics.setDeviceId(_mqttPrefix.c_str());
+  }
   _bind();
 }
 
@@ -153,6 +162,7 @@ void NetworkRuntime::_bind()
     _mqttPassword.empty() ? nullptr : _mqttPassword.c_str();
   _config.wifiHostname = _wifiHostname.c_str();
   _config.statusReporting = _statusReporting;
+  _config.mqttPrefix = _mqttPrefix.c_str();
 }
 
 void NetworkRuntime::_pushWifi()
@@ -171,6 +181,8 @@ void NetworkRuntime::_pushMqtt()
   mqttConfig.clientId = _config.mqttClientId;
   mqttConfig.username = _config.mqttUsername;
   mqttConfig.password = _config.mqttPassword;
+  mqttConfig.subscriptions = _topics.subscriptions();
+  mqttConfig.subscriptionCount = _topics.subscriptionCount();
   _mqtt.reconfigure(mqttConfig);
   _mqtt.begin();
 }

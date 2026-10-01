@@ -29,6 +29,9 @@ and calls each service from `loop()`. `Esp32PreferenceStore` hides NVS, and
 `NetworkRuntime` applies a field to WiFi or MQTT only after that field has been
 persisted. `SerialConfigController` stages line-oriented commands and, on
 `apply`, persists only the fields set since the previous successful apply.
+`kMqttDeviceId` in `src/main.cpp` is the MQTT topic root used when `mqtt_prefix`
+is not stored. `{id}` in the topic names below is that root. Setting it is
+described in [CONFIGURATION.md](CONFIGURATION.md).
 `SerialStatusReporter` writes WiFi, NTP, MQTT, and slot snapshots on a session
 interval started from `setup()` while USB serial is plugged in and periodic
 reporting is enabled. The on/off flag and the DHCP hostname are staged with
@@ -52,14 +55,14 @@ A Sensor module (`0x0200`) is polled by `SensorPoller` after
 is identified, then presence and a raw reading for each input every
 `kSensorPollIntervalMs` in `src/main.cpp` (60 seconds).
 `SensorMqttBridge` publishes every stored reading, including a repeated
-value, and accepts `watering/sensor/read` as an immediate read. The MQTT
+value, and accepts `{id}/sensor/read` as an immediate read. The MQTT
 callback only enqueues the request. Behaviour, topics, and commands are in
 [SENSORMODULE.md](SENSORMODULE.md).
 A Solenoid module (`0x0100`) is polled by `SolenoidPoller` after the sensor
 poller. The poller asks for the output count when that module is identified,
 then the on/off/disconnected state of each output once a minute.
 `SolenoidMqttBridge` publishes every stored state, and the retained list
-of connected outputs on `watering/slot/N/solenoids`. `watering/solenoids`
+of connected outputs on `{id}/slot/N/solenoids`. `{id}/solenoids`
 names the desired on/off state of each output; the poller sends an on or off
 command only where the module's state differs. If that command is absent for
 `kSolenoidCommandTimeoutMs` in `src/main.cpp` (15 minutes), every output is
@@ -69,7 +72,7 @@ A Pump module (`0x0300`) is polled by `PumpPoller` after the solenoid
 poller. The poller reads the pump when that module is identified, then
 again every `kPumpPollIntervalMs` in `src/main.cpp` (60 seconds).
 `PumpMqttBridge` publishes every stored state (`on`, `off`, or `fault`).
-`watering/pump` names the desired on/off state, or asks for a reset. The
+`{id}/pump` names the desired on/off state, or asks for a reset. The
 poller sends on or off only when the known state differs, and it resets the
 pump only after that reset command. If an on/off command is absent for
 `kPumpCommandTimeoutMs` in `src/main.cpp` (3 minutes), a pump that is on is

@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 #include "MqttService.h"
+#include "MqttTopicLayout.h"
 #include "PumpPoller.h"
 
 /**
- * MQTT command topic for one pump.
+ * Pump command topic when the device id is watering.
  * Payload is "<moduleSlot> on", "<moduleSlot> off", or
  * "<moduleSlot> reset". Module slot 1 is firmware index 0.
  * on and off record the desired state. reset asks for a pump reset
@@ -28,12 +28,11 @@ public:
    *
    * @param poller Scheduler and state cache.
    * @param mqttService Connected-only publication path.
-   * @param slotTopicPrefix Topic stem shared with slot status.
-   *        The pump on module slot 1 is "{prefix}/1/pump".
-   *        A null prefix is treated as empty.
+   * @param topics Topic tree. The pump on module slot 1 is
+   *        "{id}/slot/1/pump".
    */
   PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
-                 const char* slotTopicPrefix);
+                 MqttTopicLayout& topics);
 
   /**
    * Records a desired state or a reset when the topic and payload
@@ -53,6 +52,7 @@ public:
    * Publishes each new state, including a repeated value, and one
    * retained unavailable when the pump disappears. A rejected publish
    * stays pending. An update with no new state does not publish.
+   * A new device id sends the current state once on the new topics.
    *
    * @return Nothing.
    */
@@ -61,7 +61,8 @@ public:
 private:
   PumpPoller& _poller;
   MqttService& _mqttService;
-  std::string _slotTopicPrefix;
+  MqttTopicLayout& _topics;
+  uint32_t _seenGeneration;
   bool _publishedOk[module_protocol::kSlotCount];
   uint32_t _publishedRevision[module_protocol::kSlotCount];
   char _published[module_protocol::kSlotCount][16];
@@ -76,6 +77,13 @@ private:
    */
   void _handleMessage(const char* topic, const uint8_t* payload,
                       size_t length);
+
+  /**
+   * Forgets accepted states when the device id has changed.
+   *
+   * @return Nothing.
+   */
+  void _syncTopicGeneration();
 
   /**
    * Publishes each stored state that has not been published yet.

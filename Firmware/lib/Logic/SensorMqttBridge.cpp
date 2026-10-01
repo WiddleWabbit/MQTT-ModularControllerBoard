@@ -7,10 +7,11 @@
 
 SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
                                    MqttService& mqttService,
-                                   const char* slotTopicPrefix)
+                                   MqttTopicLayout& topics)
   : _poller(poller),
     _mqttService(mqttService),
-    _slotTopicPrefix(slotTopicPrefix == nullptr ? "" : slotTopicPrefix),
+    _topics(topics),
+    _seenGeneration(topics.generation()),
     _demandHeld(false)
 {
   _heldDemand.moduleSlot = 0;
@@ -64,8 +65,35 @@ void SensorMqttBridge::onMqttMessage(const char* topic,
  */
 void SensorMqttBridge::update()
 {
+  _syncTopicGeneration();
   _publishDemand();
   _publishSnapshots();
+}
+
+
+/**
+ * Forgets accepted readings when the device id has changed.
+ *
+ * @return Nothing.
+ */
+void SensorMqttBridge::_syncTopicGeneration()
+{
+  const uint32_t generation = _topics.generation();
+  if (generation == _seenGeneration)
+  {
+    return;
+  }
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    for (uint8_t index = 0; index < module_protocol::kMaxSensorsPerModule;
+         ++index)
+    {
+      _publishedOk[slot][index] = false;
+      _publishedRevision[slot][index] = 0;
+      _published[slot][index][0] = '\0';
+    }
+  }
+  _seenGeneration = generation;
 }
 
 
@@ -113,7 +141,7 @@ bool readUnsigned(const char*& cursor, const char* end, unsigned* value)
 void SensorMqttBridge::_handleMessage(const char* topic,
                                       const uint8_t* payload, size_t length)
 {
-  if (topic == nullptr || std::strcmp(topic, kSensorReadTopic) != 0)
+  if (topic == nullptr || std::strcmp(topic, _topics.sensorRead()) != 0)
   {
     return;
   }
@@ -280,7 +308,7 @@ bool SensorMqttBridge::_publish(uint8_t moduleSlot, uint8_t sensorIndex,
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   const unsigned sensorNumber = static_cast<unsigned>(sensorIndex) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/sensor/%u",
-                _slotTopicPrefix.c_str(), moduleNumber, sensorNumber);
+                _topics.slotPrefix(), moduleNumber, sensorNumber);
   return _mqttService.publish(topic, payload, retained);
 }
 

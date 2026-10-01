@@ -9,10 +9,11 @@
 
 ModuleSlotPublisher::ModuleSlotPublisher(ModuleHost& moduleHost,
                                          MqttService& mqttService,
-                                         const char* topicPrefix)
+                                         MqttTopicLayout& topics)
   : _moduleHost(moduleHost),
     _mqttService(mqttService),
-    _topicPrefix(topicPrefix == nullptr ? "" : topicPrefix)
+    _topics(topics),
+    _seenGeneration(topics.generation())
 {
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
@@ -32,10 +33,32 @@ ModuleSlotPublisher::ModuleSlotPublisher(ModuleHost& moduleHost,
  */
 void ModuleSlotPublisher::update()
 {
+  _syncTopicGeneration();
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
     _publishIfChanged(slot);
   }
+}
+
+
+/**
+ * Forgets accepted payloads when the device id has changed.
+ *
+ * @return Nothing.
+ */
+void ModuleSlotPublisher::_syncTopicGeneration()
+{
+  const uint32_t generation = _topics.generation();
+  if (generation == _seenGeneration)
+  {
+    return;
+  }
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    _published[slot][0] = '\0';
+    _publishedOk[slot] = false;
+  }
+  _seenGeneration = generation;
 }
 
 
@@ -59,7 +82,7 @@ void ModuleSlotPublisher::_publishIfChanged(uint8_t slotIndex)
 
   char topic[96];
   const unsigned slotNumber = static_cast<unsigned>(slotIndex) + 1U;
-  std::snprintf(topic, sizeof(topic), "%s/%u", _topicPrefix.c_str(),
+  std::snprintf(topic, sizeof(topic), "%s/%u", _topics.slotPrefix(),
                 slotNumber);
   if (!_mqttService.publish(topic, payload, true))
   {

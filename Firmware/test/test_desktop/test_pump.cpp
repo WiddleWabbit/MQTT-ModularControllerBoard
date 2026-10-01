@@ -97,6 +97,7 @@ struct PumpHarness
   FakeMqttClient client;
   MqttService mqtt;
   PumpPoller poller;
+  MqttTopicLayout topics;
   PumpMqttBridge bridge;
 
   /**
@@ -111,7 +112,8 @@ struct PumpHarness
       device(clock, modules.mod1),
       mqtt(client, clock, pumpMqttConfig()),
       poller(modules.host, clock, pollIntervalMs, commandTimeoutMs),
-      bridge(poller, mqtt, "watering/slot")
+      topics("watering"),
+      bridge(poller, mqtt, topics)
   {
     device.typeId = module_protocol::kTypePumpModule;
     modules.host.begin();
@@ -444,7 +446,8 @@ void testPumpCommandAddressesSlotTwo()
   FakeMqttClient client;
   MqttService mqtt(client, clock, pumpMqttConfig());
   PumpPoller poller(modules.host, clock, 60000, 3UL * 60UL * 1000UL);
-  PumpMqttBridge bridge(poller, mqtt, "watering/slot");
+  MqttTopicLayout topics("watering");
+  PumpMqttBridge bridge(poller, mqtt, topics);
   modules.host.begin();
   mqtt.setBroker("broker.local", 1883);
   mqtt.begin();
@@ -776,4 +779,32 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   const size_t once = harness.client.publishedMessages.size();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(once, harness.client.publishedMessages.size());
+}
+
+void testPumpBridgeFollowsDeviceId()
+{
+  PumpHarness harness;
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "off",
+                             true));
+  harness.client.publishedMessages.clear();
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+
+  harness.topics.setDeviceId("shed");
+  const size_t learned = harness.modules.bus.protocolOpCount();
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "off", true));
+
+  harness.client.deliver(harness.topics.pumpCommand(), "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "on", true));
 }

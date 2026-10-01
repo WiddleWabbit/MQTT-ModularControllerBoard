@@ -13,6 +13,7 @@ struct NetworkConfig
   const char* mqttPassword;
   const char* wifiHostname;
   bool statusReporting;
+  const char* mqttPrefix;
 };
 
 /**
@@ -29,6 +30,7 @@ struct NetworkConfigFieldMask
   bool mqttPassword = false;
   bool wifiHostname = false;
   bool statusReporting = false;
+  bool mqttPrefix = false;
 
   /**
    * Reports whether any field is selected.
@@ -38,7 +40,8 @@ struct NetworkConfigFieldMask
   bool any() const
   {
     return wifiSsid || wifiPassword || mqttHost || mqttPort || mqttClientId ||
-           mqttUsername || mqttPassword || wifiHostname || statusReporting;
+           mqttUsername || mqttPassword || wifiHostname || statusReporting ||
+           mqttPrefix;
   }
 
   /**
@@ -58,7 +61,8 @@ struct NetworkConfigFieldMask
    */
   bool affectsMqtt() const
   {
-    return mqttHost || mqttPort || mqttClientId || mqttUsername || mqttPassword;
+    return mqttHost || mqttPort || mqttClientId || mqttUsername ||
+           mqttPassword || mqttPrefix;
   }
 
   /**
@@ -78,6 +82,7 @@ struct NetworkConfigFieldMask
     fields.mqttPassword = true;
     fields.wifiHostname = true;
     fields.statusReporting = true;
+    fields.mqttPrefix = true;
     return fields;
   }
 };

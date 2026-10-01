@@ -6,10 +6,11 @@
 // ========== Construction ==========
 
 PumpMqttBridge::PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
-                               const char* slotTopicPrefix)
+                               MqttTopicLayout& topics)
   : _poller(poller),
     _mqttService(mqttService),
-    _slotTopicPrefix(slotTopicPrefix == nullptr ? "" : slotTopicPrefix)
+    _topics(topics),
+    _seenGeneration(topics.generation())
 {
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
@@ -53,7 +54,30 @@ void PumpMqttBridge::onMqttMessage(const char* topic, const uint8_t* payload,
  */
 void PumpMqttBridge::update()
 {
+  _syncTopicGeneration();
   _publishSnapshots();
+}
+
+
+/**
+ * Forgets accepted states when the device id has changed.
+ *
+ * @return Nothing.
+ */
+void PumpMqttBridge::_syncTopicGeneration()
+{
+  const uint32_t generation = _topics.generation();
+  if (generation == _seenGeneration)
+  {
+    return;
+  }
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    _publishedOk[slot] = false;
+    _publishedRevision[slot] = 0;
+    _published[slot][0] = '\0';
+  }
+  _seenGeneration = generation;
 }
 
 
@@ -163,7 +187,7 @@ bool readVerb(const char*& cursor, const char* end, PumpVerb* verb)
 void PumpMqttBridge::_handleMessage(const char* topic, const uint8_t* payload,
                                     size_t length)
 {
-  if (topic == nullptr || std::strcmp(topic, kPumpCommandTopic) != 0)
+  if (topic == nullptr || std::strcmp(topic, _topics.pumpCommand()) != 0)
   {
     return;
   }
@@ -261,7 +285,7 @@ bool PumpMqttBridge::_publish(uint8_t moduleSlot, const char* payload,
 {
   char topic[96];
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
-  std::snprintf(topic, sizeof(topic), "%s/%u/pump", _slotTopicPrefix.c_str(),
+  std::snprintf(topic, sizeof(topic), "%s/%u/pump", _topics.slotPrefix(),
                 moduleNumber);
   return _mqttService.publish(topic, payload, retained);
 }

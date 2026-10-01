@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 #include "MqttService.h"
+#include "MqttTopicLayout.h"
 #include "SensorPoller.h"
 
 /**
- * MQTT command topic for an immediate sensor reading.
+ * Sensor read topic when the device id is watering.
  * Payload is "<moduleSlot> <sensor>", both 1-based. Module slot 1 is
  * firmware index 0. Sensor 1 is wire index 0.
  */
@@ -26,12 +26,11 @@ public:
    *
    * @param poller Scheduler and sample cache.
    * @param mqttService Connected-only publication path.
-   * @param slotTopicPrefix Topic stem shared with slot status.
-   *        Sensor 1 on module slot 1 is "{prefix}/1/sensor/1".
-   *        A null prefix is treated as empty.
+   * @param topics Topic tree. Sensor 1 on module slot 1 is
+   *        "{id}/slot/1/sensor/1".
    */
   SensorMqttBridge(SensorPoller& poller, MqttService& mqttService,
-                   const char* slotTopicPrefix);
+                   MqttTopicLayout& topics);
 
   /**
    * Enqueues a reading when topic and payload name one sensor.
@@ -50,6 +49,7 @@ public:
    * Publishes each new reading, including a repeated value, and one
    * retained unavailable when an input disappears. A rejected publish
    * stays pending. An update with no new reading does not publish.
+   * A new device id sends the current readings once on the new topics.
    *
    * @return Nothing.
    */
@@ -58,7 +58,8 @@ public:
 private:
   SensorPoller& _poller;
   MqttService& _mqttService;
-  std::string _slotTopicPrefix;
+  MqttTopicLayout& _topics;
+  uint32_t _seenGeneration;
   bool _demandHeld;
   SensorDemandResult _heldDemand;
   bool _publishedOk[module_protocol::kSlotCount]
@@ -78,6 +79,13 @@ private:
    */
   void _handleMessage(const char* topic, const uint8_t* payload,
                       size_t length);
+
+  /**
+   * Forgets accepted readings when the device id has changed.
+   *
+   * @return Nothing.
+   */
+  void _syncTopicGeneration();
 
   /**
    * Publishes the held on-demand result when one is waiting.
