@@ -14,7 +14,6 @@
 #include "fakes/FakeNtpAdapter.h"
 #include "fakes/FakePreferenceStore.h"
 #include "fakes/FakeSerialPort.h"
-#include "fakes/FakeSerialStatusControl.h"
 #include "fakes/FakeWifi.h"
 
 namespace
@@ -103,8 +102,13 @@ void testSerialStagesUntilApplyAndGatesOnPlugState()
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
-  FakeSerialStatusControl statusControl;
-  SerialConfigController controller(serial, runtime, statusControl);
+  EmptyModuleHostFixture modules(clock);
+  FakeNtpAdapter ntpAdapter;
+  NtpService ntpService(ntpAdapter, clock,
+                        {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
+  SerialConfigController controller(serial, runtime, reporter);
 
   serial.feed("set wifi.ssid new-network\n");
   controller.update();
@@ -159,8 +163,13 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
-  FakeSerialStatusControl statusControl;
-  SerialConfigController controller(serial, runtime, statusControl);
+  EmptyModuleHostFixture modules(clock);
+  FakeNtpAdapter ntpAdapter;
+  NtpService ntpService(ntpAdapter, clock,
+                        {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
+  SerialConfigController controller(serial, runtime, reporter);
 
   serial.feed("set wifi.ssid applied-network\napply\n");
   controller.update();
@@ -184,8 +193,13 @@ void testApplyWithNoChangesDoesNotSave()
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   runtime.begin(config());
   FakeSerialPort serial;
-  FakeSerialStatusControl statusControl;
-  SerialConfigController controller(serial, runtime, statusControl);
+  EmptyModuleHostFixture modules(clock);
+  FakeNtpAdapter ntpAdapter;
+  NtpService ntpService(ntpAdapter, clock,
+                        {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
+  SerialConfigController controller(serial, runtime, reporter);
 
   serial.feed("apply\n");
   controller.update();
@@ -208,8 +222,13 @@ void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid()
   MqttTopicLayout topics("watering");
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   FakeSerialPort serial;
-  FakeSerialStatusControl statusControl;
-  SerialConfigController controller(serial, runtime, statusControl);
+  EmptyModuleHostFixture modules(clock);
+  FakeNtpAdapter ntpAdapter;
+  NtpService ntpService(ntpAdapter, clock,
+                        {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
+  SerialConfigController controller(serial, runtime, reporter);
   runtime.begin(config());
   const int disconnectsAfterBegin = client.disconnectCallCount;
   const int wifiBeginsAfterBegin = wifi.beginCallCount;
@@ -260,8 +279,13 @@ void testApplyRetriesDirtyFieldsAfterSaveFailure()
   MqttTopicLayout topics("watering");
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   FakeSerialPort serial;
-  FakeSerialStatusControl statusControl;
-  SerialConfigController controller(serial, runtime, statusControl);
+  EmptyModuleHostFixture modules(clock);
+  FakeNtpAdapter ntpAdapter;
+  NtpService ntpService(ntpAdapter, clock,
+                        {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
+  SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
+                                modules.host);
+  SerialConfigController controller(serial, runtime, reporter);
   runtime.begin(config());
   store.saveResult = false;
 

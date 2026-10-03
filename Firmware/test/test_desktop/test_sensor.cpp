@@ -4,6 +4,7 @@
 
 #include "ModuleCodec.h"
 #include "ModuleProtocol.h"
+#include "SensorCommands.h"
 #include "SensorMqttBridge.h"
 #include "SensorPoller.h"
 #include "fakes/EmptyModuleHostFixture.h"
@@ -183,7 +184,7 @@ void testHostReadsSensorCountConnectedAndReading()
   TEST_ASSERT_EQUAL_STRING("Sensor", fixture.host.typeName(0));
 
   const size_t before = fixture.bus.protocolOpCount();
-  const SensorCountResult count = fixture.host.querySensorCount(0);
+  const SensorCountResult count = querySensorCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, count.status);
   TEST_ASSERT_EQUAL(2, count.count);
   TEST_ASSERT_EQUAL(before + 1, fixture.bus.protocolOpCount());
@@ -191,18 +192,18 @@ void testHostReadsSensorCountConnectedAndReading()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount, lastCommand(fixture));
 
   const SensorConnectedResult presence =
-      fixture.host.querySensorConnected(0, 1);
+      querySensorConnected(fixture.host, 0, 1);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, presence.status);
   TEST_ASSERT_FALSE(presence.connected);
   TEST_ASSERT_EQUAL(1, lastSensorIndex(fixture));
 
-  const SensorReadingResult reading = fixture.host.querySensorReading(0, 0);
+  const SensorReadingResult reading = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, reading.status);
   TEST_ASSERT_TRUE(reading.connected);
   TEST_ASSERT_EQUAL(-123456, reading.value);
 
   device.forceBusy = true;
-  const SensorReadingResult busy = fixture.host.querySensorReading(0, 0);
+  const SensorReadingResult busy = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Busy, busy.status);
 }
 
@@ -212,19 +213,19 @@ void testHostRejectsSensorQueryUnlessOnlineSensor()
   EmptyModuleHostFixture fixture(clock);
   fixture.host.begin();
   const size_t before = fixture.bus.protocolOpCount();
-  const SensorCountResult absent = fixture.host.querySensorCount(0);
+  const SensorCountResult absent = querySensorCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Rejected, absent.status);
   TEST_ASSERT_EQUAL(before, fixture.bus.protocolOpCount());
 
   FakeModuleDevice device(clock, fixture.mod1);
   plugAndPump(fixture, 0, device);
   const size_t online = fixture.bus.protocolOpCount();
-  const SensorReadingResult echo = fixture.host.querySensorReading(0, 0);
+  const SensorReadingResult echo = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Rejected, echo.status);
   TEST_ASSERT_EQUAL(online, fixture.bus.protocolOpCount());
 
   const SensorConnectedResult outOfRange =
-      fixture.host.querySensorConnected(0, module_protocol::kMaxSensorsPerModule);
+      querySensorConnected(fixture.host, 0, module_protocol::kMaxSensorsPerModule);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Rejected, outOfRange.status);
   TEST_ASSERT_EQUAL(online, fixture.bus.protocolOpCount());
 }
@@ -239,9 +240,9 @@ void testHostRejectsShortSensorPayload()
   device.shortSensorPayload = true;
   fixture.host.begin();
   plugAndPump(fixture, 0, device);
-  const SensorCountResult count = fixture.host.querySensorCount(0);
+  const SensorCountResult count = querySensorCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, count.status);
-  const SensorReadingResult reading = fixture.host.querySensorReading(0, 0);
+  const SensorReadingResult reading = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, reading.status);
 }
 

@@ -12,25 +12,14 @@
 #include "Esp32SerialPort.h"
 #include "Esp32SpiMaster.h"
 #include "Esp32Wifi.h"
-#include "IspProgrammer.h"
-#include "ModuleHost.h"
-#include "ModuleSlotPublisher.h"
-#include "MqttService.h"
-#include "MqttTopicLayout.h"
-#include "NetworkRuntime.h"
-#include "NtpService.h"
-#include "PreferenceNetworkConfigStore.h"
-#include "ProgrammingSession.h"
+#include "ModuleBus.h"
+#include "Network.h"
+#include "Programming.h"
 #include "PubSubClientAdapter.h"
-#include "PumpMqttBridge.h"
-#include "PumpPoller.h"
-#include "SensorMqttBridge.h"
-#include "SensorPoller.h"
-#include "SerialConfigController.h"
-#include "SerialStatusReporter.h"
-#include "SolenoidMqttBridge.h"
-#include "SolenoidPoller.h"
-#include "WifiManager.h"
+#include "PumpModule.h"
+#include "SensorModule.h"
+#include "SerialConsole.h"
+#include "SolenoidModule.h"
 
 // ========== Timing ==========
 
@@ -41,14 +30,14 @@ const uint32_t kSensorPollIntervalMs = 60UL * 1000UL;
 // State of each solenoid output is read and published on this period.
 const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
 
-// Accepted watering/solenoids commands must arrive within this window.
+// Accepted solenoid commands must arrive within this window.
 // After 15 minutes with none, every solenoid output is turned off.
 const uint32_t kSolenoidCommandTimeoutMs = 15UL * 60UL * 1000UL;
 
 // State of the pump is read and published on this period.
 const uint32_t kPumpPollIntervalMs = 60UL * 1000UL;
 
-// Accepted watering/pump on/off commands must arrive within this window.
+// Accepted pump on/off commands must arrive within this window.
 // After 3 minutes with none, a pump that is on is turned off.
 // A reset command does not refresh this window.
 const uint32_t kPumpCommandTimeoutMs = 3UL * 60UL * 1000UL;
@@ -67,8 +56,13 @@ const uint32_t kProgrammingIdleTimeoutMs = 60UL * 1000UL;
 // ISP session. A monitor close or open can stop frames for less than this.
 const uint32_t kProgrammingUnplugTimeoutMs = 1000UL;
 
+const NetworkTiming kNetworkTiming = {15000, 1000, 30000, 1000, 30000};
 
-// ========== Network services ==========
+const NtpConfig kNtpConfig = {
+  "pool.ntp.org", "time.nist.gov", nullptr, 28800, 0, 60000};
+
+
+// ========== Network ==========
 
 // Topic root used when mqtt_prefix is not stored. One path segment.
 const char kMqttDeviceId[] = "watering";
@@ -79,22 +73,9 @@ Esp32NtpAdapter ntpDriver;
 WiFiClient mqttTransport;
 PubSubClient pubSubClient(mqttTransport);
 PubSubClientAdapter mqttDriver(pubSubClient);
-MqttTopicLayout mqttTopics(kMqttDeviceId);
-
-WifiManager wifiManager(
-  wifiDriver, systemClock,
-  {"", "", 15000, 1000, 30000});
-NtpService ntpService(
-  ntpDriver, systemClock,
-  {"pool.ntp.org", "time.nist.gov", nullptr, 28800, 0, 60000});
-MqttService mqttService(
-  mqttDriver, systemClock,
-  {"watering-controller", nullptr, nullptr, mqttTopics.subscriptions(),
-   mqttTopics.subscriptionCount(), 1000, 30000});
 Esp32PreferenceStore networkPreferences("network");
-PreferenceNetworkConfigStore networkConfigStore(networkPreferences);
-NetworkRuntime networkRuntime(
-  networkConfigStore, wifiManager, mqttService, mqttTopics);
+Network network(wifiDriver, ntpDriver, mqttDriver, systemClock,
+                networkPreferences, kMqttDeviceId, kNtpConfig, kNetworkTiming);
 
 
 // ========== Board pins ==========
@@ -140,58 +121,31 @@ SlotPins slotPins[4] = {
   {sns3, mod3, cs3},
   {sns4, mod4, cs4},
 };
-ModuleHost moduleHost(i2cMaster, systemClock, slotPins, ModuleHostConfig{});
-SensorPoller sensorPoller(moduleHost, systemClock, kSensorPollIntervalMs);
-SensorMqttBridge sensorMqttBridge(
-  sensorPoller, mqttService, mqttTopics);
-SolenoidPoller solenoidPoller(
-  moduleHost, systemClock, kSolenoidPollIntervalMs, kSolenoidCommandTimeoutMs);
-SolenoidMqttBridge solenoidMqttBridge(
-  solenoidPoller, mqttService, mqttTopics);
-PumpPoller pumpPoller(
-  moduleHost, systemClock, kPumpPollIntervalMs, kPumpCommandTimeoutMs);
-PumpMqttBridge pumpMqttBridge(
-  pumpPoller, mqttService, mqttTopics);
-ModuleSlotPublisher moduleSlotPublisher(
-  moduleHost, mqttService, mqttTopics);
+ModuleBus moduleBus(i2cMaster, systemClock, slotPins, ModuleHostConfig{},
+                    network);
+SensorModule sensorModule(moduleBus, network, systemClock,
+                          kSensorPollIntervalMs);
+SolenoidModule solenoidModule(moduleBus, network, systemClock,
+                              kSolenoidPollIntervalMs,
+                              kSolenoidCommandTimeoutMs);
+PumpModule pumpModule(moduleBus, network, systemClock, kPumpPollIntervalMs,
+                      kPumpCommandTimeoutMs);
 
 
-// ========== Serial console ==========
+// ========== Serial console and programming ==========
 
 Esp32SerialPort serialPort(Serial);
-SerialStatusReporter serialStatusReporter(
-  serialPort, systemClock, wifiManager, ntpService, mqttService, moduleHost);
-SerialConfigController serialConfigController(
-  serialPort, networkRuntime, serialStatusReporter);
+SerialConsole serialConsole(serialPort, systemClock, network, moduleBus,
+                            kSerialStatusIntervalMs);
 Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
-IspProgrammer ispProgrammer(serialPort, ispSpi, cs1, systemClock);
 Esp32ProgrammingLatch programmingLatch;
-ProgrammingSession programmingSession(
-  ispProgrammer, moduleHost, cs1, serialPort, systemClock,
-  kProgrammingIdleTimeoutMs, kProgrammingUnplugTimeoutMs);
+Programming programming(serialPort, ispSpi, cs1, moduleBus, systemClock,
+                        kProgrammingIdleTimeoutMs, kProgrammingUnplugTimeoutMs);
 bool startupAttempted = false;
 
 
 /**
- * Forwards one inbound MQTT payload to the sensor, solenoid, and pump
- * bridges. Each bridge ignores topics it does not own. Does not touch I2C.
- *
- * @param topic Received topic.
- * @param payload Payload bytes.
- * @param length Payload length.
- * @return Nothing.
- */
-void dispatchMqttMessage(const char* topic, const uint8_t* payload,
-                         size_t length, void*)
-{
-  SensorMqttBridge::onMqttMessage(topic, payload, length, &sensorMqttBridge);
-  SolenoidMqttBridge::onMqttMessage(topic, payload, length, &solenoidMqttBridge);
-  PumpMqttBridge::onMqttMessage(topic, payload, length, &pumpMqttBridge);
-}
-
-
-/**
- * Starts PSRAM, the module host, and network services once.
+ * Starts PSRAM, the module bus, and network services once.
  * A programming session that began from the RTC latch calls this
  * after the session ends. A failed PSRAM init does not try again.
  *
@@ -229,24 +183,20 @@ void startController()
   {
     Serial.println("Beginning I2C Communication.");
   }
-  moduleHost.begin();
+  moduleBus.begin();
 
-  networkRuntime.begin(
+  network.begin(
     {"", "", "", 1883, "watering-controller", nullptr, nullptr,
      "watering-controller", true, kMqttDeviceId});
   if (serialPort.isPlugged())
   {
-    const char* warning = networkConfigStore.loadWarning();
+    const char* warning = network.loadWarning();
     if (warning != nullptr && warning[0] != '\0')
     {
       Serial.println(warning);
     }
   }
-  ntpService.begin();
-  serialStatusReporter.begin({kSerialStatusIntervalMs});
-  serialStatusReporter.setReportingEnabled(
-    networkRuntime.config().statusReporting);
-  mqttService.setMessageHandler(dispatchMqttMessage, nullptr);
+  serialConsole.begin();
 }
 
 
@@ -261,7 +211,7 @@ void setup()
   Serial.begin(115200);
   if (programmingLatch.isSet())
   {
-    programmingSession.begin();
+    programming.begin();
     return;
   }
   delay(2000);
@@ -270,31 +220,26 @@ void setup()
 
 
 /**
- * One pass of the controller. Network services always run. While an
- * ISP session is active the USB byte stream belongs to STK500, and
- * the module host, pollers, and status lines wait. Otherwise serial
- * commands run, then the host takes at most one I2C transaction and
- * each poller at most one query. MQTT publishes follow from what
- * those pollers stored. USB status lines are last.
+ * One pass of the controller. Network always runs. While an ISP
+ * session is active the USB byte stream belongs to STK500, and the
+ * module bus, daughter modules, and status lines wait. Otherwise the
+ * console reads commands, the bus takes at most one I2C transaction,
+ * and each daughter module takes at most one exchange and publishes
+ * what it stored. The periodic USB snapshot is last.
  *
  * @return Nothing.
  */
 void loop()
 {
-  // Advance connect, connected, or backoff. Does not block.
+  // Advance Wi-Fi, NTP, and MQTT. Inbound commands are queued here.
   // Idle until startController(), including during a latched session.
-  wifiManager.update();
-  // Record NTP sync, or retry configuration when its interval elapses.
-  ntpService.update();
-  // Keep the broker session once Wi-Fi is up. Inbound commands are
-  // queued here. Pollers below apply them once programming ends.
-  mqttService.update(wifiManager.isConnected());
+  network.update();
 
-  if (programmingSession.active())
+  if (programming.active())
   {
-    // STK500 only. No console lines, I2C, pollers, or status.
-    programmingSession.update();
-    if (programmingSession.active())
+    // STK500 only. No console lines, I2C, modules, or status.
+    programming.update();
+    if (programming.active())
     {
       return;
     }
@@ -306,39 +251,27 @@ void loop()
   }
 
   // Read complete USB serial lines (set, apply, status, program).
-  serialConfigController.update();
-  if (serialConfigController.takeProgrammingRequest())
+  serialConsole.update();
+  if (serialConsole.takeProgrammingRequest())
   {
     // Store the latch before the session so a USB restart re-enters.
     programmingLatch.set();
-    programmingSession.begin();
+    programming.begin();
     return;
   }
 
-  // At most one I2C transaction: enumerate a slot or health-ping one.
-  moduleHost.update();
-  // At most one sensor query: immediate read, input count, or the
-  // next presence or reading.
-  sensorPoller.update();
-  // At most one solenoid query: output count, a changed on/off, the
-  // command-absence failsafe, or the next state read.
-  solenoidPoller.update();
-  // At most one pump query: a first state read, a reset, a changed
-  // on/off, the command-absence failsafe, or the next state read.
-  pumpPoller.update();
-
-  // Publish sensor readings stored above, including an unchanged value.
-  sensorMqttBridge.update();
-  // Publish solenoid states stored above, including an unchanged value.
-  solenoidMqttBridge.update();
-  // Publish the pump state stored above, including an unchanged value.
-  pumpMqttBridge.update();
-  // Publish a slot status line only when its text changed.
-  moduleSlotPublisher.update();
+  // At most one I2C transaction, then slot status if its text changed.
+  moduleBus.update();
+  // At most one sensor exchange, then publish what it stored.
+  sensorModule.update();
+  // At most one solenoid exchange, then publish what it stored.
+  solenoidModule.update();
+  // At most one pump exchange, then publish what it stored.
+  pumpModule.update();
 
   // Print Wi-Fi, NTP, MQTT, and the four slot lines when the snapshot
   // interval has elapsed and USB is plugged in.
-  serialStatusReporter.update();
+  serialConsole.updateStatus();
 
   // Print free heap and PSRAM when USB is plugged in.
   static uint32_t lastReportAt = 0;
