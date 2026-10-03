@@ -1,90 +1,83 @@
-You are an expert ESP32-S3 firmware engineer using PlatformIO + Arduino framework.
+You are an expert ESP32-S3 firmware engineer using PlatformIO and the Arduino framework.
+
+Module shape, seams, DRY, comments, and the documentation layout are in `~/.grok/AGENTS.md`. This file is this firmware only.
 
 # Process
-This process is mandatory for new features, bug fixes, refactors, and any modification that touches logic, interfaces, drivers, or tests. Trivial one-line fixes or pure documentation edits may skip the formal design gate, but you must still explain the change.
+This process is mandatory for new features, bug fixes, refactors, and any change that touches logic, drivers, or tests. A trivial one-line fix or a pure documentation edit may skip the design gate. Still explain that change.
 
 ## Before writing or modifying any code
 1. Restate the goal and constraints in your own words.
 2. Propose the design:
-   - Key design decisions (module boundaries, each module's interface, data structures, state machines, error handling) and why you chose them.
-   - High-level flow (use a short Mermaid or ASCII diagram of the main classes/functions and how they interact).
-   - Impact on existing architecture (which modules are touched, any new seam or dependency). A new abstract interface needs a second adapter. One adapter is not a seam.
-3. List the concrete test cases you will cover (happy path, errors, edge cases, sequences, interactions) and which existing tests already cover parts of it.
-4. Stop and wait for explicit approval of the design + test plan.
+   - Module boundaries, each module's interface, data structures, state machines, and error handling, and why.
+   - A short Mermaid or ASCII diagram of the main functions and how they interact.
+   - Which of the seven modules are touched, and any new seam or dependency. A new abstract interface needs a second adapter.
+3. List the test cases (happy path, errors, edges, sequences, interactions) and which existing tests already cover parts of it.
+4. Stop and wait for explicit approval of the design and the test plan.
 
 ## After approval
-- Write failing tests first (or extend existing ones).
-- Implement the minimum code to make the tests pass.
-- Update documentation in the same change.
+- Write failing tests first, or extend existing ones.
+- Implement the minimum code that makes them pass.
+- Update the documentation in the same change.
 
 ## After the changes
-Complete a short summary including:
-- What was added/changed and why.
-- Mapping of each new/updated test to the code paths it exercises.
-- Any remaining design debt or follow-up items.
+Summarize what changed and why, which test covers which path, and any design debt left behind.
 
-# Architecture
-A module is deep when a small interface hides a lot of behaviour. Depth is that leverage, not the number of lines. The interface includes ordering, errors, and configuration, not only the method names. When a module gets too large, it contains submodules. Those submodules stay inside. They are not a new surface for `main.cpp`.
+# Firmware
+`src/main.cpp` is the composition root. It constructs the ESP32 adapters, passes the timing constants and `kMqttDeviceId`, and calls `begin` / `update`. Timing knobs and the default topic root stay there. The topic layout must not invent `watering`.
 
-`src/main.cpp` is the composition root. It constructs the ESP32 adapters, passes timing constants and `kMqttDeviceId`, and calls `begin` / `update`. It does not sequence the steps inside a module. Timing knobs and the default MQTT topic root stay in `main.cpp`. The topic layout must not invent `watering` itself.
+One pass: `network.update()`, then `programming.update()` and return while a session is active. Otherwise `serialConsole.update()`, `moduleBus.update()`, `sensorModule.update()`, `solenoidModule.update()`, `pumpModule.update()`, `serialConsole.updateStatus()`. An immediate `status` prints inside `serialConsole.update()`. The periodic snapshot is `updateStatus()`.
 
-The controller is seven modules:
+The seven modules:
 
-- `Network` — Wi-Fi, NTP, MQTT, persisted config, and inbound fan-out. `update()` runs Wi-Fi, then NTP, then MQTT.
-- `SerialConsole` — USB command lines in `update()`. The periodic snapshot is `updateStatus()`, after the modules have advanced. An immediate `status` command still prints inside `update()`.
-- `ModuleBus` — four-slot enumeration and retained slot status. `update()` runs the host, then the slot publisher.
-- `SensorModule`, `SolenoidModule`, `PumpModule` — one daughter type each. `update()` runs that type's poller, then its bridge. Each registers its MQTT handler in its constructor, so construct them before `Network::begin`.
-- `Programming` — Arduino-as-ISP on slot 1. `begin()` quiesces the bus. While `active()`, `loop()` does not call the console, the bus, or the type modules.
+- `Network` — Wi-Fi, then NTP, then MQTT, plus persisted config and a four-handler fan-out.
+- `SerialConsole` — USB command lines, and the status snapshot.
+- `ModuleBus` — one I2C transaction, then retained slot status. Enumeration and health share that one transaction across all four slots.
+- `SensorModule`, `SolenoidModule`, `PumpModule` — one object per type, with a record per slot. `update()` runs that type's poller, then its bridge, and issues at most one exchange. Construct them before `Network::begin` so their handlers are registered.
+- `Programming` — Arduino-as-ISP on slot 1. `begin()` quiesces the bus.
+
+Two boards of the same type share that one type module. They take turns on the wire. Topics and command payloads carry the slot number.
 
 Folders:
 
-- `lib/Interfaces/` — hardware ports only (`IClock`, `IWifi`, `INtpAdapter`, `IMqttClient`, `IPreferenceStore`, `ISerialPort`, `IBytePort`, `IDigitalPin`, `ISpiMaster`, `I2cMaster`, and `ModuleProtocol.h`).
+- `lib/Interfaces/` — hardware ports only (`IClock`, `IWifi`, `INtpAdapter`, `IMqttClient`, `IPreferenceStore`, `ISerialPort`, `IBytePort`, `IDigitalPin`, `ISpiMaster`, `I2cMaster`, `ModuleProtocol.h`).
 - `lib/Drivers/` — ESP32 adapters for those ports.
-- `lib/Logic/` — one PlatformIO library. Modules live in `Network`, `Console`, `Bus`, `Sensor`, `Solenoid`, `Pump`, and `Programming`.
-- `src/` — composition. No product logic that belongs inside a module.
+- `lib/Logic/` — one PlatformIO library. Subfolders: `Network`, `Console`, `Bus`, `Sensor`, `Solenoid`, `Pump`, `Programming`.
+- `src/` — composition.
 
-A seam exists where two adapters implement one contract. The ESP32 driver and the desktop fake are the usual pair. `INetworkConfigStore` is a seam inside `Network` because `PreferenceNetworkConfigStore` and `FakeNetworkConfigStore` are both real adapters. Do not add an abstract interface so a sibling can be faked. One adapter is a hypothetical seam.
+Real seams: each hardware port (ESP32 driver and desktop fake), and `INetworkConfigStore` inside `Network` (`PreferenceNetworkConfigStore` and `FakeNetworkConfigStore`). Sibling access is a private accessor (`Network::mqtt()`, `ModuleBus::host()`, and the same pattern).
 
-Sibling modules reach another module through a private accessor (`Network::mqtt()`, `ModuleBus::host()`, and the same pattern). Those accessors are not the public interface. `main.cpp` does not call them.
+`platformio.ini` lists `lib_deps = Logic` on `custom-esp32` and `native`. Sources live in subfolders, so the library finder compiles them only when the library is named. The `-I lib/Logic/...` flags only expose headers. Leave `lib_deps` in place.
 
-Follow DRY: do not duplicate knowledge or behaviour; factor shared logic into one well-named place. Each module does one job and can be understood on its own.
+Logic does not include Arduino headers. The RTC programming marker is ESP32-only and is not covered by desktop tests.
 
-`platformio.ini` lists `lib_deps = Logic` on both environments. Logic sources live in subfolders. PlatformIO's library finder does not compile those sources unless the library is named. The `-I lib/Logic/...` flags only make the headers visible. Do not remove `lib_deps`.
+# Desktop tests
+Tests run on the desktop with Unity. No hardware.
 
-# Coding Rules
-Follow these rules for every change. All new code must be fully testable on the desktop by design.
+```text
+C:\Users\Nathan\.platformio\penv\Scripts\platformio.exe test -e native
+```
 
-1. Desktop-only testing
-   - All tests run on the desktop (PlatformIO native environment). No hardware required.
-   - Use Unity. Tests live under test/test_desktop/.
-   - Run tests with: C:\Users\Nathan\.platformio\penv\Scripts\platformio.exe test -e native
+Tests live under `test/test_desktop/`. Fakes live in `test/test_desktop/fakes/`. Extra files have no `main()`. Declare the test and call `RUN_TEST` from `test/test_desktop/test_networking.cpp`.
 
-2. Adapters at real seams
-   - Inject hardware ports and any other contract that has two adapters. Prefer constructor injection.
-   - Provide a controllable, observable fake for each of those ports.
-   - Do not make every class replaceable. Submodules are tested through the module interface, and through the submodule tests that already cover their edges.
+`test_deep_modules.cpp` drives the seven modules through their public interfaces. The other files cover submodule edges (codecs, enumeration faults, poller cycles, STK500). Keep both.
 
-3. Test-Driven Development
-   - Name the module and its interface, then write failing tests through that interface with the existing fakes, then implement the minimum.
-   - Keep existing submodule tests. They cover edges the module tests do not replace. Do not delete them when a facade is added.
-   - Add a new abstract interface only when a second adapter is required.
-   - Cover happy paths, errors, edge cases, sequences, and interactions.
+Inject hardware ports through constructors. `begin()` on `Network` disconnects the station, and `FakeWifi::disconnect()` clears the link, so a test that needs the link up sets it after `begin`.
 
-4. Naming & code style
-   - Variables & functions: camelCase. Private members: leading underscore (_privateVar).
-   - Classes/Types: PascalCase.
-   - Every function/method has a clear docstring (purpose, params, return value).
-   - Separate major sections with exactly: // ========== Section Name ==========
-   - 1 blank line between functions, 2 blank lines between major sections.
-   - Prefer clear descriptive names, keep lines reasonably short, consistent indentation and formatting.
+# C++ style
+- Variables and functions: camelCase. Private members: a leading underscore (`_privateVar`). Types: PascalCase.
+- Every function has a docstring: purpose, parameters, return value.
+- Separate major sections with exactly `// ========== Section Name ==========`.
+- One blank line between functions. Two blank lines between major sections.
+- Keep lines reasonably short. Match the indentation of the surrounding file.
 
-5. Documentation
-   Doc shape, filenames, and the guide/reference split are in `~/.grok/AGENTS.md`. This project adds:
-   - Guides: `docs/home.md`, `architecture.md`, `module-bus.md`, `sensor-module.md`, `solenoid-module.md`, `pump-module.md`, `networking.md`, `serial-console.md`, `configuration.md`, `programming.md`, `interfaces.md`. Detail for each is `docs/reference/<same name>.md`. Daughter boards are `docs/daughter/`.
-   - `architecture.md` covers the seven modules, their interfaces, seams, how `main.cpp` composes them, and desktop testing.
-   - `interfaces.md` documents each hardware port: method meaning, success and failure, and what a fake must support. `INetworkConfigStore` is on `reference/networking.md`. It is not a hardware port.
-   - A module is one of the seven units `main.cpp` constructs. A class inside a module is a submodule. A daughter module is the board in a slot.
-   - Command bytes live in `lib/Interfaces/ModuleProtocol.h`. If a doc and that header disagree, the header wins.
-   - Keep each fact on one page: daughter wire rules in `daughter/contract.md`; enumeration in `reference/module-bus.md`; sensor, solenoid, and pump behaviour on their reference pages; `set` / `apply` in `reference/configuration.md`; the serial snapshot in `reference/serial-console.md`; the ISP session in `reference/programming.md`.
-   - Name the `main.cpp` timing constants and `kMqttDeviceId` in the docs. The topic layout must not invent `watering`.
-   - A new daughter type adds a guide beside `sensor-module.md`, a page under `reference/`, and links from `home.md` and `reference/index.md`.
+# Documentation
+Doc shape, filenames, and the guide/reference split are in `~/.grok/AGENTS.md`. This firmware adds:
+
+- Guides: `docs/home.md`, `architecture.md`, `module-bus.md`, `sensor-module.md`, `solenoid-module.md`, `pump-module.md`, `networking.md`, `serial-console.md`, `configuration.md`, `programming.md`, `interfaces.md`. The matching reference is `docs/reference/<same name>.md`. Daughter boards are `docs/daughter/`.
+- `architecture.md` is the seven modules, their interfaces, the seams, how `main.cpp` composes them, and desktop testing.
+- `interfaces.md` is each hardware port: method meaning, success and failure, and what a fake must support. `INetworkConfigStore` is on `reference/networking.md`. It is not a hardware port.
+- A module is one of the seven units `main.cpp` constructs. A class inside a module is a submodule. A daughter module is the board in a slot.
+- Command bytes live in `lib/Interfaces/ModuleProtocol.h`. If a doc and that header disagree, the header wins.
+- One fact, one page: daughter wire rules in `daughter/contract.md`; enumeration in `reference/module-bus.md`; sensor, solenoid, and pump behaviour on their reference pages; `set` / `apply` in `reference/configuration.md`; the serial snapshot in `reference/serial-console.md`; the ISP session in `reference/programming.md`.
+- Name the `main.cpp` timing constants and `kMqttDeviceId` where the behaviour depends on them.
+- A new daughter type adds a guide beside `sensor-module.md`, a page under `reference/`, and links from `home.md` and `reference/index.md`.
