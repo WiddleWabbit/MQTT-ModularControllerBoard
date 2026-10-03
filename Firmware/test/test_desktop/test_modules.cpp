@@ -1160,3 +1160,85 @@ void testHostQuiesceReleasesModAndStopsI2cUntilResume()
   pumpMs(fixture, 100);
   TEST_ASSERT_TRUE(fixture.bus.protocolOpCount() > ops);
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the frame, enumeration, and bus-quiesce cases.
+ *
+ * @return Nothing.
+ */
+void runModuleTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testCodecEncodesPingFrameWithCrc);
+  RUN_TEST(testCrc8SmbusMatchesHeaderHelper);
+  RUN_TEST(testCodecRejectsBadCrc);
+  RUN_TEST(testCodecRejectsLengthUnderMinAndOverMax);
+  RUN_TEST(testCodecDecodesIdentityBigEndian);
+  RUN_TEST(testCodecRoundTripEchoPayload);
+  RUN_TEST(testCodecParsesPaddedNineteenByteRead);
+  RUN_TEST(testCodecParsesShortErrorInsidePaddedRead);
+  RUN_TEST(testCodecIgnoresPadBytesAfterLength);
+  RUN_TEST(testCodecEncodesSetAddressFourByteFrame);
+  RUN_TEST(testHostBeginConfiguresSensePullupModInputCsPullup);
+  RUN_TEST(testHostBeginCallsBusBeginAndAppliesClockAndTimeout);
+  RUN_TEST(testUpdateDoesNothingBeforeBegin);
+  RUN_TEST(testEmptySlotsStayEmpty);
+  RUN_TEST(testPlugOneDoesNotEnumerateBeforeDebounce);
+  RUN_TEST(testPlugOneWaitsBootWait);
+  RUN_TEST(testPlugOneEnumeratesAfterDebounceAndBootWait);
+  RUN_TEST(testWrapSafeDebounceTiming);
+  RUN_TEST(testWrapSafeBootWaitTiming);
+  RUN_TEST(testDebounceRestartsIfSenseBouncesHigh);
+  RUN_TEST(testShortAbsenceIsGlitchFilterKeepsOnline);
+  RUN_TEST(testStuckLowSenseWithNoAckGoesFaultNack);
+  RUN_TEST(testFaultRetriesAfterFaultRetryMs);
+  RUN_TEST(testFaultRetryProbesDefaultBeforeSlotAddress);
+  RUN_TEST(testUnconfiguredModuleReachesOnlineWithoutEarlySlotPing);
+  RUN_TEST(testRememberedAddressSkipsSetAddressAfterThreeDefaultNacks);
+  RUN_TEST(testRememberedSlot2ProbesOnlyItsAddress);
+  RUN_TEST(testUnconfiguredAndRememberedSlotsEnumerateInOrder);
+  RUN_TEST(testCsUntouchedDuringEnumeration);
+  RUN_TEST(testAssignsSlotDerivedAddress);
+  RUN_TEST(testModOpenDrainLowOnlyDuringSelect);
+  RUN_TEST(testModSettleElapsedBeforeFirstDefaultPing);
+  RUN_TEST(testIdentifyOnlineIdentityEcho);
+  RUN_TEST(testProtocolVersionNotOneIsUnsupported);
+  RUN_TEST(testPingSucceedsWhenOnline);
+  RUN_TEST(testEchoZeroAndSixteenByteRoundTrip);
+  RUN_TEST(testEchoSeventeenBytesRejectedWithoutBus);
+  RUN_TEST(testUnknownTypeIsUnsupportedNotCrash);
+  RUN_TEST(testNackDuringIdentifyRetriesThenFault);
+  RUN_TEST(testBadCrcDuringIdentifyIsFault);
+  RUN_TEST(testBusyDuringIdentifyRetriesThenFaultBusy);
+  RUN_TEST(testGetIdentityOkWithWrongLengthIsBadFrameNotUnsupported);
+  RUN_TEST(testSetAddressWriteIsFourBytesWithStop);
+  RUN_TEST(testSetAddressCommitSurvivesModRelease);
+  RUN_TEST(testEnumLockHeldUntilIdentifyCompletes);
+  RUN_TEST(testEnumLockReleasedOnFaultSoSecondSlotEnumerates);
+  RUN_TEST(testEnumLockReleasedOnUnsupported);
+  RUN_TEST(testUnplugMidEnumerateReleasesModAndLock);
+  RUN_TEST(testUnplugAfterOnlineFreesAddressAndReturnsEmpty);
+  RUN_TEST(testUnplugDuringBootWaitNeverTouchesBus);
+  RUN_TEST(testReplugReenumerates);
+  RUN_TEST(testAddressReuseAfterUnplug);
+  RUN_TEST(testModuleMcuResetWithoutUnplugReenumerates);
+  RUN_TEST(testHealthFailWhenStillAtAssignedAddressRecoversWithoutUnplug);
+  RUN_TEST(testHealthPingBusyDoesNotIncrementFailCountStaysOnline);
+  RUN_TEST(testIdentifyFailAfterAssignRecoversAtAssignedAddress);
+  RUN_TEST(testVerifyFailWhenModuleCommittedRetriesAssignedNotOnlyDefault);
+  RUN_TEST(testStuckSdaRecoversBusForOtherSlots);
+  RUN_TEST(testStuckSdaStillStuckAfterRecoverStaysFault);
+  RUN_TEST(testTwoSlotsInsertedTogetherDoNotCollide);
+  RUN_TEST(testFourSlotsInsertedTogetherGetUniqueAddresses);
+  RUN_TEST(testOneI2cTransactionPerUpdateGlobally);
+  RUN_TEST(testHealthPingDoesNotShareUpdateWithEnumTxn);
+  RUN_TEST(testWriteReadNackOnWriteDoesNotParseRx);
+  RUN_TEST(testNoncompliantAlwaysAck0x0AIsDetected);
+  RUN_TEST(testSenseGlitchDuringWaitForLockDoesNotAbortEnumerate);
+  RUN_TEST(testSetAddressNackRetries);
+  RUN_TEST(testHostQuiesceReleasesModAndStopsI2cUntilResume);
+}

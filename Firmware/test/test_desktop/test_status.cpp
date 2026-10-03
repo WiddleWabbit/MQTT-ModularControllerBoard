@@ -717,3 +717,55 @@ void testWifiManagerCommitsChangedHostnameBeforeBegin()
   TEST_ASSERT_EQUAL(2, wifi.resetStationModeCount);
   TEST_ASSERT_EQUAL_STRING("tank-room", wifi.lastHostname.c_str());
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the serial status cases.
+ *
+ * @return Nothing.
+ */
+void runStatusTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testWifiManagerForwardsRssi);
+  RUN_TEST(testNtpServiceExposesConfig);
+  RUN_TEST(testStatusReporterWritesNothingBeforeBegin);
+  RUN_TEST(testStatusReporterWritesNothingWhenUnplugged);
+  RUN_TEST(testStatusReporterPrintsIdleStates);
+  RUN_TEST(testStatusReporterPrintsConnectingWithoutRssi);
+  RUN_TEST(testStatusReporterPrintsBackoffWithoutRssi);
+  RUN_TEST(testStatusReporterPrintsConnectedRssi);
+  RUN_TEST(testStatusReporterPrintsWaitingForSyncWithoutTime);
+  RUN_TEST(testStatusReporterPrintsSynchronizedLocalTime);
+  RUN_TEST(testStatusReporterAppliesDaylightOffset);
+  RUN_TEST(testStatusReporterPrintsMqttWaitingForNetwork);
+  RUN_TEST(testStatusReporterPrintsMqttConnected);
+  RUN_TEST(testStatusReporterPrintsMqttBackoff);
+  RUN_TEST(testStatusReporterPrintsMqttUnconfigured);
+  RUN_TEST(testStatusReporterUsesConfiguredInterval);
+  RUN_TEST(testStatusReporterExposesConfig);
+  RUN_TEST(testStatusReporterReconfigureChangesInterval);
+  RUN_TEST(testStatusReporterWaitsForIntervalBeforeReprint);
+  RUN_TEST(testStatusReporterAdvancesClockAfterSync);
+  RUN_TEST(testStatusReporterStopsWhenUnpluggedAfterPrint);
+  RUN_TEST(testStatusReporterPrintsEmptySlots);
+  RUN_TEST(testStatusReporterSlotOneIsIndexZeroAddr10);
+  RUN_TEST(testStatusReporterPrintsOnlineSlot);
+  RUN_TEST(testStatusReporterPrintsFault);
+  RUN_TEST(testSlotNackPrintsOnceUntilTheSlotRecovers);
+  RUN_TEST(testRememberedAddressDoesNotPrintSlotNack);
+  RUN_TEST(testSlotNackPrintsWhileReportingIsOff);
+  RUN_TEST(testSerialStatusDoesNotCallPingOrEcho);
+  RUN_TEST(testStatusReporterPrintsConnectedAddressAndRssi);
+  RUN_TEST(testStatusReporterOmitsAddressUntilConnected);
+  RUN_TEST(testStatusReporterSkipsPrintsWhenDisabled);
+  RUN_TEST(testStatusReporterResumeWaitsForFullInterval);
+  RUN_TEST(testStatusReporterPrintsOnDemandWhileDisabled);
+  RUN_TEST(testStatusReporterPrintOnDemandWritesNothingWhenUnplugged);
+  RUN_TEST(testStatusReporterPrintOnDemandRestartsInterval);
+  RUN_TEST(testWifiManagerForwardsLocalAddress);
+  RUN_TEST(testWifiManagerCommitsChangedHostnameBeforeBegin);
+}

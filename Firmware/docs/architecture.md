@@ -103,7 +103,7 @@ Do not add an interface so one logic class can be replaced by a fake. `WifiManag
 - `lib/Drivers/` contains the ESP32 adapters.
 - `lib/Logic/` is one PlatformIO library. Sources live in `Network`, `Console`, `Bus`, `Sensor`, `Solenoid`, `Pump`, and `Programming`.
 - `test/test_desktop/fakes/` contains the desktop adapters.
-- `test/test_desktop/` contains Unity tests. `test_deep_modules.cpp` drives the seven modules. The other files drive the classes inside them.
+- `test/test_desktop/` contains Unity tests. `test_main.cpp` calls each file's runner. `test_deep_modules.cpp` drives the seven modules. The other files drive the classes inside them.
 - `src/main.cpp` composes the product.
 
 `platformio.ini` lists `lib_deps = Logic` on both environments. The library finder does not compile sources that live in subfolders unless the library is named. The `-I lib/Logic/...` flags only expose the headers. Leave `lib_deps` in place.

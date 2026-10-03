@@ -1020,3 +1020,57 @@ void testBootAppliesStoredPrefixToSubscriptions()
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/connected",
                            active.subscriptions[4].topic);
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the configuration load, save, and apply cases.
+ *
+ * @return Nothing.
+ */
+void runConfigurationTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testRuntimeLoadsPersistedConfiguration);
+  RUN_TEST(testSerialStagesUntilApplyAndGatesOnPlugState);
+  RUN_TEST(testRuntimeApplyFailureDoesNotChangeActiveConfiguration);
+  RUN_TEST(testAppliedConfigurationIsOwnedFromLaterStagedEdits);
+  RUN_TEST(testApplyWithNoChangesDoesNotSave);
+  RUN_TEST(testApplyUpdatesOnlyPasswordAndKeepsStoredSsid);
+  RUN_TEST(testApplyRetriesDirtyFieldsAfterSaveFailure);
+  RUN_TEST(testRecordSaveWritesOnlySelectedFields);
+  RUN_TEST(testRecordEmptyStringSaveSucceedsWhenKeyIsStored);
+  RUN_TEST(testRecordEmptyStringSaveFailsWhenKeyIsMissing);
+  RUN_TEST(testRecordNonEmptyWriteFailureReturnsFalse);
+  RUN_TEST(testRecordLoadUsesDefaultClientIdWithoutReadingMissingKey);
+  RUN_TEST(testRecordLoadFailureDoesNotWarnWhenNothingIsStored);
+  RUN_TEST(testRecordFailedClientRepairStillLoads);
+  RUN_TEST(testSetStatusOffRemainsEnabledUntilApply);
+  RUN_TEST(testApplyStatusOffStoresZeroAndStopsPrints);
+  RUN_TEST(testApplyStatusOnResumesAfterInterval);
+  RUN_TEST(testStatusCommandPrintsWhileReportingIsOff);
+  RUN_TEST(testStatusCommandPrintsNothingWhenUnplugged);
+  RUN_TEST(testStatusCommandRestartsSnapshotInterval);
+  RUN_TEST(testSetStatusRejectsUnknownValue);
+  RUN_TEST(testHostnameStaysStagedUntilApply);
+  RUN_TEST(testInvalidHostnameIsRejectedBeforeStaging);
+  RUN_TEST(testFailedApplyKeepsHostnameAndStatusUntilRetry);
+  RUN_TEST(testPasswordApplyReconnectsWithStoredHostname);
+  RUN_TEST(testRecordKeepsDefaultHostnameAndStatusWhenMissing);
+  RUN_TEST(testRecordLoadsStoredHostnameAndStatus);
+  RUN_TEST(testRecordSavesHostnameAndStatusOnly);
+  RUN_TEST(testRuntimeRejectsInvalidHostnameWithoutSaving);
+  RUN_TEST(testStoredStatusOffLoadsDisabled);
+  RUN_TEST(testProgramCommandRequestsIsp);
+  RUN_TEST(testProgramUpdiIsRejected);
+  RUN_TEST(testMqttPrefixStagesUntilApplyAndRestartsMqttOnly);
+  RUN_TEST(testInvalidMqttPrefixIsRejectedBeforeStaging);
+  RUN_TEST(testMqttPrefixApplyFailureKeepsOldPrefix);
+  RUN_TEST(testRecordKeepsDefaultPrefixWhenMissing);
+  RUN_TEST(testRecordLoadsAndSavesPrefixOnly);
+  RUN_TEST(testRuntimeRejectsInvalidPrefixWithoutSaving);
+  RUN_TEST(testPasswordAndHostApplyLeavePrefix);
+  RUN_TEST(testBootAppliesStoredPrefixToSubscriptions);
+}

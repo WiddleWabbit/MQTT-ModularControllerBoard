@@ -666,3 +666,36 @@ void testProgrammingSessionEndsWhenUnplugged()
   TEST_ASSERT_TRUE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the STK500 and programming-session cases.
+ *
+ * @return Nothing.
+ */
+void runProgrammingTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testIspSyncAndSignOn);
+  RUN_TEST(testIspResyncAfterNoise);
+  RUN_TEST(testIspUnknownCommandDoesNotUseSpi);
+  RUN_TEST(testIspPartialCommandWaitsForEnd);
+  RUN_TEST(testIspEnterProgrammingEnableAfterResetSettle);
+  RUN_TEST(testIspEnterFailsAfterThreeEnables);
+  RUN_TEST(testIspLeaveReleasesReset);
+  RUN_TEST(testIspReadSignature);
+  RUN_TEST(testIspUniversalReturnsFourthByte);
+  RUN_TEST(testIspLoadAddressIsLittleEndianWord);
+  RUN_TEST(testIspProgramPageWaitsBeforeNextTransfer);
+  RUN_TEST(testIspReadPageAssemblesFlashBytes);
+  RUN_TEST(testIspProgramEepromUsesEepromOpcode);
+  RUN_TEST(testIspChipEraseWaits);
+  RUN_TEST(testIspSetParameterDoesNotChangeSpiClock);
+  RUN_TEST(testProgrammingSessionQuiescesHostUntilIdleTimeout);
+  RUN_TEST(testProgrammingSessionStaysUpWhilePortUnseen);
+  RUN_TEST(testProgrammingSessionSurvivesBriefUnplug);
+  RUN_TEST(testProgrammingSessionEndsWhenUnplugged);
+}

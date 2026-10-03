@@ -809,3 +809,44 @@ void testPumpBridgeFollowsDeviceId()
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "on", true));
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the pump command, poller, and bridge cases.
+ *
+ * @return Nothing.
+ */
+void runPumpTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testCodecEncodesPumpCommands);
+  RUN_TEST(testHostReadsPumpStateSetAndReset);
+  RUN_TEST(testHostRejectsPumpQueryUnlessOnlinePump);
+  RUN_TEST(testHostRejectsShortPumpPayload);
+  RUN_TEST(testPumpTimingDefaultsAreThreeMinutesAndOneMinute);
+  RUN_TEST(testPollerReadsPumpStateThenRepeatsAtInterval);
+  RUN_TEST(testPollerRequeriesPumpStateAfterModuleReset);
+  RUN_TEST(testPollerRetriesBusyPumpStateThenWaits);
+  RUN_TEST(testPumpCommandSetsOnlyWhenStateDiffers);
+  RUN_TEST(testPumpCommandBeforeStateReadsThenSets);
+  RUN_TEST(testPumpCommandAddressesSlotTwo);
+  RUN_TEST(testPumpFaultIsPublishedAndNotResetUntilCommand);
+  RUN_TEST(testPumpResetThenTurnsOnWhenDesired);
+  RUN_TEST(testPumpResetThatStaysFaultDoesNotTurnOn);
+  RUN_TEST(testPumpResetWhileOffDoesNotTurnOn);
+  RUN_TEST(testPumpCommandRejectsMalformedPayload);
+  RUN_TEST(testPumpCommandDroppedForOtherModule);
+  RUN_TEST(testPumpCommandReappliesAfterModuleReset);
+  RUN_TEST(testPumpCommandTimeoutTurnsPumpOff);
+  RUN_TEST(testPumpCommandRefreshesAbsenceTimeout);
+  RUN_TEST(testPumpResetDoesNotRefreshAbsenceTimeout);
+  RUN_TEST(testPumpMalformedPayloadDoesNotRefreshAbsenceTimeout);
+  RUN_TEST(testPumpComingOnlineAfterTimeoutIsTurnedOff);
+  RUN_TEST(testPumpTimeoutDoesNotResetFault);
+  RUN_TEST(testPumpCommandWaitsThroughEnumeration);
+  RUN_TEST(testPeriodicPumpPublishEachStateAndClearOnUnplug);
+  RUN_TEST(testPumpBridgeFollowsDeviceId);
+}

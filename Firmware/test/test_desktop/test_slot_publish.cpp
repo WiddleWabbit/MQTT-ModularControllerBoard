@@ -366,3 +366,28 @@ void testSlotPublisherRepublishesWhenDeviceIdChanges()
   harness.publisher.update();
   TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the retained slot-status cases.
+ *
+ * @return Nothing.
+ */
+void runSlotPublishTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testSlotPublisherPublishesRetainedEmptySlots);
+  RUN_TEST(testSlotPublisherWaitsUntilMqttConnected);
+  RUN_TEST(testSlotPublisherPublishesLatestSnapshotAfterReconnect);
+  RUN_TEST(testSlotPublisherRetriesRejectedSlotOnly);
+  RUN_TEST(testSlotPublisherPublishesOnlyTheChangedSlot);
+  RUN_TEST(testSlotPublisherPublishesOnlineIdentityEcho);
+  RUN_TEST(testSlotPublisherPublishesUnsupportedType);
+  RUN_TEST(testSlotPublisherPublishesFaultNack);
+  RUN_TEST(testSlotPublisherRepublishesEmptyAfterUnplug);
+  RUN_TEST(testSlotPublisherDoesNotTouchTheBus);
+  RUN_TEST(testSlotPublisherRepublishesWhenDeviceIdChanges);
+}

@@ -1480,3 +1480,46 @@ void testSerialConsoleRejectsBadHostnameWhileUnplugged()
     board.preferences.contains(NetworkConfigKeys::wifiHostname));
   TEST_ASSERT_TRUE(wroteLine(serial, "OK applied"));
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the seven-module interface cases.
+ *
+ * @return Nothing.
+ */
+void runDeepModuleTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testNetworkBeginAppliesDefaultsAndConfiguresNtp);
+  RUN_TEST(testNetworkUpdateConnectsMqttOnlyAfterWifi);
+  RUN_TEST(testNetworkReconnectsAfterWifiDropUsingBackoff);
+  RUN_TEST(testNetworkPublishFollowsBrokerConnection);
+  RUN_TEST(testNetworkFansInboundMessagesOutToFourHandlers);
+  RUN_TEST(testNetworkApplyPersistsThroughPreferenceStore);
+  RUN_TEST(testNetworkRejectsInvalidNamesAndAClosedStore);
+  RUN_TEST(testNetworkEmptyBrokerStaysUnconfiguredUntilApplied);
+  RUN_TEST(testNetworkRetriesNtpOnItsInterval);
+  RUN_TEST(testModuleBusPublishesEmptySlotsOnceWhenMqttConnects);
+  RUN_TEST(testModuleBusEnumeratesWithOneTransactionPerUpdate);
+  RUN_TEST(testModuleBusFollowsAPrefixChangeAndQuiesces);
+  RUN_TEST(testSensorModulePublishesReadingOnTheSameUpdate);
+  RUN_TEST(testSensorModuleReadCommandAndMalformedPayload);
+  RUN_TEST(testSensorModuleHonorsPollIntervalAndUnplug);
+  RUN_TEST(testSensorModulePublishesConnectedList);
+  RUN_TEST(testSensorModuleDoesNotExchangeWhileProgramming);
+  RUN_TEST(testSolenoidModuleCommandPublishesAndTimesOut);
+  RUN_TEST(testSolenoidModuleSkipsDisconnectedAndPublishesInventory);
+  RUN_TEST(testSolenoidModuleClearsOnUnplug);
+  RUN_TEST(testPumpModuleTurnsOnAndPublishes);
+  RUN_TEST(testPumpModuleResetsFaultBeforeTurningOn);
+  RUN_TEST(testPumpModuleResetDoesNotRefreshAbsenceTimeout);
+  RUN_TEST(testPumpModuleAddressesSlotTwoAndClearsOnUnplug);
+  RUN_TEST(testProgrammingBeginQuiescesUntilIdleTimeout);
+  RUN_TEST(testProgrammingSyncRefreshesIdleAndUnplugEndsSession);
+  RUN_TEST(testSerialConsoleApplyPersistsAndStatusPrintsImmediately);
+  RUN_TEST(testSerialConsolePeriodicStatusAndProgramRequest);
+  RUN_TEST(testSerialConsoleRejectsBadHostnameWhileUnplugged);
+}

@@ -57,7 +57,7 @@ Tests run on the desktop with Unity. No hardware.
 C:\Users\Nathan\.platformio\penv\Scripts\platformio.exe test -e native
 ```
 
-Tests live under `test/test_desktop/`. Fakes live in `test/test_desktop/fakes/`. Extra files have no `main()`. Declare the test and call `RUN_TEST` from `test/test_desktop/test_networking.cpp`.
+Tests live under `test/test_desktop/`. Fakes live in `test/test_desktop/fakes/`. `test_main.cpp` is the only `main()`. It calls each file's `run*Tests()`, and that function is where the file's `RUN_TEST` calls live. Add a case in its file. Edit `test_main.cpp` only when adding a file.
 
 `test_deep_modules.cpp` drives the seven modules through their public interfaces. The other files cover submodule edges (codecs, enumeration faults, poller cycles, STK500). Keep both.
 

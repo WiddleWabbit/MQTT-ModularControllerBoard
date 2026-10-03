@@ -773,3 +773,39 @@ void testSolenoidBridgeFollowsDeviceId()
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
                              "on", true));
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the solenoid command, poller, and bridge cases.
+ *
+ * @return Nothing.
+ */
+void runSolenoidTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testCodecEncodesSolenoidCommands);
+  RUN_TEST(testHostReadsSolenoidCountStateAndSet);
+  RUN_TEST(testHostRejectsSolenoidQueryUnlessOnlineSolenoid);
+  RUN_TEST(testHostRejectsShortSolenoidPayload);
+  RUN_TEST(testSolenoidTimingDefaultsAreFifteenMinutesAndOneMinute);
+  RUN_TEST(testPollerQueriesCountThenEachSolenoidAtInterval);
+  RUN_TEST(testPollerRequeriesSolenoidCountAfterModuleReset);
+  RUN_TEST(testPollerIdleWhenSolenoidCountIsZero);
+  RUN_TEST(testPollerRetriesBusySolenoidStateThenMovesOn);
+  RUN_TEST(testSolenoidCommandSetsOnlyMismatchedOutputs);
+  RUN_TEST(testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized);
+  RUN_TEST(testSolenoidCommandBeforeCountReadsStateThenSets);
+  RUN_TEST(testSolenoidCommandRejectsMalformedPayload);
+  RUN_TEST(testSolenoidCommandReappliesAfterModuleReset);
+  RUN_TEST(testSolenoidCommandTimeoutTurnsOutputsOff);
+  RUN_TEST(testSolenoidCommandRefreshesAbsenceTimeout);
+  RUN_TEST(testPeriodicSolenoidPublishEachStateAndClearOnUnplug);
+  RUN_TEST(testConnectedQueryPublishesIndexesWithoutRefreshingSilence);
+  RUN_TEST(testConnectedQueryWaitsUntilEveryStateIsKnown);
+  RUN_TEST(testConnectedQueryRejectsMalformedPayload);
+  RUN_TEST(testConnectedInventoryClearsWhenModuleUnplugged);
+  RUN_TEST(testSolenoidBridgeFollowsDeviceId);
+}

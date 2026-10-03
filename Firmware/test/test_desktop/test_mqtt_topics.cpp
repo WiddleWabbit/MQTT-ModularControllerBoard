@@ -60,3 +60,19 @@ void testMqttTopicLayoutSetDeviceIdBumpsGenerationOnce()
   TEST_ASSERT_EQUAL_STRING("shed/solenoids",
                            topics.subscriptions()[0].topic);
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the topic-layout cases.
+ *
+ * @return Nothing.
+ */
+void runMqttTopicTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testMqttTopicLayoutBuildsPlantRoomTopics);
+  RUN_TEST(testMqttTopicLayoutSetDeviceIdBumpsGenerationOnce);
+}

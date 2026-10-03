@@ -768,3 +768,37 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
                              "unavailable", true));
 }
+
+
+// ========== Runner ==========
+
+/**
+ * Registers the sensor command, poller, and bridge cases.
+ *
+ * @return Nothing.
+ */
+void runSensorTests()
+{
+  // UNITY_BEGIN records test_main.cpp, so name this file for the report.
+  UnitySetTestFile(__FILE__);
+  RUN_TEST(testCodecEncodesSensorCommands);
+  RUN_TEST(testHostReadsSensorCountConnectedAndReading);
+  RUN_TEST(testHostRejectsSensorQueryUnlessOnlineSensor);
+  RUN_TEST(testHostRejectsShortSensorPayload);
+  RUN_TEST(testPollerQueriesCountThenEachSensorAtInterval);
+  RUN_TEST(testPollerRequeriesCountAfterModuleReset);
+  RUN_TEST(testPollerIdleWhenSensorCountIsZero);
+  RUN_TEST(testPollerRetriesBusyThenMovesOn);
+  RUN_TEST(testSensorReadCommandPublishesWithoutBusUntilUpdate);
+  RUN_TEST(testSensorReadCommandRepeatsUnchangedReading);
+  RUN_TEST(testSensorReadCommandRejectsMalformedPayload);
+  RUN_TEST(testSensorReadCommandUnavailableWhenSensorMissing);
+  RUN_TEST(testPeriodicSensorPublishEachReadingAndClearOnUnplug);
+  RUN_TEST(testSensorBridgeFollowsDeviceId);
+  RUN_TEST(testSensorConnectedListPublishesIndexes);
+  RUN_TEST(testSensorConnectedQueryWaitsUntilPresenceIsKnown);
+  RUN_TEST(testSensorConnectedQueryRejectsMalformedPayload);
+  RUN_TEST(testSensorConnectedListForEmptyAndAllAbsent);
+  RUN_TEST(testSensorConnectedListFollowsPresenceChange);
+  RUN_TEST(testSensorConnectedInventoryClearsWhenModuleUnplugged);
+}
