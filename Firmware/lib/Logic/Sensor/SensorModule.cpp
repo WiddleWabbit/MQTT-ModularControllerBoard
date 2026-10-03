@@ -17,7 +17,8 @@ SensorModule::SensorModule(ModuleBus& bus, Network& network, IClock& clock,
 // ========== Public API ==========
 
 /**
- * Issues at most one sensor exchange, then publishes stored readings.
+ * Issues at most one sensor exchange, then publishes stored readings
+ * and the connected-input list.
  *
  * @return Nothing.
  */

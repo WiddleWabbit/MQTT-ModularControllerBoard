@@ -28,6 +28,9 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
     }
+    _inventoryPending[slot] = false;
+    _inventoryOk[slot] = false;
+    _inventoryPayload[slot][0] = '\0';
   }
 }
 
@@ -35,8 +38,9 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
 // ========== Public API ==========
 
 /**
- * Enqueues a reading when topic and payload name one sensor.
- * Ignores every other message. Safe to call from the MQTT callback.
+ * Enqueues a reading, or records a connected-list request, when the
+ * topic and payload name one sensor slot. Ignores every other
+ * message. Safe to call from the MQTT callback.
  *
  * @param topic Received topic.
  * @param payload Payload bytes. Not necessarily NUL-terminated.
@@ -58,8 +62,10 @@ void SensorMqttBridge::onMqttMessage(const char* topic,
 
 /**
  * Publishes each new reading, including a repeated value, and one
- * retained unavailable when an input disappears. A rejected publish
- * stays pending. An update with no new reading does not publish.
+ * retained unavailable when an input disappears. Publishes the
+ * connected-input list when that text changes or a request asked
+ * again. A rejected publish stays pending. An update with no new
+ * reading and no list change does not publish.
  *
  * @return Nothing.
  */
@@ -68,11 +74,12 @@ void SensorMqttBridge::update()
   _syncTopicGeneration();
   _publishDemand();
   _publishSnapshots();
+  _publishInventories();
 }
 
 
 /**
- * Forgets accepted readings when the device id has changed.
+ * Forgets accepted readings and lists when the device id has changed.
  *
  * @return Nothing.
  */
@@ -92,6 +99,8 @@ void SensorMqttBridge::_syncTopicGeneration()
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
     }
+    _inventoryOk[slot] = false;
+    _inventoryPayload[slot][0] = '\0';
   }
   _seenGeneration = generation;
 }
@@ -131,7 +140,8 @@ bool readUnsigned(const char*& cursor, const char* end, unsigned* value)
 }
 
 /**
- * Parses a read command and enqueues it.
+ * Parses a read command and enqueues it, or records a connected-list
+ * request.
  *
  * @param topic Received topic.
  * @param payload Payload bytes.
@@ -141,7 +151,16 @@ bool readUnsigned(const char*& cursor, const char* end, unsigned* value)
 void SensorMqttBridge::_handleMessage(const char* topic,
                                       const uint8_t* payload, size_t length)
 {
-  if (topic == nullptr || std::strcmp(topic, _topics.sensorRead()) != 0)
+  if (topic == nullptr)
+  {
+    return;
+  }
+  if (std::strcmp(topic, _topics.sensorConnected()) == 0)
+  {
+    _handleConnectedQuery(payload, length);
+    return;
+  }
+  if (std::strcmp(topic, _topics.sensorRead()) != 0)
   {
     return;
   }
@@ -189,6 +208,47 @@ void SensorMqttBridge::_handleMessage(const char* topic,
   }
   _poller.requestReading(static_cast<uint8_t>(moduleNumber - 1),
                          static_cast<uint8_t>(sensorNumber - 1));
+}
+
+/**
+ * Records a request to publish one slot's connected inputs.
+ * Does not enqueue a reading.
+ *
+ * @param payload Payload bytes.
+ * @param length Payload length.
+ * @return Nothing.
+ */
+void SensorMqttBridge::_handleConnectedQuery(const uint8_t* payload,
+                                             size_t length)
+{
+  if (payload == nullptr && length > 0)
+  {
+    return;
+  }
+  const char* cursor = reinterpret_cast<const char*>(payload);
+  const char* end = cursor + length;
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  unsigned moduleNumber = 0;
+  if (!readUnsigned(cursor, end, &moduleNumber))
+  {
+    return;
+  }
+  if (moduleNumber < 1 || moduleNumber > module_protocol::kSlotCount)
+  {
+    return;
+  }
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  if (cursor != end)
+  {
+    return;
+  }
+  _inventoryPending[moduleNumber - 1] = true;
 }
 
 
@@ -290,6 +350,113 @@ void SensorMqttBridge::_publishSnapshots()
       _publishedRevision[slot][index] = revision;
     }
   }
+}
+
+/**
+ * Publishes the retained input list for each slot that can answer.
+ * A slot that could answer and no longer can publishes unavailable.
+ *
+ * @return Nothing.
+ */
+void SensorMqttBridge::_publishInventories()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    char text[80];
+    if (!_formatInventory(slot, text, sizeof(text)))
+    {
+      if (_inventoryOk[slot] && _publishInventory(slot, "unavailable"))
+      {
+        _inventoryOk[slot] = false;
+        _inventoryPayload[slot][0] = '\0';
+        _inventoryPending[slot] = false;
+      }
+      continue;
+    }
+    const bool changed = !_inventoryOk[slot] ||
+                         std::strcmp(_inventoryPayload[slot], text) != 0;
+    if (!changed && !_inventoryPending[slot])
+    {
+      continue;
+    }
+    if (!_publishInventory(slot, text))
+    {
+      continue;
+    }
+    std::snprintf(_inventoryPayload[slot], sizeof(_inventoryPayload[slot]),
+                  "%s", text);
+    _inventoryOk[slot] = true;
+    _inventoryPending[slot] = false;
+  }
+}
+
+/**
+ * Formats "<count> <connected indexes...>" for one slot.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param out Destination buffer.
+ * @param outCap Destination capacity.
+ * @return False until the count and every input's presence are known.
+ */
+bool SensorMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
+                                       size_t outCap) const
+{
+  if (!_poller.countKnown(moduleSlot) || out == nullptr || outCap < 2)
+  {
+    return false;
+  }
+  const uint8_t count = _poller.sensorCount(moduleSlot);
+  if (count > module_protocol::kMaxSensorsPerModule)
+  {
+    return false;
+  }
+  int used = std::snprintf(out, outCap, "%u", static_cast<unsigned>(count));
+  if (used < 0 || static_cast<size_t>(used) >= outCap)
+  {
+    return false;
+  }
+  for (uint8_t index = 0; index < count; ++index)
+  {
+    bool connected = false;
+    bool hasValue = false;
+    int32_t value = 0;
+    if (!_poller.sensorSample(moduleSlot, index, &connected, &hasValue,
+                              &value))
+    {
+      return false;
+    }
+    if (!connected)
+    {
+      continue;
+    }
+    const int next = std::snprintf(out + used,
+                                   outCap - static_cast<size_t>(used),
+                                   " %u", static_cast<unsigned>(index) + 1U);
+    if (next < 0 ||
+        static_cast<size_t>(next) >= outCap - static_cast<size_t>(used))
+    {
+      return false;
+    }
+    used += next;
+  }
+  return true;
+}
+
+/**
+ * Publishes the retained inventory topic for one slot.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param payload Text payload.
+ * @return True when publication was accepted.
+ */
+bool SensorMqttBridge::_publishInventory(uint8_t moduleSlot,
+                                        const char* payload)
+{
+  char topic[96];
+  const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
+  std::snprintf(topic, sizeof(topic), "%s/%u/sensors",
+                _topics.slotPrefix(), moduleNumber);
+  return _mqttService.publish(topic, payload, true);
 }
 
 /**

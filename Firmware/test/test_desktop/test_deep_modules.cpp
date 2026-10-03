@@ -454,7 +454,7 @@ void testNetworkUpdateConnectsMqttOnlyAfterWifi()
   TEST_ASSERT_EQUAL_STRING("", kit.mqtt.lastUsername.c_str());
   TEST_ASSERT_EQUAL_STRING("broker.local", kit.mqtt.brokerHost.c_str());
   TEST_ASSERT_EQUAL(1883, kit.mqtt.brokerPort);
-  TEST_ASSERT_EQUAL(4, kit.mqtt.subscribeCallCount);
+  TEST_ASSERT_EQUAL(5, kit.mqtt.subscribeCallCount);
   TEST_ASSERT_EQUAL_STRING("watering/solenoids",
                            kit.mqtt.subscribedTopics[0].c_str());
   TEST_ASSERT_EQUAL_STRING("watering/solenoids/connected",
@@ -463,6 +463,8 @@ void testNetworkUpdateConnectsMqttOnlyAfterWifi()
                            kit.mqtt.subscribedTopics[2].c_str());
   TEST_ASSERT_EQUAL_STRING("watering/sensor/read",
                            kit.mqtt.subscribedTopics[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("watering/sensor/connected",
+                           kit.mqtt.subscribedTopics[4].c_str());
   TEST_ASSERT_EQUAL(1, kit.mqtt.subscribedQos[0]);
 
   kit.network.update();
@@ -496,7 +498,7 @@ void testNetworkReconnectsAfterWifiDropUsingBackoff()
 
   kit.network.update();
   TEST_ASSERT_EQUAL(2, kit.mqtt.connectCallCount);
-  TEST_ASSERT_EQUAL(8, kit.mqtt.subscribeCallCount);
+  TEST_ASSERT_EQUAL(10, kit.mqtt.subscribeCallCount);
 }
 
 void testNetworkPublishFollowsBrokerConnection()
@@ -700,7 +702,7 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
   board.network.update();
   const char* last =
     board.mqtt.subscribedTopics.back().c_str();
-  TEST_ASSERT_EQUAL_STRING("shed/sensor/read", last);
+  TEST_ASSERT_EQUAL_STRING("shed/sensor/connected", last);
   board.bus.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/1", "Empty", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/4", "Empty", true));
@@ -852,7 +854,52 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   board.sensor.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
                              "unavailable", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensors",
+                             "unavailable", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", true));
+}
+
+void testSensorModulePublishesConnectedList()
+{
+  Board board(kPollMs, kPollMs, kSolenoidSilenceMs, kPollMs, kPumpSilenceMs);
+  board.start();
+  FakeModuleDevice device(board.clock, board.slots.mod1);
+  device.typeId = module_protocol::kTypeSensorModule;
+  device.sensorCount = 4;
+  device.sensorConnected[0] = true;
+  device.sensorConnected[1] = true;
+  device.sensorConnected[2] = false;
+  device.sensorConnected[3] = true;
+  device.sensorValue[0] = 1;
+  device.sensorValue[1] = 2;
+  device.sensorValue[2] = 0;
+  device.sensorValue[3] = 4;
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
+
+  for (int step = 0; step < 9; ++step)
+  {
+    board.sensor.update();
+  }
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensors",
+                             "4 1 2 4", true));
+  const int once = countTopic(board.mqtt, "watering/slot/1/sensors");
+  board.sensor.update();
+  TEST_ASSERT_EQUAL(once, countTopic(board.mqtt, "watering/slot/1/sensors"));
+
+  const size_t learned = board.slots.i2c.protocolOpCount();
+  board.mqtt.deliver("watering/sensor/connected", "1");
+  board.sensor.update();
+  TEST_ASSERT_EQUAL(learned, board.slots.i2c.protocolOpCount());
+  TEST_ASSERT_EQUAL(once + 1, countTopic(board.mqtt, "watering/slot/1/sensors"));
+
+  board.mqtt.publishedMessages.clear();
+  board.mqtt.deliver("watering/sensor/connected", "1 2");
+  board.mqtt.deliver("watering/sensor/connected", "5");
+  board.mqtt.deliver("watering/sensor/connected", "on");
+  board.mqtt.deliver("watering/sensor/connected", "");
+  board.sensor.update();
+  TEST_ASSERT_EQUAL(learned, board.slots.i2c.protocolOpCount());
+  TEST_ASSERT_EQUAL(0, board.mqtt.publishedMessages.size());
 }
 
 void testSensorModuleDoesNotExchangeWhileProgramming()

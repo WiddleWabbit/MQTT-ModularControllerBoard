@@ -10,7 +10,7 @@ Wire indexes are 0-based. MQTT slot and sensor numbers are 1-based. The controll
 
 ## Where it sits
 
-`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, and `kSensorPollIntervalMs` (60 seconds). The constructor registers the `{id}/sensor/read` handler, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
+`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, and `kSensorPollIntervalMs` (60 seconds). The constructor registers the handler for `{id}/sensor/read` and `{id}/sensor/connected`, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
 
 ## What it creates
 
@@ -18,7 +18,7 @@ Wire indexes are 0-based. MQTT slot and sensor numbers are 1-based. The controll
 main.cpp
   SensorModule
     SensorPoller         one query per pass; per-slot count, samples, and timer
-    SensorMqttBridge     publishes stored readings; the callback only enqueues
+    SensorMqttBridge     publishes stored readings and the connected list
 ```
 
 `ModuleHost`, inside the bus, is the only I2C caller. The poller's exchange is separate from the one transaction inside `moduleBus.update()`.
@@ -31,16 +31,16 @@ flowchart TD
   poll --> order["Immediate read, else a missing count, else the next cycle step"]
   order --> mem["Store the count or the sample"]
   mem --> bridge["SensorMqttBridge"]
-  bridge --> pub{"A sample was stored this pass?"}
-  pub -->|yes| mqtt["Publish the retained reading"]
+  bridge --> pub{"A reading was stored, or the connected list changed?"}
+  pub -->|yes| mqtt["Publish the retained reading, and the list when it changed"]
   pub -->|no| quiet["Leave the broker as it is"]
 ```
 
-The callback for `{id}/sensor/read` only enqueues a slot and a sensor index. The poller sends `GET_SENSOR_READING` on a later pass. While the count is still unknown, that request waits and the count query runs instead.
+The callback for `{id}/sensor/read` only enqueues a slot and a sensor index. The poller sends `GET_SENSOR_READING` on a later pass. While the count is still unknown, that request waits and the count query runs instead. `{id}/sensor/connected` only asks for the connected-input list. It does not enqueue a reading.
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, samples, revision, and poll timer. The bridge reads those and publishes `{id}/slot/N/sensor/M` when a reading was stored. Unplug publishes retained `unavailable` once for that slot's inputs. Another slot keeps its own cache.
+Each slot keeps its own count, samples, revision, and poll timer. The bridge reads those and publishes `{id}/slot/N/sensor/M` when a reading was stored, and `{id}/slot/N/sensors` as the count plus the connected indexes. Unplug publishes retained `unavailable` once for that slot's inputs and for its list. Another slot keeps its own cache.
 
 Serial status prints the slot line (`Online Sensor addr=0x10`). It does not print individual inputs.
 

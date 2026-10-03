@@ -14,9 +14,18 @@
 static const char kSensorReadTopic[] = "watering/sensor/read";
 
 /**
+ * Sensor connected-input topic when the device id is watering.
+ * Payload is the 1-based module slot, for example "1".
+ * This is not a reading request.
+ */
+static const char kSensorConnectedTopic[] = "watering/sensor/connected";
+
+/**
  * Publishes sensor samples and turns the read command into a poller
- * request. The command handler only enqueues; it does not touch I2C.
- * Readings are published at "{prefix}/{moduleSlot}/sensor/{sensor}".
+ * request. The command handler only records a request; it does not
+ * touch I2C. Readings are published at
+ * "{prefix}/{moduleSlot}/sensor/{sensor}". The connected list is
+ * published at "{prefix}/{moduleSlot}/sensors".
  */
 class SensorMqttBridge
 {
@@ -33,8 +42,9 @@ public:
                    MqttTopicLayout& topics);
 
   /**
-   * Enqueues a reading when topic and payload name one sensor.
-   * Ignores every other message. Safe to call from the MQTT callback.
+   * Enqueues a reading, or records a connected-list request, when the
+   * topic and payload name one sensor slot. Ignores every other
+   * message. Safe to call from the MQTT callback.
    *
    * @param topic Received topic.
    * @param payload Payload bytes. Not necessarily NUL-terminated.
@@ -47,9 +57,11 @@ public:
 
   /**
    * Publishes each new reading, including a repeated value, and one
-   * retained unavailable when an input disappears. A rejected publish
-   * stays pending. An update with no new reading does not publish.
-   * A new device id sends the current readings once on the new topics.
+   * retained unavailable when an input disappears. Publishes the
+   * connected-input list when that text changes or a request asked
+   * again. A rejected publish stays pending. An update with no new
+   * reading and no list change does not publish. A new device id
+   * sends the current readings and the list once on the new topics.
    *
    * @return Nothing.
    */
@@ -68,9 +80,13 @@ private:
                              [module_protocol::kMaxSensorsPerModule];
   char _published[module_protocol::kSlotCount]
                  [module_protocol::kMaxSensorsPerModule][32];
+  bool _inventoryPending[module_protocol::kSlotCount];
+  bool _inventoryOk[module_protocol::kSlotCount];
+  char _inventoryPayload[module_protocol::kSlotCount][80];
 
   /**
-   * Parses a read command and enqueues it.
+   * Parses a read command and enqueues it, or records a connected-list
+   * request.
    *
    * @param topic Received topic.
    * @param payload Payload bytes.
@@ -81,11 +97,21 @@ private:
                       size_t length);
 
   /**
-   * Forgets accepted readings when the device id has changed.
+   * Forgets accepted readings and lists when the device id has changed.
    *
    * @return Nothing.
    */
   void _syncTopicGeneration();
+
+  /**
+   * Records a request to publish one slot's connected inputs.
+   * Does not enqueue a reading.
+   *
+   * @param payload Payload bytes.
+   * @param length Payload length.
+   * @return Nothing.
+   */
+  void _handleConnectedQuery(const uint8_t* payload, size_t length);
 
   /**
    * Publishes the held on-demand result when one is waiting.
@@ -100,6 +126,33 @@ private:
    * @return Nothing.
    */
   void _publishSnapshots();
+
+  /**
+   * Publishes the retained input list for each slot that can answer.
+   * A slot that could answer and no longer can publishes unavailable.
+   *
+   * @return Nothing.
+   */
+  void _publishInventories();
+
+  /**
+   * Formats "<count> <connected indexes...>" for one slot.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param out Destination buffer.
+   * @param outCap Destination capacity.
+   * @return False until the count and every input's presence are known.
+   */
+  bool _formatInventory(uint8_t moduleSlot, char* out, size_t outCap) const;
+
+  /**
+   * Publishes the retained inventory topic for one slot.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param payload Text payload.
+   * @return True when publication was accepted.
+   */
+  bool _publishInventory(uint8_t moduleSlot, const char* payload);
 
   /**
    * Publishes one sensor topic.

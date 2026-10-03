@@ -105,10 +105,21 @@ const char* MqttTopicLayout::sensorRead() const
 }
 
 /**
- * Returns the four QoS 1 command subscriptions.
+ * Returns the sensor connected-input query topic.
+ *
+ * @return "{id}/sensor/connected".
+ */
+const char* MqttTopicLayout::sensorConnected() const
+{
+  return _sensorConnected.c_str();
+}
+
+/**
+ * Returns the five QoS 1 command subscriptions.
  *
  * The pointer stays valid until the next setDeviceId call. Order is
- * solenoids, solenoids/connected, pump, then sensor/read.
+ * solenoids, solenoids/connected, pump, sensor/read, then
+ * sensor/connected.
  *
  * @return Subscription array of kSubscriptionCount entries.
  */
@@ -142,8 +153,10 @@ void MqttTopicLayout::_rebuild()
   _solenoidConnected = _deviceId + "/solenoids/connected";
   _pumpCommand = _deviceId + "/pump";
   _sensorRead = _deviceId + "/sensor/read";
+  _sensorConnected = _deviceId + "/sensor/connected";
   _subscriptions[0] = {_solenoidCommand.c_str(), 1};
   _subscriptions[1] = {_solenoidConnected.c_str(), 1};
   _subscriptions[2] = {_pumpCommand.c_str(), 1};
   _subscriptions[3] = {_sensorRead.c_str(), 1};
+  _subscriptions[4] = {_sensorConnected.c_str(), 1};
 }

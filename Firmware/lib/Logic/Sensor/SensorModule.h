@@ -11,8 +11,9 @@ class Network;
 
 /**
  * Sensor daughter behaviour: count, presence, readings, the immediate
- * read command, and retained publication. update() issues at most one
- * bus exchange and then publishes what that exchange stored.
+ * read command, the connected-input list, and retained publication.
+ * update() issues at most one bus exchange and then publishes what
+ * that exchange stored.
  */
 class SensorModule
 {
@@ -30,7 +31,8 @@ public:
                uint32_t pollIntervalMs);
 
   /**
-   * Issues at most one sensor exchange, then publishes stored readings.
+   * Issues at most one sensor exchange, then publishes stored readings
+   * and the connected-input list.
    *
    * @return Nothing.
    */

@@ -44,7 +44,7 @@ The service enters `Connected` only after every configured subscription succeeds
 
 ### Subscriptions
 
-`MqttTopicLayout` builds the four QoS 1 subscriptions. They are not stored in NVS. `set mqtt.prefix` changes the root, and `NetworkRuntime` pushes the new list into `MqttService`.
+`MqttTopicLayout` builds the five QoS 1 subscriptions. They are not stored in NVS. `set mqtt.prefix` changes the root, and `NetworkRuntime` pushes the new list into `MqttService`.
 
 | Topic | Who handles it |
 | --- | --- |
@@ -52,8 +52,9 @@ The service enters `Connected` only after every configured subscription succeeds
 | `{id}/solenoids/connected` | Solenoid bridge, same handler |
 | `{id}/pump` | Pump bridge |
 | `{id}/sensor/read` | Sensor bridge |
+| `{id}/sensor/connected` | Sensor bridge, same handler |
 
-`kSubscriptionCount` is 4, and all four are in use. A new command topic means raising that count. Command payloads are on the type reference pages.
+`kSubscriptionCount` is 5, and all five are in use. A new command topic means raising that count. Command payloads are on the type reference pages.
 
 `{id}` is one path segment. `kMqttDeviceId` in `src/main.cpp` supplies it when NVS has no `mqtt_prefix`. That constant is `watering`. The hostname and the MQTT client id stay independent. Two boards on one broker need different client ids as well as different prefixes. The character rules are in the [configuration reference](configuration.md).
 
@@ -61,7 +62,7 @@ The service enters `Connected` only after every configured subscription succeeds
 
 ### Generation
 
-Publishers remember the payload the broker has accepted. Slot status and the solenoid inventory compare that text. Sensor, solenoid, and pump state compare the poller's revision, so a repeated value is sent again only after a new sample is stored.
+Publishers remember the payload the broker has accepted. Slot status, the solenoid inventory, and the sensor inventory compare that text. Sensor, solenoid, and pump state compare the poller's revision, so a repeated value is sent again only after a new sample is stored.
 
 `MqttTopicLayout` keeps a generation counter. It starts at 1 and adds 1 only when the id text changes. Each publisher remembers the generation it last published under. The next `update()` sees a newer count, forgets the accepted-payload notes, and sends the current values once on the new topics. A note is stored again only after that publish is accepted, so a reconnect retries whatever the broker has not taken. Later passes with the same readings go quiet. Retained messages under the previous id are left on the broker.
 

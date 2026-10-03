@@ -68,6 +68,7 @@ The id used when `mqtt_prefix` is missing is `kMqttDeviceId` in `src/main.cpp`. 
 ```text
 watering/slot/N
 watering/slot/N/sensor/M
+watering/slot/N/sensors
 watering/slot/N/solenoid/M
 watering/slot/N/solenoids
 watering/slot/N/pump
@@ -75,6 +76,7 @@ watering/solenoids
 watering/solenoids/connected
 watering/pump
 watering/sensor/read
+watering/sensor/connected
 ```
 
 `{id}` in the other docs means this segment. After `set mqtt.prefix plant-room` and `apply`, the same tree starts with `plant-room`.
@@ -84,6 +86,7 @@ Publishers normally stay quiet once the broker has accepted a payload. Changing 
 ```text
 plant-room/slot/1                  Online Sensor addr=0x10
 plant-room/slot/1/sensor/1         connected 2500
+plant-room/slot/1/sensors          2 1
 plant-room/slot/1/solenoid/1       on
 plant-room/slot/1/solenoids        4 1 2 4
 plant-room/slot/1/pump             off
