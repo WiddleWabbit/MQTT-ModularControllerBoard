@@ -39,7 +39,7 @@ Fields on one `SlotController`:
 | `_phase` | Private phase. `state()` is the public fold below. |
 | `_phaseBeforeAbsent` | Phase to restore if SENSE returns before the absence debounce ends. |
 | `_address` | Assigned 7-bit address. Stays 0 until the ping at that address succeeds. |
-| `_committedAddress` | Last `SET_ADDRESS` target. Kept when recovery forgets the identity and tries the assigned address again. |
+| `_committedAddress` | Address this slot is using. Set by `SET_ADDRESS`, or by a ping of the slot address after `0x0A` NACKed. Kept when recovery forgets the identity. Cleared when the slot returns to `Empty`. |
 | `_priorPublic` | `Online` or `Unsupported` to restore when health recovery finds the assigned address still answering. |
 | `_typeId`, `_protocolVersion`, `_firmwareVersion` | Last successful `GET_IDENTITY`. Cleared on return to `Empty`, and when a recovery ping at `0x0A` succeeds. |
 | `_identityEpoch` | Count of successful `GET_IDENTITY` results for this slot, including after a restart. |
@@ -102,7 +102,7 @@ Callers see `SlotState`: `Empty`, `Debouncing`, `Enumerating`, `Online`, `Unsupp
 | `Empty` | `Empty` |
 | `DebouncePresent` | `Debouncing` |
 | `DebounceAbsent` | The public state of `_phaseBeforeAbsent`. A sense gap shorter than the absence debounce leaves the previous public state in place. |
-| `BootWait`, `WaitForLock`, `SelectAssert`, `ProbeDefault`, `SetAddress`, `VerifyAssigned`, `Identify`, `RecoverWaitLock`, `RecoverSelect`, `RecoverProbeDefault`, `RecoverProbeAssigned` | `Enumerating` |
+| `BootWait`, `WaitForLock`, `SelectAssert`, `ProbeDefault`, `ProbeAssigned`, `SetAddress`, `VerifyAssigned`, `Identify`, `RecoverWaitLock`, `RecoverSelect`, `RecoverProbeDefault`, `RecoverProbeAssigned` | `Enumerating` |
 | `Online` | `Online` |
 | `Unsupported` | `Unsupported` |
 | `Fault` | `Fault` |
@@ -130,14 +130,15 @@ Every `ModuleHost::update()` reads SENSE on every slot before any I2C. LOW means
 
 Unconfigured modules all answer at `0x0A`, so the host selects one slot. The enumeration lock goes to the lowest waiting slot: slot 1 before slot 2, and so on. That slot drives MOD low, waits 10 ms, then:
 
-1. `PING` at `0x0A`
-2. `SET_ADDRESS` to `0x10 + slotIndex` (slot 1 is `0x10`, slot 2 is `0x11`)
-3. `PING` at the assigned address
-4. `GET_IDENTITY`
+1. `PING` at `0x0A`.
+2. When that ping is answered, `SET_ADDRESS` to `0x10 + slotIndex` (slot 1 is `0x10`, slot 2 is `0x11`), then `PING` at the assigned address, then `GET_IDENTITY`.
+3. When `0x0A` NACKs three times, `PING` at `0x10 + slotIndex`. An answer skips `SET_ADDRESS` and goes to `GET_IDENTITY`. Three NACKs enter `Fault`.
 
-The lock stays with that slot until identify finishes and MOD is released. The other module remains `Enumerating` with no address yet. The lock then moves to the next waiting slot. One host transaction runs per `update()`. While the lock owner has an enumeration step due, that step is the transaction. During the 10 ms MOD settle and the 50 ms gap between retries the owner proposes nothing, and one health ping can use the pass. The health ping uses the other slot's assigned address. The module under MOD still answers only at `0x0A`.
+The slot address is calculated from the slot index. It is not written to flash. A successful ping stores it in the slot's RAM for this seating. Unplug clears that RAM. The next seating starts again at `0x0A`, which is what a module does after its own power cycle.
 
-A seated module that never ACKs `0x0A` is pinged three times, about 50 ms apart, then waits 1 s in `Fault` and repeats. SENSE can still read present.
+The lock stays with that slot until identify finishes and MOD is released. The other module remains `Enumerating` with no address yet. The lock then moves to the next waiting slot. One host transaction runs per `update()`. While the lock owner has an enumeration step due, that step is the transaction. During the 10 ms MOD settle and the 50 ms gap between retries the owner proposes nothing, and one health ping can use the pass. The health ping uses the other slot's assigned address. An unconfigured module under MOD answers at `0x0A`. A module that kept its slot address answers that address.
+
+A seated module that answers neither address is pinged three times at `0x0A` and three times at the slot address, about 50 ms apart, then waits 1 s in `Fault` and repeats from `0x0A`. SENSE can still read present.
 
 ### Health
 
@@ -208,6 +209,6 @@ Defaults in `ModuleHostConfig`:
 
 ## Tests
 
-- `test/test_desktop/test_modules.cpp` — frames, enumeration, the lock, faults, `begin` pin modes.
+- `test/test_desktop/test_modules.cpp` — frames, enumeration, a module that kept its slot address, the lock, faults, `begin` pin modes.
 - `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, prefix generation.
 - `test/test_desktop/test_deep_modules.cpp` — `ModuleBus::update()` through the public module, including quiesce.

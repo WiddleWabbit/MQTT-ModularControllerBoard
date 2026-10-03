@@ -164,14 +164,15 @@ public:
   /**
    * Reads the latched assigned address.
    *
-   * @return 7-bit address, or 0 before VerifyAssigned success.
+   * @return 7-bit address, or 0 before a ping at that address succeeds.
    */
   uint8_t address() const;
 
   /**
-   * Reads the last committed SET_ADDRESS target.
+   * Reads the address this slot is using.
    *
-   * @return 7-bit address, or 0 if SET_ADDRESS never succeeded.
+   * @return 7-bit address, or 0 until SET_ADDRESS or a slot-address
+   *         ping succeeds.
    */
   uint8_t committedAddress() const;
 
@@ -234,6 +235,7 @@ private:
     WaitForLock,
     SelectAssert,
     ProbeDefault,
+    ProbeAssigned,
     SetAddress,
     VerifyAssigned,
     Identify,

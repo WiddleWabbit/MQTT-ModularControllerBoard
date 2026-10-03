@@ -69,7 +69,7 @@ Sibling modules reach the host through `ModuleBus::host()`. `main.cpp` does not 
 Each `SlotController` stores that slot:
 
 - the private phase, which `state()` folds into `Empty`, `Debouncing`, `Enumerating`, `Online`, `Unsupported`, or `Fault`
-- the assigned address, which stays 0 until the ping at that address succeeds, and the address committed by `SET_ADDRESS`
+- the assigned address, which stays 0 until a ping at that address succeeds. The ping follows `SET_ADDRESS`, or it follows three NACKs at `0x0A`. The slot address is `0x10` plus the slot index. Unplug and a controller reset both clear it.
 - type id, protocol version, firmware version, and identity epoch
 - the last fault (`None`, `Nack`, `BadCrc`, `BadFrame`, `Timeout`, or `Busy`)
 

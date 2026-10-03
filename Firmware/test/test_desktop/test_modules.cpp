@@ -360,24 +360,170 @@ void testFaultRetriesAfterFaultRetryMs()
   TEST_ASSERT_TRUE(fixture.bus.protocolOpCount() > before);
 }
 
-void testFaultRetryWithNoAssignedAddressStillProbes0x0A()
+void testFaultRetryProbesDefaultBeforeSlotAddress()
 {
   FakeClock clock;
   EmptyModuleHostFixture fixture(clock);
   fixture.host.begin();
   fixture.sns1.setPresent(true);
   pumpMs(fixture, 800);
+  TEST_ASSERT_EQUAL(SlotState::Fault, fixture.host.state(0));
+  TEST_ASSERT_EQUAL(SlotFault::Nack, fixture.host.fault(0));
   const size_t before = fixture.bus.ops.size();
-  pumpMs(fixture, 1100);
-  bool sawAssigned = false;
+  pumpMs(fixture, 1200);
+  int leadingDefault = 0;
+  bool leftDefault = false;
+  uint8_t firstAfter = 0;
   for (size_t i = before; i < fixture.bus.ops.size(); ++i)
   {
-    if (fixture.bus.ops[i].address == 0x10)
+    const uint8_t address = fixture.bus.ops[i].address;
+    if (!leftDefault &&
+        address == module_protocol::kUnconfiguredAddress)
     {
-      sawAssigned = true;
+      leadingDefault++;
+      continue;
+    }
+    leftDefault = true;
+    firstAfter = address;
+    break;
+  }
+  TEST_ASSERT_EQUAL(3, leadingDefault);
+  TEST_ASSERT_EQUAL(0x10, firstAfter);
+  TEST_ASSERT_EQUAL(SlotState::Fault, fixture.host.state(0));
+}
+
+void testUnconfiguredModuleReachesOnlineWithoutEarlySlotPing()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice device(clock, fixture.mod1);
+  fixture.host.begin();
+  plugAndPump(fixture, 0, device);
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(0));
+  TEST_ASSERT_EQUAL(0x10, fixture.host.address(0));
+  bool sawSetAddress = false;
+  bool slotPingBeforeSet = false;
+  for (const FakeI2cOp& op : fixture.bus.ops)
+  {
+    if (op.type == FakeI2cOp::Type::Write &&
+        op.address == module_protocol::kUnconfiguredAddress)
+    {
+      sawSetAddress = true;
+    }
+    if (!sawSetAddress && op.address == 0x10)
+    {
+      slotPingBeforeSet = true;
     }
   }
-  TEST_ASSERT_FALSE(sawAssigned);
+  TEST_ASSERT_TRUE(sawSetAddress);
+  TEST_ASSERT_FALSE(slotPingBeforeSet);
+}
+
+void testRememberedAddressSkipsSetAddressAfterThreeDefaultNacks()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice device(clock, fixture.mod1);
+  device.assigned = true;
+  device.assignedAddress = 0x10;
+  device.typeId = module_protocol::kTypeSensorModule;
+  fixture.host.begin();
+  plugAndPump(fixture, 0, device);
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(0));
+  TEST_ASSERT_EQUAL(0x10, fixture.host.address(0));
+  TEST_ASSERT_EQUAL(module_protocol::kTypeSensorModule,
+                    fixture.host.typeId(0));
+  int defaultPings = 0;
+  bool sawSlotPing = false;
+  bool sawWrite = false;
+  for (const FakeI2cOp& op : fixture.bus.ops)
+  {
+    if (op.type == FakeI2cOp::Type::Write)
+    {
+      sawWrite = true;
+    }
+    if (!sawSlotPing && op.type == FakeI2cOp::Type::WriteRead &&
+        op.address == module_protocol::kUnconfiguredAddress)
+    {
+      defaultPings++;
+    }
+    if (op.address == 0x10)
+    {
+      sawSlotPing = true;
+    }
+  }
+  TEST_ASSERT_EQUAL(3, defaultPings);
+  TEST_ASSERT_TRUE(sawSlotPing);
+  TEST_ASSERT_FALSE(sawWrite);
+}
+
+void testRememberedSlot2ProbesOnlyItsAddress()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice device(clock, fixture.mod2);
+  device.assigned = true;
+  device.assignedAddress = 0x11;
+  fixture.host.begin();
+  plugAndPump(fixture, 1, device);
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(1));
+  TEST_ASSERT_EQUAL(0x11, fixture.host.address(1));
+  TEST_ASSERT_EQUAL(SlotState::Empty, fixture.host.state(0));
+  bool saw11 = false;
+  bool sawOtherSlot = false;
+  for (const FakeI2cOp& op : fixture.bus.ops)
+  {
+    if (op.address == 0x11)
+    {
+      saw11 = true;
+    }
+    if (op.address == 0x10 || op.address == 0x12 || op.address == 0x13)
+    {
+      sawOtherSlot = true;
+    }
+  }
+  TEST_ASSERT_TRUE(saw11);
+  TEST_ASSERT_FALSE(sawOtherSlot);
+}
+
+void testUnconfiguredAndRememberedSlotsEnumerateInOrder()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice d0(clock, fixture.mod1);
+  FakeModuleDevice d1(clock, fixture.mod2);
+  d1.assigned = true;
+  d1.assignedAddress = 0x11;
+  fixture.bus.attach(d0);
+  fixture.bus.attach(d1);
+  fixture.host.begin();
+  fixture.sns1.setPresent(true);
+  fixture.sns2.setPresent(true);
+  pumpMs(fixture, 2000);
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(0));
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(1));
+  TEST_ASSERT_EQUAL(0x10, fixture.host.address(0));
+  TEST_ASSERT_EQUAL(0x11, fixture.host.address(1));
+  bool sawSet = false;
+  bool rememberedBeforeSet = false;
+  int setAddressWrites = 0;
+  for (const FakeI2cOp& op : fixture.bus.ops)
+  {
+    if (op.address == 0x11 && !sawSet)
+    {
+      rememberedBeforeSet = true;
+    }
+    if (op.type == FakeI2cOp::Type::Write)
+    {
+      setAddressWrites++;
+      sawSet = true;
+      TEST_ASSERT_EQUAL(module_protocol::kUnconfiguredAddress, op.address);
+      TEST_ASSERT_TRUE(op.tx.size() >= 3);
+      TEST_ASSERT_EQUAL(0x10, op.tx[2]);
+    }
+  }
+  TEST_ASSERT_EQUAL(1, setAddressWrites);
+  TEST_ASSERT_FALSE(rememberedBeforeSet);
 }
 
 void testCsUntouchedDuringEnumeration()
@@ -701,8 +847,18 @@ void testReplugReenumerates()
   pumpMs(fixture, 60);
   device.resetToUnconfigured();
   fixture.sns1.setPresent(true);
+  const size_t before = fixture.bus.ops.size();
   pumpMs(fixture, 800);
   TEST_ASSERT_EQUAL(SlotState::Online, fixture.host.state(0));
+  bool sawSetAddress = false;
+  for (size_t i = before; i < fixture.bus.ops.size(); ++i)
+  {
+    if (fixture.bus.ops[i].type == FakeI2cOp::Type::Write)
+    {
+      sawSetAddress = true;
+    }
+  }
+  TEST_ASSERT_TRUE(sawSetAddress);
 }
 
 void testAddressReuseAfterUnplug()

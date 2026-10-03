@@ -253,6 +253,10 @@ SlotI2cProposal SlotController::proposedI2c() const
       proposal.op = SlotI2cOp::PingUnconfigured;
       proposal.i2cAddress = module_protocol::kUnconfiguredAddress;
       break;
+    case Phase::ProbeAssigned:
+      proposal.op = SlotI2cOp::PingAssigned;
+      proposal.i2cAddress = targetAddress();
+      break;
     case Phase::SetAddress:
       proposal.op = SlotI2cOp::SetAddress;
       proposal.i2cAddress = module_protocol::kUnconfiguredAddress;
@@ -353,11 +357,38 @@ void SlotController::applyI2cResult(const ModuleStepResult& result)
     return;
   }
 
+  if (_phase == Phase::ProbeAssigned)
+  {
+    if (result.status == SlotFault::None)
+    {
+      _committedAddress = targetAddress();
+      _address = _committedAddress;
+      _releaseMod();
+      _enterStep(Phase::Identify);
+      return;
+    }
+    _noteAttemptFail(result.status);
+    return;
+  }
+
   if (_phase == Phase::ProbeDefault)
   {
     if (result.status == SlotFault::None)
     {
       _enterStep(Phase::SetAddress);
+      return;
+    }
+    if (result.status == SlotFault::Nack)
+    {
+      _fault = result.status;
+      _attempts = static_cast<uint8_t>(_attempts + 1);
+      if (_attempts >= _config.commandRetries)
+      {
+        _enterStep(Phase::ProbeAssigned);
+        return;
+      }
+      _waitingRetry = true;
+      _retryAt = now;
       return;
     }
     _noteAttemptFail(result.status);
@@ -417,7 +448,7 @@ SlotState SlotController::state() const
 /**
  * Reads the latched assigned address.
  *
- * @return 7-bit address, or 0 before VerifyAssigned success.
+ * @return 7-bit address, or 0 before a ping at that address succeeds.
  */
 uint8_t SlotController::address() const
 {
@@ -425,9 +456,10 @@ uint8_t SlotController::address() const
 }
 
 /**
- * Reads the last committed SET_ADDRESS target.
+ * Reads the address this slot is using.
  *
- * @return 7-bit address, or 0 if SET_ADDRESS never succeeded.
+ * @return 7-bit address, or 0 until SET_ADDRESS or a slot-address
+ *         ping succeeds.
  */
 uint8_t SlotController::committedAddress() const
 {
@@ -564,6 +596,7 @@ bool SlotController::_holdsLock(Phase phase)
     case Phase::WaitForLock:
     case Phase::SelectAssert:
     case Phase::ProbeDefault:
+    case Phase::ProbeAssigned:
     case Phase::SetAddress:
     case Phase::VerifyAssigned:
     case Phase::Identify:
@@ -598,6 +631,7 @@ bool SlotController::_stepDue(uint32_t now) const
   switch (_phase)
   {
     case Phase::ProbeDefault:
+    case Phase::ProbeAssigned:
     case Phase::SetAddress:
     case Phase::VerifyAssigned:
     case Phase::Identify:
