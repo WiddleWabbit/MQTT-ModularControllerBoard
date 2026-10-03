@@ -6,9 +6,9 @@ This process is mandatory for new features, bug fixes, refactors, and any modifi
 ## Before writing or modifying any code
 1. Restate the goal and constraints in your own words.
 2. Propose the design:
-   - Key design decisions (interfaces, data structures, state machines, error handling, module boundaries, etc.) and why you chose them.
+   - Key design decisions (module boundaries, each module's interface, data structures, state machines, error handling) and why you chose them.
    - High-level flow (use a short Mermaid or ASCII diagram of the main classes/functions and how they interact).
-   - Impact on existing architecture (which layers/modules are touched, any new interfaces or dependencies).
+   - Impact on existing architecture (which modules are touched, any new seam or dependency). A new abstract interface needs a second adapter. One adapter is not a seam.
 3. List the concrete test cases you will cover (happy path, errors, edge cases, sequences, interactions) and which existing tests already cover parts of it.
 4. Stop and wait for explicit approval of the design + test plan.
 
@@ -24,15 +24,32 @@ Complete a short summary including:
 - Any remaining design debt or follow-up items.
 
 # Architecture
-   - lib/Interfaces/  → pure abstract interfaces
-   - lib/Drivers/     → real ESP32 implementations
-   - lib/Logic/       → business logic & state machines that depend only on interfaces
-   - src/             → application composition and product-specific code
-   - Every significant module has a simple, narrow interface and a deep implementation. Apply this recursively.
-   - Modules are orthogonal: each does one job, has minimal explicit dependencies, and can be understood or replaced independently.
-   - Follow DRY: do not duplicate knowledge or behaviour; factor shared logic into single, well-named places.
-   - main.cpp (and its loop) is the central driver of the system: it calls update methods, reads values, and triggers actions that flow downward (e.g. tell MQTT to publish). It owns the top-level control flow.
-   - As features grow, split files or group related classes under a parent as needed to keep the architecture clear and navigable.
+A module is deep when a small interface hides a lot of behaviour. Depth is that leverage, not the number of lines. The interface includes ordering, errors, and configuration, not only the method names. When a module gets too large, it contains submodules. Those submodules stay inside. They are not a new surface for `main.cpp`.
+
+`src/main.cpp` is the composition root. It constructs the ESP32 adapters, passes timing constants and `kMqttDeviceId`, and calls `begin` / `update`. It does not sequence the steps inside a module. Timing knobs and the default MQTT topic root stay in `main.cpp`. The topic layout must not invent `watering` itself.
+
+The controller is seven modules:
+
+- `Network` — Wi-Fi, NTP, MQTT, persisted config, and inbound fan-out. `update()` runs Wi-Fi, then NTP, then MQTT.
+- `SerialConsole` — USB command lines in `update()`. The periodic snapshot is `updateStatus()`, after the modules have advanced. An immediate `status` command still prints inside `update()`.
+- `ModuleBus` — four-slot enumeration and retained slot status. `update()` runs the host, then the slot publisher.
+- `SensorModule`, `SolenoidModule`, `PumpModule` — one daughter type each. `update()` runs that type's poller, then its bridge. Each registers its MQTT handler in its constructor, so construct them before `Network::begin`.
+- `Programming` — Arduino-as-ISP on slot 1. `begin()` quiesces the bus. While `active()`, `loop()` does not call the console, the bus, or the type modules.
+
+Folders:
+
+- `lib/Interfaces/` — hardware ports only (`IClock`, `IWifi`, `INtpAdapter`, `IMqttClient`, `IPreferenceStore`, `ISerialPort`, `IBytePort`, `IDigitalPin`, `ISpiMaster`, `I2cMaster`, and `ModuleProtocol.h`).
+- `lib/Drivers/` — ESP32 adapters for those ports.
+- `lib/Logic/` — one PlatformIO library. Modules live in `Network`, `Console`, `Bus`, `Sensor`, `Solenoid`, `Pump`, and `Programming`.
+- `src/` — composition. No product logic that belongs inside a module.
+
+A seam exists where two adapters implement one contract. The ESP32 driver and the desktop fake are the usual pair. `INetworkConfigStore` is a seam inside `Network` because `PreferenceNetworkConfigStore` and `FakeNetworkConfigStore` are both real adapters. Do not add an abstract interface so a sibling can be faked. One adapter is a hypothetical seam.
+
+Sibling modules reach another module through a private accessor (`Network::mqtt()`, `ModuleBus::host()`, and the same pattern). Those accessors are not the public interface. `main.cpp` does not call them.
+
+Follow DRY: do not duplicate knowledge or behaviour; factor shared logic into one well-named place. Each module does one job and can be understood on its own.
+
+`platformio.ini` lists `lib_deps = Logic` on both environments. Logic sources live in subfolders. PlatformIO's library finder does not compile those sources unless the library is named. The `-I lib/Logic/...` flags only make the headers visible. Do not remove `lib_deps`.
 
 # Coding Rules
 Follow these rules for every change. All new code must be fully testable on the desktop by design.
@@ -42,14 +59,16 @@ Follow these rules for every change. All new code must be fully testable on the 
    - Use Unity. Tests live under test/test_desktop/.
    - Run tests with: C:\Users\Nathan\.platformio\penv\Scripts\platformio.exe test -e native
 
-2. Full mockability
-   - Every level must be mockable (drivers, managers, network objects, subsystems, or a virtual board).
-   - Dependencies are injected (prefer constructor injection). Provide controllable, observable fakes.
+2. Adapters at real seams
+   - Inject hardware ports and any other contract that has two adapters. Prefer constructor injection.
+   - Provide a controllable, observable fake for each of those ports.
+   - Do not make every class replaceable. Submodules are tested through the module interface, and through the submodule tests that already cover their edges.
 
 3. Test-Driven Development
-   - Write thorough failing tests first, then the minimum code to make them pass.
+   - Name the module and its interface, then write failing tests through that interface with the existing fakes, then implement the minimum.
+   - Keep existing submodule tests. They cover edges the module tests do not replace. Do not delete them when a facade is added.
+   - Add a new abstract interface only when a second adapter is required.
    - Cover happy paths, errors, edge cases, sequences, and interactions.
-   - Feature order: interface(s) → tests with fakes → real implementation.
 
 4. Naming & code style
    - Variables & functions: camelCase. Private members: leading underscore (_privateVar).
@@ -60,7 +79,8 @@ Follow these rules for every change. All new code must be fully testable on the 
    - Prefer clear descriptive names, keep lines reasonably short, consistent indentation and formatting.
 
 5. Documentation
-   - Maintain docs/ARCHITECTURE.md explaining overall design, Interfaces → Drivers → Logic, deep-module philosophy, orthogonality, and desktop testing.
-   - For every major feature/module (WiFi, NTP, MQTT, etc.) keep a short docs/ file covering purpose, public API, key classes, important states/sequences, configuration, and how it is tested with fakes.
-   - Document each hardware interface (meaning of methods, success/failure behaviour, what fakes must support).
+   - Maintain docs/ARCHITECTURE.md: the seven modules, their interfaces, seams, how `main.cpp` composes them, and desktop testing.
+   - For every major module keep a short docs/ file covering purpose, public API, key classes, important states/sequences, configuration, and how it is tested with fakes.
+   - Document each hardware port (meaning of methods, success/failure behaviour, what fakes must support) in docs/INTERFACES.md.
+   - `INetworkConfigStore` is documented with Network. It is not a hardware port.
    - Documentation is high-level and practical (what & why). Update it in the same change when behaviour changes.

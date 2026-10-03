@@ -335,7 +335,7 @@ bool PumpPoller::_serviceUnknown()
   }
   SlotRuntime& runtime = _runtime[slot];
   const PumpStateResult reading =
-      _moduleHost.queryPumpState(static_cast<uint8_t>(slot));
+      queryPumpState(_moduleHost, static_cast<uint8_t>(slot));
   if (reading.status == PumpQueryStatus::Ok)
   {
     _rememberState(static_cast<uint8_t>(slot), reading.state, true);
@@ -369,7 +369,7 @@ bool PumpPoller::_serviceReset()
     {
       continue;
     }
-    const PumpStateResult reset = _moduleHost.resetPump(slot);
+    const PumpStateResult reset = resetPump(_moduleHost, slot);
     if (reset.status == PumpQueryStatus::Ok)
     {
       _rememberState(slot, reset.state, true);
@@ -416,7 +416,7 @@ bool PumpPoller::_serviceApply()
       continue;
     }
 
-    const PumpStateResult written = _moduleHost.setPump(slot, intent.desiredOn);
+    const PumpStateResult written = setPump(_moduleHost, slot, intent.desiredOn);
     if (written.status == PumpQueryStatus::Ok)
     {
       _rememberState(slot, written.state, false);
@@ -554,7 +554,7 @@ bool PumpPoller::_servicePeriodic()
   }
   SlotRuntime& runtime = _runtime[slot];
   const PumpStateResult reading =
-      _moduleHost.queryPumpState(static_cast<uint8_t>(slot));
+      queryPumpState(_moduleHost, static_cast<uint8_t>(slot));
   if (reading.status == PumpQueryStatus::Ok)
   {
     _rememberState(static_cast<uint8_t>(slot), reading.state, true);

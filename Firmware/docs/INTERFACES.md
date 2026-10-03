@@ -1,8 +1,8 @@
 # Hardware interfaces
 
-The networking logic depends only on the abstract contracts in
-`lib/Interfaces/`. Drivers implement these contracts for ESP32/Arduino, while
-desktop tests use controllable fakes.
+Hardware ports live in `lib/Interfaces/`. Drivers implement them for
+ESP32/Arduino. Desktop tests use controllable fakes. A port is a seam
+because both adapters exist. Logic-to-logic interfaces are not added here.
 
 ## `IClock`
 
@@ -58,6 +58,12 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 `PubSubClient`.
 
 ## `INetworkConfigStore`
+
+This contract is not a hardware port and does not live in `lib/Interfaces/`.
+It is an internal port of `Network`, in `lib/Logic/Network/`.
+`PreferenceNetworkConfigStore` adapts `IPreferenceStore` for the product.
+`FakeNetworkConfigStore` is the other adapter, used by the configuration
+tests. Both adapters are why the contract exists.
 
 - `load()` overlays stored fields onto the defaults already in the destination.
   Missing keys keep those defaults. A missing client id is stored. A missing

@@ -12,25 +12,17 @@ Framing, CRC, addressing, and the commands every module must answer are in
 
 ## Roles
 
-`ModuleHost` is the only I2C caller. `PumpPoller` decides which pump query
-to run. `PumpMqttBridge` turns `{id}/pump` into a desired state or a
-reset, and publishes the pump state. `loop()` calls them after the solenoid
-poller:
-
-```text
-moduleHost.update()
-sensorPoller.update()
-solenoidPoller.update()
-pumpPoller.update()
-sensorMqttBridge.update()
-solenoidMqttBridge.update()
-pumpMqttBridge.update()
-```
+`PumpModule` owns this behaviour. `loop()` calls `pumpModule.update()` after
+the solenoid module. That call runs `PumpPoller`, then `PumpMqttBridge`.
+`ModuleHost`, inside the bus, is the only I2C caller. The poller decides
+which pump query to run. The bridge turns `{id}/pump` into a desired state
+or a reset, and publishes the pump state.
 
 The MQTT callback only records the request. It does not touch I2C. The
 poller issues at most one pump transaction per pass. That transaction is
 separate from the host health ping and from the sensor and solenoid queries,
-so one `loop()` can carry one of each.
+so one `loop()` can carry one of each. The sensor and solenoid bridges
+publish before this poller runs.
 
 Serial status prints the slot line (`Online Pump addr=0x10`). It does not
 print the pump state. That state is the MQTT payload below.

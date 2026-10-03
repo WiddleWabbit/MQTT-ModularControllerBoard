@@ -5,6 +5,7 @@
 #include "IClock.h"
 #include "ModuleHost.h"
 #include "ModuleProtocol.h"
+#include "SolenoidCommands.h"
 
 /**
  * Schedules Solenoid-module commands. Queries the output count when a

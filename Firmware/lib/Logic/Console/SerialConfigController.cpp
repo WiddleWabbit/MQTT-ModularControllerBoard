@@ -4,7 +4,7 @@
 
 SerialConfigController::SerialConfigController(ISerialPort& serial,
                                                NetworkRuntime& runtime,
-                                               ISerialStatusControl& status)
+                                               SerialStatusReporter& status)
   : _serial(serial), _runtime(runtime), _status(status)
 {
   const NetworkConfig& active = _runtime.config();

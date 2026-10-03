@@ -371,8 +371,8 @@ bool SolenoidPoller::_serviceCount()
     return false;
   }
   SlotRuntime& runtime = _runtime[slot];
-  const SolenoidCountResult count = _moduleHost.querySolenoidCount(
-      static_cast<uint8_t>(slot));
+  const SolenoidCountResult count = querySolenoidCount(
+      _moduleHost, static_cast<uint8_t>(slot));
   if (count.status == SolenoidQueryStatus::Ok)
   {
     runtime.countKnown = true;
@@ -443,8 +443,8 @@ bool SolenoidPoller::_serviceApply()
     Output& output = runtime.outputs[intent.index];
     if (!output.known)
     {
-      const SolenoidStateResult reading = _moduleHost.querySolenoidState(
-          slot, intent.index);
+      const SolenoidStateResult reading = querySolenoidState(
+          _moduleHost, slot, intent.index);
       if (reading.status == SolenoidQueryStatus::Ok)
       {
         _rememberState(slot, intent.index, reading.state);
@@ -467,8 +467,8 @@ bool SolenoidPoller::_serviceApply()
       continue;
     }
 
-    const SolenoidStateResult written = _moduleHost.setSolenoid(
-        slot, intent.index, _desiredOn(slot, intent.index));
+    const SolenoidStateResult written = setSolenoid(
+        _moduleHost, slot, intent.index, _desiredOn(slot, intent.index));
     if (written.status == SolenoidQueryStatus::Ok)
     {
       _rememberState(slot, intent.index, written.state);
@@ -641,8 +641,8 @@ bool SolenoidPoller::_servicePeriodic()
     runtime.stepAttempts = 0;
   }
 
-  const SolenoidStateResult reading = _moduleHost.querySolenoidState(
-      static_cast<uint8_t>(slot), runtime.index);
+  const SolenoidStateResult reading = querySolenoidState(
+      _moduleHost, static_cast<uint8_t>(slot), runtime.index);
   if (reading.status == SolenoidQueryStatus::Ok)
   {
     _rememberState(static_cast<uint8_t>(slot), runtime.index, reading.state);

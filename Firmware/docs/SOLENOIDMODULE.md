@@ -12,24 +12,17 @@ Framing, CRC, addressing, and the commands every module must answer are in
 
 ## Roles
 
-`ModuleHost` is the only I2C caller. `SolenoidPoller` decides which solenoid
-query to run. `SolenoidMqttBridge` turns `{id}/solenoids` into a desired
-state and publishes each output. `loop()` calls them after the sensor poller:
-
-```text
-moduleHost.update()
-sensorPoller.update()
-solenoidPoller.update()
-pumpPoller.update()
-sensorMqttBridge.update()
-solenoidMqttBridge.update()
-pumpMqttBridge.update()
-```
+`SolenoidModule` owns this behaviour. `loop()` calls
+`solenoidModule.update()` after the sensor module. That call runs
+`SolenoidPoller`, then `SolenoidMqttBridge`. `ModuleHost`, inside the bus,
+is the only I2C caller. The poller decides which solenoid query to run. The
+bridge turns `{id}/solenoids` into a desired state and publishes each output.
 
 The MQTT callback only records the desired state. It does not touch I2C.
 The poller issues at most one solenoid transaction per pass. That transaction
 is separate from the host health ping and from the sensor query, so one
-`loop()` can carry one of each.
+`loop()` can carry one of each. The sensor bridge publishes before this
+poller runs.
 
 Serial status prints the slot line (`Online Solenoid addr=0x10`). It does
 not print individual outputs.

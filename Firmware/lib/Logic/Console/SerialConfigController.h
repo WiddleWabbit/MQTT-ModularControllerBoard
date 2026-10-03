@@ -4,8 +4,8 @@
 
 #include "INetworkConfigStore.h"
 #include "ISerialPort.h"
-#include "ISerialStatusControl.h"
 #include "NetworkRuntime.h"
+#include "SerialStatusReporter.h"
 
 /**
  * Stages line-oriented network commands. `apply` persists only fields set
@@ -22,7 +22,7 @@ public:
    * @param status Live status reporter controlled after a successful apply.
    */
   SerialConfigController(ISerialPort& serial, NetworkRuntime& runtime,
-                         ISerialStatusControl& status);
+                         SerialStatusReporter& status);
 
   /**
    * Consumes complete lines currently available from the serial port.
@@ -41,7 +41,7 @@ public:
 private:
   ISerialPort& _serial;
   NetworkRuntime& _runtime;
-  ISerialStatusControl& _status;
+  SerialStatusReporter& _status;
   std::string _line;
   bool _programmingRequested = false;
   NetworkConfig _staged{};

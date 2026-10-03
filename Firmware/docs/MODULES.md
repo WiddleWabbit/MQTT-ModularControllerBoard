@@ -103,10 +103,13 @@ Unsupported 0x05.
 
 ## Several modules
 
-The host watches all four slots on every pass. Presence, enumeration,
-identify, and the action that follows are per slot. Two modules plugged in
-at once each run this sequence. They share the I2C bus, so enumeration and
-later bus commands take turns.
+The host watches all four slots on every pass. `loop()` calls
+`ModuleBus::update()`, which runs `ModuleHost::update()` and then publishes
+slot text that changed. Sensor, solenoid, and pump commands run in those
+modules on the same pass. Presence, enumeration, identify, and the action
+that follows are per slot. Two modules plugged in at once each run this
+sequence. They share the I2C bus, so enumeration and later bus commands take
+turns.
 
 ### Scan
 

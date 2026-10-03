@@ -4,6 +4,7 @@
 
 #include "ModuleCodec.h"
 #include "ModuleProtocol.h"
+#include "PumpCommands.h"
 #include "PumpMqttBridge.h"
 #include "PumpPoller.h"
 #include "SensorMqttBridge.h"
@@ -200,20 +201,20 @@ void testHostReadsPumpStateSetAndReset()
   TEST_ASSERT_EQUAL(module_protocol::kTypePumpModule, fixture.host.typeId(0));
   TEST_ASSERT_EQUAL_STRING("Pump", fixture.host.typeName(0));
 
-  const PumpStateResult off = fixture.host.queryPumpState(0);
+  const PumpStateResult off = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, off.status);
   TEST_ASSERT_EQUAL(PumpState::Off, off.state);
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState, lastCommand(fixture));
 
   device.pumpState = module_protocol::kPumpStateOn;
-  const PumpStateResult on = fixture.host.queryPumpState(0);
+  const PumpStateResult on = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpState::On, on.state);
   device.pumpState = module_protocol::kPumpStateFault;
-  const PumpStateResult fault = fixture.host.queryPumpState(0);
+  const PumpStateResult fault = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpState::Fault, fault.state);
 
   device.pumpState = module_protocol::kPumpStateOff;
-  const PumpStateResult turned = fixture.host.setPump(0, true);
+  const PumpStateResult turned = setPump(fixture.host, 0, true);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, turned.status);
   TEST_ASSERT_EQUAL(PumpState::On, turned.state);
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(fixture));
@@ -221,12 +222,12 @@ void testHostReadsPumpStateSetAndReset()
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, device.pumpState);
 
   device.pumpState = module_protocol::kPumpStateFault;
-  const PumpStateResult stillFault = fixture.host.setPump(0, true);
+  const PumpStateResult stillFault = setPump(fixture.host, 0, true);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, stillFault.status);
   TEST_ASSERT_EQUAL(PumpState::Fault, stillFault.state);
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, device.pumpState);
 
-  const PumpStateResult reset = fixture.host.resetPump(0);
+  const PumpStateResult reset = resetPump(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, reset.status);
   TEST_ASSERT_EQUAL(PumpState::Off, reset.state);
   TEST_ASSERT_EQUAL(module_protocol::kCmdResetPump, lastCommand(fixture));
@@ -234,18 +235,18 @@ void testHostReadsPumpStateSetAndReset()
 
   device.pumpState = module_protocol::kPumpStateFault;
   device.pumpResetLeavesFault = true;
-  const PumpStateResult stuck = fixture.host.resetPump(0);
+  const PumpStateResult stuck = resetPump(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpState::Fault, stuck.state);
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, device.pumpState);
 
   device.pumpResetLeavesFault = false;
   device.pumpState = 9;
-  const PumpStateResult bad = fixture.host.queryPumpState(0);
+  const PumpStateResult bad = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, bad.status);
 
   device.pumpState = module_protocol::kPumpStateOff;
   device.forceBusy = true;
-  const PumpStateResult busy = fixture.host.queryPumpState(0);
+  const PumpStateResult busy = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Busy, busy.status);
 }
 
@@ -255,17 +256,17 @@ void testHostRejectsPumpQueryUnlessOnlinePump()
   EmptyModuleHostFixture fixture(clock);
   fixture.host.begin();
   const size_t before = fixture.bus.protocolOpCount();
-  const PumpStateResult absent = fixture.host.queryPumpState(0);
+  const PumpStateResult absent = queryPumpState(fixture.host, 0);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, absent.status);
-  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, fixture.host.setPump(0, true).status);
-  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, fixture.host.resetPump(0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, setPump(fixture.host, 0, true).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, resetPump(fixture.host, 0).status);
   TEST_ASSERT_EQUAL(before, fixture.bus.protocolOpCount());
 
   FakeModuleDevice device(clock, fixture.mod1);
   plugAndPump(fixture, 0, device);
   const size_t echo = fixture.bus.protocolOpCount();
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected,
-                    fixture.host.queryPumpState(0).status);
+                    queryPumpState(fixture.host, 0).status);
   TEST_ASSERT_EQUAL(echo, fixture.bus.protocolOpCount());
 
   device.typeId = module_protocol::kTypeSensorModule;
@@ -274,7 +275,7 @@ void testHostRejectsPumpQueryUnlessOnlinePump()
   TEST_ASSERT_EQUAL(module_protocol::kTypeSensorModule, fixture.host.typeId(0));
   const size_t sensor = fixture.bus.protocolOpCount();
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected,
-                    fixture.host.queryPumpState(0).status);
+                    queryPumpState(fixture.host, 0).status);
   TEST_ASSERT_EQUAL(sensor, fixture.bus.protocolOpCount());
 
   device.typeId = module_protocol::kTypePumpModule;
@@ -284,7 +285,7 @@ void testHostRejectsPumpQueryUnlessOnlinePump()
   TEST_ASSERT_EQUAL(SlotState::Unsupported, fixture.host.state(0));
   const size_t unsupported = fixture.bus.protocolOpCount();
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected,
-                    fixture.host.setPump(0, false).status);
+                    setPump(fixture.host, 0, false).status);
   TEST_ASSERT_EQUAL(unsupported, fixture.bus.protocolOpCount());
 }
 
@@ -297,9 +298,9 @@ void testHostRejectsShortPumpPayload()
   device.shortPumpPayload = true;
   fixture.host.begin();
   plugAndPump(fixture, 0, device);
-  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, fixture.host.queryPumpState(0).status);
-  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, fixture.host.setPump(0, true).status);
-  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, fixture.host.resetPump(0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpState(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, setPump(fixture.host, 0, true).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, resetPump(fixture.host, 0).status);
 }
 
 void testPumpTimingDefaultsAreThreeMinutesAndOneMinute()

@@ -11,20 +11,15 @@ Framing, CRC, addressing, and the commands every module must answer are in
 
 ## Roles
 
-`ModuleHost` is the only I2C caller. `SensorPoller` decides which sensor
-query to run. `SensorMqttBridge` turns the read command into a poller request
-and publishes readings. `loop()` calls them in this order, after MQTT has
-been serviced:
-
-```text
-moduleHost.update()
-sensorPoller.update()
-sensorMqttBridge.update()
-```
+`SensorModule` owns this behaviour. `loop()` calls `sensorModule.update()`
+after `network.update()` and `moduleBus.update()`. That call runs
+`SensorPoller`, then `SensorMqttBridge`. `ModuleHost`, inside the bus, is
+the only I2C caller. The poller decides which sensor query to run. The
+bridge turns the read command into a poller request and publishes readings.
 
 The MQTT callback only enqueues a request. It does not touch I2C. The poller
 issues at most one sensor transaction per pass, and that transaction is
-separate from the single transaction inside `moduleHost.update()`.
+separate from the single transaction inside `moduleBus.update()`.
 
 Serial status prints the slot line (`Online Sensor addr=0x10`). It does not
 print individual inputs.

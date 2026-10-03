@@ -1,5 +1,11 @@
 # Networking services
 
+`Network` is the module `loop()` calls. `Network::update()` advances
+`WifiManager`, then `NtpService`, then `MqttService`. The classes below live
+inside that module. `main.cpp` does not call them. Construction, `begin`,
+`apply`, and the four-handler fan-out are covered with the module in
+`test_deep_modules.cpp`. The state machines below keep their own tests.
+
 ## WiFi
 
 `WifiManager` owns the states `Idle`, `Connecting`, `Connected`, and `Backoff`.
@@ -66,9 +72,9 @@ command, the character rules, and a commissioning example are in
 [CONFIGURATION.md](CONFIGURATION.md).
 
 `ModuleSlotPublisher` reads `ModuleHost` public snapshots and publishes one
-retained message per slot when that text changes. `loop()` calls `update()`
-after `moduleHost.update()`. The host does not depend on MQTT, and the
-publisher does not call `ping()` or `echo()`. Topics are `{id}/slot/1`
+retained message per slot when that text changes. `ModuleBus::update()`
+calls it after `ModuleHost::update()`. The host does not depend on MQTT, and
+the publisher does not call `ping()` or `echo()`. Topics are `{id}/slot/1`
 through `{id}/slot/4` (firmware index 0 is topic 1). Payloads use the
 same words as the serial slot line, without the `Slot N:` prefix:
 
@@ -93,7 +99,7 @@ MQTT. The first query after identify, including after the module restarts and
 is identified again, is the input count. Presence and a raw int32 reading for
 every input then run immediately, and again every `kSensorPollIntervalMs`
 (60 seconds, set in `src/main.cpp`). One sensor query runs per
-`SensorPoller::update()`, after `moduleHost.update()`.
+`SensorModule::update()`, after `moduleBus.update()`.
 
 `SensorMqttBridge` publishes a retained reading at `{id}/slot/N/sensor/M`
 (module slot and sensor number are both 1-based) each time a poll or an
@@ -113,7 +119,7 @@ topics. Command parsing, poll order, and the publish rules are in
 The first query after identify, including after the module restarts and is
 identified again, is the output count. Each output's state (`on`, `off`, or
 `disconnected`) is then read immediately, and again every 60 seconds. One
-solenoid query runs per `SolenoidPoller::update()`, after the sensor poller.
+solenoid query runs per `SolenoidModule::update()`, after the sensor module.
 `SolenoidMqttBridge` publishes a retained state at
 `{id}/slot/N/solenoid/M` each time a read or a set stores a state.
 `{id}/solenoids` with payload `N on off ...` is the desired state of
@@ -132,8 +138,8 @@ parsing, which outputs are skipped, and the cutoff are in
 `PumpPoller` reads an online Pump module (`0x0300`) the same way. The first
 query after identify, including after the module restarts and is identified
 again, is the pump state (`on`, `off`, or `fault`). That state is read again
-every 60 seconds. One pump query runs per `PumpPoller::update()`, after the
-solenoid poller. `PumpMqttBridge` publishes a retained state at
+every 60 seconds. One pump query runs per `PumpModule::update()`, after the
+solenoid module. `PumpMqttBridge` publishes a retained state at
 `{id}/slot/N/pump` each time a read, set, or reset stores a state.
 `{id}/pump` with payload `N on` or `N off` is the desired state.
 `N reset` resets the pump and does not, by itself, turn it on. The callback

@@ -6,7 +6,6 @@
 
 #include "IClock.h"
 #include "ISerialPort.h"
-#include "ISerialStatusControl.h"
 #include "ModuleHost.h"
 #include "MqttService.h"
 #include "NtpService.h"
@@ -21,7 +20,7 @@ struct SerialStatusReporterConfig
  * Writes USB-gated WiFi, NTP, MQTT, and slot status snapshots on a
  * configured interval for the current power-on session.
  */
-class SerialStatusReporter : public ISerialStatusControl
+class SerialStatusReporter
 {
 public:
   /**
@@ -71,14 +70,14 @@ public:
    * @param enabled True to print on the snapshot interval.
    * @return Nothing.
    */
-  void setReportingEnabled(bool enabled) override;
+  void setReportingEnabled(bool enabled);
 
   /**
    * Reports whether periodic snapshots are enabled.
    *
    * @return True when periodic snapshots are enabled.
    */
-  bool reportingEnabled() const override;
+  bool reportingEnabled() const;
 
   /**
    * Writes one WiFi, NTP, MQTT, and slot snapshot immediately.
@@ -88,7 +87,7 @@ public:
    *
    * @return Nothing.
    */
-  void printStatus() override;
+  void printStatus();
 
   /**
    * Returns the active snapshot configuration.

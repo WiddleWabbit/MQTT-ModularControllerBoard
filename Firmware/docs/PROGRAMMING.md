@@ -59,15 +59,16 @@ on this USB port; the port is the ESP32 USB serial link.
 ## Session
 
 `program` prints those two lines, stores an RTC marker, and gives the USB
-byte stream to STK500. The session stops the module host, the sensor,
-solenoid, and pump pollers, slot publishing, and the USB status and heap
-lines. Wi-Fi, NTP, and MQTT keep running. Desired-state messages can still
-arrive, and they are applied only when the pollers run again after the
-session.
+byte stream to STK500. `Programming::begin` quiesces the module bus. While
+the session is active, `loop()` updates Wi-Fi, NTP, and MQTT, then the
+programmer, and returns. It does not read the console, publish slot status,
+update the sensor, solenoid, or pump modules, or print the heap lines.
+Desired-state messages can still arrive, and they are applied only when
+those modules run again after the session.
 
 Absence timers keep counting during the session. A session longer than
 `kSolenoidCommandTimeoutMs` (15 minutes) or `kPumpCommandTimeoutMs`
-(3 minutes) makes the next poller update turn those outputs off. A shorter
+(3 minutes) makes the next module update turn those outputs off. A shorter
 session leaves outputs as they were.
 
 The session ends 60 seconds after the last STK500 byte, or 60 seconds after

@@ -4,6 +4,7 @@
 
 #include "ModuleCodec.h"
 #include "ModuleProtocol.h"
+#include "SolenoidCommands.h"
 #include "SensorMqttBridge.h"
 #include "SolenoidMqttBridge.h"
 #include "SolenoidPoller.h"
@@ -209,20 +210,20 @@ void testHostReadsSolenoidCountStateAndSet()
   plugAndPump(fixture, 0, device);
   TEST_ASSERT_EQUAL_STRING("Solenoid", fixture.host.typeName(0));
 
-  const SolenoidCountResult count = fixture.host.querySolenoidCount(0);
+  const SolenoidCountResult count = querySolenoidCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Ok, count.status);
   TEST_ASSERT_EQUAL(3, count.count);
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidCount, lastCommand(fixture));
 
-  const SolenoidStateResult off = fixture.host.querySolenoidState(0, 0);
+  const SolenoidStateResult off = querySolenoidState(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Ok, off.status);
   TEST_ASSERT_EQUAL(SolenoidOutputState::Off, off.state);
-  const SolenoidStateResult on = fixture.host.querySolenoidState(0, 1);
+  const SolenoidStateResult on = querySolenoidState(fixture.host, 0, 1);
   TEST_ASSERT_EQUAL(SolenoidOutputState::On, on.state);
-  const SolenoidStateResult open = fixture.host.querySolenoidState(0, 2);
+  const SolenoidStateResult open = querySolenoidState(fixture.host, 0, 2);
   TEST_ASSERT_EQUAL(SolenoidOutputState::Disconnected, open.state);
 
-  const SolenoidStateResult turned = fixture.host.setSolenoid(0, 0, true);
+  const SolenoidStateResult turned = setSolenoid(fixture.host, 0, 0, true);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Ok, turned.status);
   TEST_ASSERT_EQUAL(SolenoidOutputState::On, turned.state);
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(fixture));
@@ -230,18 +231,18 @@ void testHostReadsSolenoidCountStateAndSet()
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(fixture, 3));
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, device.solenoidState[0]);
 
-  const SolenoidStateResult stillOpen = fixture.host.setSolenoid(0, 2, true);
+  const SolenoidStateResult stillOpen = setSolenoid(fixture.host, 0, 2, true);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Ok, stillOpen.status);
   TEST_ASSERT_EQUAL(SolenoidOutputState::Disconnected, stillOpen.state);
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateDisconnected,
                     device.solenoidState[2]);
 
   device.solenoidState[1] = 9;
-  const SolenoidStateResult bad = fixture.host.querySolenoidState(0, 1);
+  const SolenoidStateResult bad = querySolenoidState(fixture.host, 0, 1);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Failed, bad.status);
 
   device.forceBusy = true;
-  const SolenoidStateResult busy = fixture.host.querySolenoidState(0, 0);
+  const SolenoidStateResult busy = querySolenoidState(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Busy, busy.status);
 }
 
@@ -251,16 +252,16 @@ void testHostRejectsSolenoidQueryUnlessOnlineSolenoid()
   EmptyModuleHostFixture fixture(clock);
   fixture.host.begin();
   const size_t before = fixture.bus.protocolOpCount();
-  const SolenoidCountResult absent = fixture.host.querySolenoidCount(0);
+  const SolenoidCountResult absent = querySolenoidCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Rejected, absent.status);
   TEST_ASSERT_EQUAL(before, fixture.bus.protocolOpCount());
 
   FakeModuleDevice device(clock, fixture.mod1);
   plugAndPump(fixture, 0, device);
   const size_t online = fixture.bus.protocolOpCount();
-  const SolenoidStateResult echo = fixture.host.querySolenoidState(0, 0);
+  const SolenoidStateResult echo = querySolenoidState(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Rejected, echo.status);
-  const SolenoidStateResult set = fixture.host.setSolenoid(0, 0, true);
+  const SolenoidStateResult set = setSolenoid(fixture.host, 0, 0, true);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Rejected, set.status);
   TEST_ASSERT_EQUAL(online, fixture.bus.protocolOpCount());
 
@@ -269,11 +270,11 @@ void testHostRejectsSolenoidQueryUnlessOnlineSolenoid()
   pumpMs(fixture, 4000);
   TEST_ASSERT_EQUAL(module_protocol::kTypeSensorModule, fixture.host.typeId(0));
   const size_t sensor = fixture.bus.protocolOpCount();
-  const SolenoidCountResult wrong = fixture.host.querySolenoidCount(0);
+  const SolenoidCountResult wrong = querySolenoidCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Rejected, wrong.status);
   TEST_ASSERT_EQUAL(sensor, fixture.bus.protocolOpCount());
 
-  const SolenoidStateResult outOfRange = fixture.host.querySolenoidState(
+  const SolenoidStateResult outOfRange = querySolenoidState(fixture.host, 
       0, module_protocol::kMaxSolenoidsPerModule);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Rejected, outOfRange.status);
 }
@@ -288,11 +289,11 @@ void testHostRejectsShortSolenoidPayload()
   device.shortSolenoidPayload = true;
   fixture.host.begin();
   plugAndPump(fixture, 0, device);
-  const SolenoidCountResult count = fixture.host.querySolenoidCount(0);
+  const SolenoidCountResult count = querySolenoidCount(fixture.host, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Failed, count.status);
-  const SolenoidStateResult state = fixture.host.querySolenoidState(0, 0);
+  const SolenoidStateResult state = querySolenoidState(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Failed, state.status);
-  const SolenoidStateResult set = fixture.host.setSolenoid(0, 0, false);
+  const SolenoidStateResult set = setSolenoid(fixture.host, 0, 0, false);
   TEST_ASSERT_EQUAL(SolenoidQueryStatus::Failed, set.status);
 }
 

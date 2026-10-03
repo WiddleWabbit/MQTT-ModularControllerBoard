@@ -1,5 +1,7 @@
 #include "SensorPoller.h"
 
+#include "SensorCommands.h"
+
 // ========== Construction ==========
 
 SensorPoller::SensorPoller(ModuleHost& moduleHost, IClock& clock,
@@ -300,8 +302,8 @@ bool SensorPoller::_serviceDemand()
     return true;
   }
 
-  const SensorReadingResult reading = _moduleHost.querySensorReading(
-      demand.moduleSlot, demand.sensorIndex);
+  const SensorReadingResult reading = querySensorReading(
+      _moduleHost, demand.moduleSlot, demand.sensorIndex);
   if (reading.status == SensorQueryStatus::Ok)
   {
     _rememberReading(demand.moduleSlot, demand.sensorIndex, reading.connected,
@@ -395,8 +397,8 @@ bool SensorPoller::_serviceCount()
     return false;
   }
   SlotRuntime& runtime = _runtime[slot];
-  const SensorCountResult count = _moduleHost.querySensorCount(
-      static_cast<uint8_t>(slot));
+  const SensorCountResult count = querySensorCount(
+      _moduleHost, static_cast<uint8_t>(slot));
   if (count.status == SensorQueryStatus::Ok)
   {
     runtime.countKnown = true;
@@ -444,8 +446,8 @@ bool SensorPoller::_servicePeriodic()
   bool succeeded = false;
   if (!runtime.readingStep)
   {
-    const SensorConnectedResult presence = _moduleHost.querySensorConnected(
-        static_cast<uint8_t>(slot), runtime.index);
+    const SensorConnectedResult presence = querySensorConnected(
+        _moduleHost, static_cast<uint8_t>(slot), runtime.index);
     if (presence.status == SensorQueryStatus::Ok)
     {
       _rememberConnected(static_cast<uint8_t>(slot), runtime.index,
@@ -455,8 +457,8 @@ bool SensorPoller::_servicePeriodic()
   }
   else
   {
-    const SensorReadingResult reading = _moduleHost.querySensorReading(
-        static_cast<uint8_t>(slot), runtime.index);
+    const SensorReadingResult reading = querySensorReading(
+        _moduleHost, static_cast<uint8_t>(slot), runtime.index);
     if (reading.status == SensorQueryStatus::Ok)
     {
       _rememberReading(static_cast<uint8_t>(slot), runtime.index,

@@ -5,6 +5,7 @@
 #include "IClock.h"
 #include "ModuleHost.h"
 #include "ModuleProtocol.h"
+#include "PumpCommands.h"
 
 /**
  * Schedules Pump-module commands. Reads the pump state when a module
