@@ -7,6 +7,7 @@
 #include "IClock.h"
 #include "ISerialPort.h"
 #include "ModuleHost.h"
+#include "ModuleProtocol.h"
 #include "MqttService.h"
 #include "NtpService.h"
 #include "WifiManager.h"
@@ -106,7 +107,17 @@ private:
   SerialStatusReporterConfig _config{};
   bool _started = false;
   bool _reportingEnabled = true;
+  bool _nackReported[module_protocol::kSlotCount] = {};
   uint32_t _lastReportAt = 0;
+
+  /**
+   * Writes one "Slot N: Nack" line when a slot is newly in Fault Nack.
+   * The snapshot's own Fault Nack line counts as that report.
+   *
+   * @param snapshotDue True when this call will write the full snapshot.
+   * @return Nothing.
+   */
+  void _reportSlotNack(bool snapshotDue);
 
   /**
    * Writes the WiFi, NTP, MQTT, and slot lines.

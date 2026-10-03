@@ -443,6 +443,88 @@ void testStatusReporterPrintsFault()
                            fixture.serial.output[3].c_str());
 }
 
+void testSlotNackPrintsOnceUntilTheSlotRecovers()
+{
+  StatusFixture fixture;
+  fixture.modules.host.begin();
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  TEST_ASSERT_EQUAL(SlotState::Fault, fixture.modules.host.state(0));
+  fixture.start(60000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(1, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Nack", fixture.serial.output[0].c_str());
+
+  for (uint32_t i = 0; i < 1500; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(1, fixture.serial.output.size());
+
+  fixture.modules.sns1.setPresent(false);
+  for (uint32_t i = 0; i < 80; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(SlotState::Empty, fixture.modules.host.state(0));
+  TEST_ASSERT_EQUAL(1, fixture.serial.output.size());
+
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(2, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Nack", fixture.serial.output[1].c_str());
+}
+
+void testRememberedAddressDoesNotPrintSlotNack()
+{
+  StatusFixture fixture;
+  FakeModuleDevice device(fixture.clock, fixture.modules.mod1);
+  device.assigned = true;
+  device.assignedAddress = 0x10;
+  fixture.modules.host.begin();
+  fixture.modules.bus.attach(device);
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  TEST_ASSERT_EQUAL(SlotState::Online, fixture.modules.host.state(0));
+  fixture.start(60000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(0, fixture.serial.output.size());
+}
+
+void testSlotNackPrintsWhileReportingIsOff()
+{
+  StatusFixture fixture;
+  fixture.modules.host.begin();
+  fixture.modules.sns1.setPresent(true);
+  for (uint32_t i = 0; i < 800; ++i)
+  {
+    fixture.clock.advance(1);
+    fixture.modules.host.update();
+  }
+  fixture.start(60000);
+  fixture.reporter.setReportingEnabled(false);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(1, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Nack", fixture.serial.output[0].c_str());
+}
+
 void testSerialStatusDoesNotCallPingOrEcho()
 {
   StatusFixture fixture;

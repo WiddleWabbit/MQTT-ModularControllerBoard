@@ -138,7 +138,7 @@ The slot address is calculated from the slot index. It is not written to flash. 
 
 The lock stays with that slot until identify finishes and MOD is released. The other module remains `Enumerating` with no address yet. The lock then moves to the next waiting slot. One host transaction runs per `update()`. While the lock owner has an enumeration step due, that step is the transaction. During the 10 ms MOD settle and the 50 ms gap between retries the owner proposes nothing, and one health ping can use the pass. The health ping uses the other slot's assigned address. An unconfigured module under MOD answers at `0x0A`. A module that kept its slot address answers that address.
 
-A seated module that answers neither address is pinged three times at `0x0A` and three times at the slot address, about 50 ms apart, then waits 1 s in `Fault` and repeats from `0x0A`. SENSE can still read present.
+A seated module that answers neither address is pinged three times at `0x0A` and three times at the slot address, about 50 ms apart, then waits 1 s in `Fault` and repeats from `0x0A`. SENSE can still read present. Those NACKs are not printed by the I2C driver. The console prints `Slot N: Nack` once for that fault. See the [serial console reference](serial-console.md).
 
 ### Health
 

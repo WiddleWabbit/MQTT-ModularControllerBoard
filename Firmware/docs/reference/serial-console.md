@@ -71,6 +71,8 @@ Lines that are not a known command are rejected by `SerialConfigController`. The
 
 `printStatus()` writes nothing when USB is unplugged.
 
+A slot in `Fault Nack` prints `Slot N: Nack` once from `updateStatus()`, including while periodic reporting is off. The following snapshot still contains `Slot N: Fault Nack`. The short line is not printed again until the slot has been `Empty`, `Online`, or `Unsupported`. A snapshot that already includes the fault counts as the one report, so the short line is skipped on that pass. USB unplugged prints neither. An I2C NACK is not printed by the driver.
+
 ## Configuration
 
 | Constant in `src/main.cpp` | Value | Role |

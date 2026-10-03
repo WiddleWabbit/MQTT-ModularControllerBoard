@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include <Wire.h>
+#include <esp_err.h>
 
 #include "I2cMaster.h"
 
@@ -67,7 +68,8 @@ public:
   I2cTxnStatus read(uint8_t address, uint8_t* buffer, size_t length) override;
 
   /**
-   * Writes then reads with a repeated start. Skips the read on write NACK.
+   * Writes then reads with a repeated start. A NACK is returned and
+   * is not written to the serial log.
    *
    * @param address 7-bit slave address.
    * @param tx Bytes to write.
@@ -100,4 +102,19 @@ private:
    * @return Transaction status.
    */
   static I2cTxnStatus _mapEndTransmission(uint8_t code);
+
+  /**
+   * Returns the ESP32 I2C port number for this TwoWire instance.
+   *
+   * @return 0 for Wire, 1 for Wire1.
+   */
+  uint8_t _port() const;
+
+  /**
+   * Maps an ESP-IDF I2C result to I2cTxnStatus.
+   *
+   * @param err ESP-IDF result.
+   * @return Transaction status.
+   */
+  static I2cTxnStatus _mapEspErr(esp_err_t err);
 };

@@ -87,13 +87,16 @@ void SerialStatusReporter::reconfigure(const SerialStatusReporterConfig& config)
  */
 void SerialStatusReporter::update()
 {
-  if (!_started || !_reportingEnabled || !_serial.isPlugged())
+  if (!_started)
   {
     return;
   }
 
   const uint32_t now = _clock.millis();
-  if (!_hasElapsed(now, _lastReportAt, _config.intervalMs))
+  const bool snapshotDue = _reportingEnabled && _serial.isPlugged() &&
+                           _hasElapsed(now, _lastReportAt, _config.intervalMs);
+  _reportSlotNack(snapshotDue);
+  if (!snapshotDue)
   {
     return;
   }
@@ -160,6 +163,43 @@ const SerialStatusReporterConfig& SerialStatusReporter::config() const
 
 
 // ========== Private Helpers ==========
+
+/**
+ * Writes one "Slot N: Nack" line when a slot is newly in Fault Nack.
+ * The snapshot's own Fault Nack line counts as that report.
+ *
+ * @param snapshotDue True when this call will write the full snapshot.
+ * @return Nothing.
+ */
+void SerialStatusReporter::_reportSlotNack(bool snapshotDue)
+{
+  for (uint8_t i = 0; i < module_protocol::kSlotCount; ++i)
+  {
+    const bool nackFault = _moduleHost.state(i) == SlotState::Fault &&
+                           _moduleHost.fault(i) == SlotFault::Nack;
+    if (!nackFault)
+    {
+      if (_moduleHost.state(i) != SlotState::Enumerating)
+      {
+        _nackReported[i] = false;
+      }
+      continue;
+    }
+    if (_nackReported[i] || !_serial.isPlugged())
+    {
+      continue;
+    }
+    _nackReported[i] = true;
+    if (snapshotDue)
+    {
+      continue;
+    }
+    char line[32];
+    const uint8_t slotNumber = static_cast<uint8_t>(i + 1);
+    std::snprintf(line, sizeof(line), "Slot %u: Nack", slotNumber);
+    _serial.writeLine(line);
+  }
+}
 
 /**
  * Writes the WiFi, NTP, MQTT, and slot lines.

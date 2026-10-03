@@ -39,6 +39,8 @@ flowchart TD
 
 `updateStatus()` prints the same snapshot when periodic reporting is on, the link is plugged in, and `kSerialStatusIntervalMs` has elapsed. `status` prints even when periodic reporting is off. It does not change the on/off flag. A successful immediate print restarts the wait until the next periodic snapshot.
 
+A slot that reaches `Fault Nack` also prints one line, `Slot N: Nack`, on the next `updateStatus()`. That line is not repeated while the slot keeps failing and retrying. It is printed again after the slot is empty, online, or unsupported and then faults again. The I2C driver does not print its own NACK line.
+
 `program` inside `update()` makes `loop()` store the RTC latch and call `programming.begin()` before the bus runs. The command list is in [Configuration](configuration.md). The session is in [Programming](programming.md).
 
 ## What is stored, and who reads it

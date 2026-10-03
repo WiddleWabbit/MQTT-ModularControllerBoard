@@ -116,8 +116,9 @@ It is inside `Network`. The load and save rules are in the
 ## `I2cMaster`
 
 - `begin()`, `setClockHz()`, and `setTimeoutMs()` configure the bus.
-- `write()` issues STOP. `writeRead()` uses a repeated start; a write-phase
-  NACK/timeout/bus-error returns immediately without the read phase.
+- `write()` issues STOP. `writeRead()` uses a repeated start. A NACK,
+  timeout, or bus error is returned to the caller. The ESP32 driver does
+  not print a NACK. The console reports `Slot N: Nack` once.
 - `recover()` clocks SCL up to nine times, issues STOP, and re-inits. It is
   best-effort; a still-stuck SDA needs the module unplugged.
 - Results are `Ok`, `Nack`, `Timeout`, or `BusError`.

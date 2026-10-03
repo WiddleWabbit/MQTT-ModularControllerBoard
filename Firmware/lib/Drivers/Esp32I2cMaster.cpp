@@ -1,6 +1,7 @@
 #include "Esp32I2cMaster.h"
 
 #include <Arduino.h>
+#include <esp32-hal-i2c.h>
 
 // ========== Construction ==========
 
@@ -80,21 +81,27 @@ I2cTxnStatus Esp32I2cMaster::write(uint8_t address, const uint8_t* data,
 I2cTxnStatus Esp32I2cMaster::read(uint8_t address, uint8_t* buffer,
                                   size_t length)
 {
-  const size_t got = _wire.requestFrom(static_cast<int>(address),
-                                       static_cast<int>(length));
+  if (buffer == nullptr || length == 0)
+  {
+    return I2cTxnStatus::BusError;
+  }
+  size_t got = 0;
+  const esp_err_t err =
+      i2cRead(_port(), address, buffer, length, _timeoutMs, &got);
+  if (err != ESP_OK)
+  {
+    return _mapEspErr(err);
+  }
   if (got != length)
   {
     return I2cTxnStatus::Nack;
-  }
-  for (size_t i = 0; i < length; ++i)
-  {
-    buffer[i] = static_cast<uint8_t>(_wire.read());
   }
   return I2cTxnStatus::Ok;
 }
 
 /**
- * Writes then reads with a repeated start. Skips the read on write NACK.
+ * Writes then reads with a repeated start. A NACK is returned and
+ * is not written to the serial log.
  *
  * @param address 7-bit slave address.
  * @param tx Bytes to write.
@@ -107,18 +114,22 @@ I2cTxnStatus Esp32I2cMaster::writeRead(uint8_t address, const uint8_t* tx,
                                        size_t txLen, uint8_t* rx,
                                        size_t rxLen)
 {
-  _wire.beginTransmission(address);
-  if (txLen > 0 && tx != nullptr)
+  if (rx == nullptr || rxLen == 0 || (txLen > 0 && tx == nullptr))
   {
-    _wire.write(tx, txLen);
+    return I2cTxnStatus::BusError;
   }
-  const I2cTxnStatus writeStatus =
-      _mapEndTransmission(_wire.endTransmission(false));
-  if (writeStatus != I2cTxnStatus::Ok)
+  size_t got = 0;
+  const esp_err_t err = i2cWriteReadNonStop(_port(), address, tx, txLen, rx,
+                                            rxLen, _timeoutMs, &got);
+  if (err != ESP_OK)
   {
-    return writeStatus;
+    return _mapEspErr(err);
   }
-  return read(address, rx, rxLen);
+  if (got != rxLen)
+  {
+    return I2cTxnStatus::Nack;
+  }
+  return I2cTxnStatus::Ok;
 }
 
 /**
@@ -172,6 +183,44 @@ I2cTxnStatus Esp32I2cMaster::_mapEndTransmission(uint8_t code)
     case 3:
       return I2cTxnStatus::Nack;
     case 5:
+      return I2cTxnStatus::Timeout;
+    default:
+      return I2cTxnStatus::BusError;
+  }
+}
+
+/**
+ * Returns the ESP32 I2C port number for this TwoWire instance.
+ *
+ * @return 0 for Wire, 1 for Wire1.
+ */
+uint8_t Esp32I2cMaster::_port() const
+{
+  if (&_wire == &Wire1)
+  {
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * Maps an ESP-IDF I2C result to I2cTxnStatus.
+ *
+ * ESP_FAIL is a NACK. The driver does not print it. The console
+ * reports a slot NACK once that slot reaches Fault.
+ *
+ * @param err ESP-IDF result.
+ * @return Transaction status.
+ */
+I2cTxnStatus Esp32I2cMaster::_mapEspErr(esp_err_t err)
+{
+  switch (err)
+  {
+    case ESP_OK:
+      return I2cTxnStatus::Ok;
+    case ESP_FAIL:
+      return I2cTxnStatus::Nack;
+    case ESP_ERR_TIMEOUT:
       return I2cTxnStatus::Timeout;
     default:
       return I2cTxnStatus::BusError;
