@@ -1,5 +1,7 @@
 # Hardware interfaces
 
+[Home](home.md)
+
 Hardware ports live in `lib/Interfaces/`. Drivers implement them for
 ESP32/Arduino. Desktop tests use controllable fakes. A port is a seam
 because both adapters exist. Logic-to-logic interfaces are not added here.
@@ -60,20 +62,8 @@ Arduino `millis()`, and `PubSubClientAdapter` wraps an existing
 ## `INetworkConfigStore`
 
 This contract is not a hardware port and does not live in `lib/Interfaces/`.
-It is an internal port of `Network`, in `lib/Logic/Network/`.
-`PreferenceNetworkConfigStore` adapts `IPreferenceStore` for the product.
-`FakeNetworkConfigStore` is the other adapter, used by the configuration
-tests. Both adapters are why the contract exists.
-
-- `load()` overlays stored fields onto the defaults already in the destination.
-  Missing keys keep those defaults. A missing client id is stored. A missing
-  `mqtt_prefix` keeps the supplied default and is not written. It returns
-  false when no network key is stored.
-- `save(config, fields)` writes only the selected fields. An empty string is a
-  successful write when the key exists afterwards. Other stored fields stay
-  unchanged.
-- `loadWarning()` returns a boot note from the last load, or an empty string.
-- Fakes must expose load/save results, the field mask, and owned stored values.
+It is inside `Network`. The load and save rules are in the
+[network reference](reference/networking.md).
 
 ## `IPreferenceStore`
 
@@ -135,4 +125,5 @@ tests. Both adapters are why the contract exists.
   simulated modules. They must support stuck-SDA and two-ACK collision.
 
 Module command IDs, frame layout, and CRC-8/SMBus live in copyable
-`lib/Interfaces/ModuleProtocol.h`. See `docs/MODULES.md`.
+`lib/Interfaces/ModuleProtocol.h`. Behaviour a daughter board must follow
+is in [the daughter contract](daughter/contract.md).

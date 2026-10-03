@@ -79,8 +79,12 @@ Follow these rules for every change. All new code must be fully testable on the 
    - Prefer clear descriptive names, keep lines reasonably short, consistent indentation and formatting.
 
 5. Documentation
-   - Maintain docs/ARCHITECTURE.md: the seven modules, their interfaces, seams, how `main.cpp` composes them, and desktop testing.
-   - For every major module keep a short docs/ file covering purpose, public API, key classes, important states/sequences, configuration, and how it is tested with fakes.
-   - Document each hardware port (meaning of methods, success/failure behaviour, what fakes must support) in docs/INTERFACES.md.
-   - `INetworkConfigStore` is documented with Network. It is not a hardware port.
-   - Documentation is high-level and practical (what & why). Update it in the same change when behaviour changes.
+   Doc shape, filenames, and the guide/reference split are in `~/.grok/AGENTS.md`. This project adds:
+   - Guides: `docs/home.md`, `architecture.md`, `module-bus.md`, `sensor-module.md`, `solenoid-module.md`, `pump-module.md`, `networking.md`, `serial-console.md`, `configuration.md`, `programming.md`, `interfaces.md`. Detail for each is `docs/reference/<same name>.md`. Daughter boards are `docs/daughter/`.
+   - `architecture.md` covers the seven modules, their interfaces, seams, how `main.cpp` composes them, and desktop testing.
+   - `interfaces.md` documents each hardware port: method meaning, success and failure, and what a fake must support. `INetworkConfigStore` is on `reference/networking.md`. It is not a hardware port.
+   - A module is one of the seven units `main.cpp` constructs. A class inside a module is a submodule. A daughter module is the board in a slot.
+   - Command bytes live in `lib/Interfaces/ModuleProtocol.h`. If a doc and that header disagree, the header wins.
+   - Keep each fact on one page: daughter wire rules in `daughter/contract.md`; enumeration in `reference/module-bus.md`; sensor, solenoid, and pump behaviour on their reference pages; `set` / `apply` in `reference/configuration.md`; the serial snapshot in `reference/serial-console.md`; the ISP session in `reference/programming.md`.
+   - Name the `main.cpp` timing constants and `kMqttDeviceId` in the docs. The topic layout must not invent `watering`.
+   - A new daughter type adds a guide beside `sensor-module.md`, a page under `reference/`, and links from `home.md` and `reference/index.md`.

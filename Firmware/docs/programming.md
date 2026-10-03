@@ -1,150 +1,49 @@
-# Programming daughter modules
+# Programming
 
-The controller can act as an Arduino-as-ISP programmer for an ATmega328PB
-module. The sensor and solenoid modules have a separate 2×3 ISP header
-(MISO, VCC, SCK, MOSI, RESET, GND). That header is not the slot connector,
-so the module under test sits off the motherboard and is jumpered from an
-empty firmware slot 1.
+[Home](home.md) · Reference: [Programming](reference/programming.md)
 
-`program updi` is reserved for a later programmer. The pump module is an
-ATtiny1614 and is not programmed by this firmware.
+## Summary
 
-## Pins
+`Programming` is an Arduino-as-ISP session for an ATmega328PB on firmware slot 1. `program` or `program isp` quiesces the module bus and hands the USB port to STK500. The pump board is an ATtiny1614 on UPDI. `program updi` replies `ERR program`.
 
-Jumper firmware slot 1 to the module ISP header:
+## Where it sits
 
-| ISP signal | Controller net |
-| --- | --- |
-| MOSI | GPIO11 (MOSI_R on the slot header) |
-| MISO | GPIO13 (MISO_R) |
-| SCK | GPIO12 (SCK_R) |
-| RESET | Slot 1 CS, GPIO6 |
-| VCC | Slot 3.3 V |
-| GND | Slot GND |
+`main.cpp` constructs it with the USB byte port, the SPI master, slot 1 CS, `ModuleBus`, the clock, `kProgrammingIdleTimeoutMs` (60 seconds), and `kProgrammingUnplugTimeoutMs` (1 second). `loop()` calls `network.update()` first. While `active()` is true it calls `programming.update()` and returns, unless the session ended on that pass.
 
-The slot header is the schematic connector, not a silkscreen “slot 1”.
-Physical left-to-right on the board is schematic slot 4 toward slot 1, so
-this plug is the right-hand header. SPI to every slot is the same bus, with
-series resistors on the `_R` nets. Program with the other modules removed.
-The ISP clock is 125 kHz, which is slow enough for those resistors.
+`serialConsole.update()` recognizes `program` and returns before the bus. `loop()` then stores the RTC latch and calls `begin()`.
 
-Power is 3.3 V only. The sensor runs from its internal 8 MHz oscillator, so
-the ISP clock must stay at or below 2 MHz. This firmware always clocks SPI
-at 125 kHz. avrdude’s `-B5` is accepted and does not change that clock.
-
-## Commands
-
-While the USB link is plugged in and no programming session is active:
+## What it creates
 
 ```text
-program
-program isp
+main.cpp
+  Programming
+    ProgrammingSession     silence timer and the seen-then-absent unplug rule
+    IspProgrammer          STK500v1 subset avrdude uses, 125 kHz SPI
 ```
 
-Both reply:
+`begin()` quiesces the bus and holds reset idle-high. While the session is active the console, the bus, and the type modules do not run. Wi-Fi, NTP, and MQTT do. Desired solenoid and pump commands wait, and their absence windows keep counting.
 
-```text
-OK programming
-ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND
+## One update
+
+```mermaid
+flowchart TD
+  cmd["program or program isp"] --> ok["OK programming, pin line, RTC marker"]
+  ok --> begin["Programming.begin() quiesces the bus"]
+  begin --> step["programming.update(): one STK500 step"]
+  step --> done{"60 s of silence, or 1 s absent after the link was seen?"}
+  done -->|no| step
+  done -->|yes| resume["Release SPI, restore CS pull-up, clear the marker, resume the bus"]
 ```
 
-Any other `program ...` line, including `program updi`, replies
-`ERR program` and does not start a session.
+A USB-open restart keeps the marker, so `setup()` enters STK500 without the banner and without `startController()`. The reset button and a power cycle clear it. Pins, the signature, and the reset pulses are in the reference.
 
-The sensor project’s Upload_ISP environment already uses
-`upload_protocol = stk500v1`, `upload_speed = 19200`, and `-B5`. Point
-`upload_port` at this controller’s COM port. The baud rate is not a UART
-on this USB port; the port is the ESP32 USB serial link.
+## What is stored, and who reads it
 
-## Session
+The latch is one word in RTC slow memory (`.rtc_noinit`). `setup()` reads it. `loop()` clears it when the session ends. Ending the session does not reset the chip. If init already ran, the power-on lines are not printed again.
 
-`program` prints those two lines, stores an RTC marker, and gives the USB
-byte stream to STK500. `Programming::begin` quiesces the module bus. While
-the session is active, `loop()` updates Wi-Fi, NTP, and MQTT, then the
-programmer, and returns. It does not read the console, publish slot status,
-update the sensor, solenoid, or pump modules, or print the heap lines.
-Desired-state messages can still arrive, and they are applied only when
-those modules run again after the session.
+## See also
 
-Absence timers keep counting during the session. A session longer than
-`kSolenoidCommandTimeoutMs` (15 minutes) or `kPumpCommandTimeoutMs`
-(3 minutes) makes the next module update turn those outputs off. A shorter
-session leaves outputs as they were.
-
-The session ends 60 seconds after the last STK500 byte, or 60 seconds after
-it started when none arrive (`kProgrammingIdleTimeoutMs` in `src/main.cpp`).
-
-After the USB link has been present in this session, it also ends once that
-link has stayed absent for 1 second (`kProgrammingUnplugTimeoutMs`). A session
-that has not seen the link yet stays up until the silence timer. Closing or
-opening the serial monitor can reset the chip and stop USB frames while the
-port enumerates again. The session and the RTC marker survive that gap. Setup
-on the restarted chip starts STK500 with no banner.
-
-When the session ends, slot 1 CS returns to an input with pull-up, SPI is
-released, the RTC marker is cleared, and the normal loop resumes.
-
-The marker is one word in the `.rtc_noinit` part of RTC slow memory.
-That section is not reloaded from the firmware image, so a USB-open
-reset or a software restart keeps it. The reset button pulls `CHIP_PU`
-low, and a power cycle removes RTC power, so both clear it.
-
-## USB-open restart
-
-avrdude opens the port with DTR/RTS. On this board that is the USB Serial/JTAG
-controller, so the ESP32 may restart, or the ROM download mode may take the
-port. The firmware does not add a second USB stack. If the application
-restarts, setup sees the RTC marker, skips the two-second banner delay, and
-starts STK500 before Wi-Fi, NVS, and the banner. That boot prints nothing.
-The `program` command has already printed `OK programming` before any reset.
-
-If the ROM download mode captures the port, avrdude will not get a sync
-answer. That has to be checked on the board. Desktop tests do not cover it.
-
-## ISP sequence
-
-SPI starts first, mode 0, MSB first, SCK idle low. Reset (slot 1 CS) is then
-driven low. After 20 ms the programmer sends `AC 53 00 00`. Success is the
-third response byte equal to `0x53`. It tries three times. Between tries it
-pulses reset high, then low, and waits 20 ms again. After three failures it
-replies STK500 failed and drives reset high as an output.
-
-A second enter, while already programming, replies OK and does not pulse
-reset. Leave programming ends SPI and drives reset high. The input pull-up
-is restored when the session ends, not on leave. `ModuleHost::begin()`
-configures CS only once, so the session restores the pin itself.
-
-Page writes wait 5 ms. Each EEPROM byte waits 10 ms. Chip erase waits 10 ms,
-including a universal `AC 80 00 00`. The signature is read from the chip
-(an ATmega328PB answers `1E 95 16`). Fuse writes are passed through.
-A wrong clock fuse can stop ISP until a high-voltage programmer is used.
-
-The spoken protocol is the STK500v1 subset avrdude uses: sync, sign-on
-`AVR ISP`, parameters, device setup, programming enable, universal, paged
-flash and EEPROM read/write, signature, and chip erase. Unknown commands
-answer `STK_UNKNOWN` when the next byte is the end marker.
-
-## Later hardware
-
-A later board can add a 2×3 header wired the same way, plus one spare GPIO
-for UPDI. GPIO9, GPIO10, GPIO14, GPIO17, and GPIO18 are free on this MCU and
-are not routed for that. This firmware does not drive them.
-
-## Tests
-
-Native tests in `test/test_desktop/test_isp.cpp` cover the STK500 subset,
-the reset-before-SPI order, the fixed 125 kHz clock, and the session idle
-path. They also cover an unplug before the port has been seen, a sub-second
-unplug that leaves STK500 running, and a full one-second unplug. A second
-`begin()` after that confirmed unplug starts a new seen-port count.
-`test_modules.cpp` covers host quiesce. `test_configuration.cpp`
-covers `program`, `program isp`, and `program updi`. The `.rtc_noinit`
-marker is ESP32-only and is not part of the desktop tests.
-
-```text
-pio test -e native
-```
-
-The first check on the board, after those tests and a `custom-esp32` build,
-is that avrdude syncs after the USB-open restart and a 328PB returns its
-signature. This change does not flash the controller.
+- [Programming reference](reference/programming.md) — jumper pins, STK500, the unplug rule, tests.
+- [Serial console](serial-console.md)
+- [Module bus](module-bus.md)
+- [Architecture](architecture.md)
