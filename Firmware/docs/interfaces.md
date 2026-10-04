@@ -49,8 +49,9 @@ because both adapters exist. Logic-to-logic interfaces are not added here.
 - `connected()` reports the current broker state.
 - `disconnect()` closes the broker session.
 - `subscribe()` returns whether a topic subscription was accepted.
-- `publish()` returns whether a publication was accepted.
+- `publish()` returns whether a publication was accepted. It takes a retain flag and no QoS. Outbound messages are QoS 0.
 - `loop()` services the underlying MQTT transport.
+- The topics this firmware subscribes to and publishes are in the [MQTT reference](reference/mqtt.md).
 - The fake records all calls, supports result sequences, and can inject
   inbound messages.
 

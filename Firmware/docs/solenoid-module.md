@@ -47,6 +47,7 @@ Serial status prints the slot line only.
 ## See also
 
 - [Solenoid reference](reference/solenoid-module.md) — commands, the cutoff, the inventory, tests.
+- [MQTT reference](reference/mqtt.md) — the solenoid topics, and a payload to publish when testing.
 - [Daughter contract](daughter/contract.md)
 - [Module bus](module-bus.md)
 - [Architecture](architecture.md)

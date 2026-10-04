@@ -48,6 +48,12 @@ The sensor project's Upload_ISP environment uses `upload_protocol = stk500v1`, `
 
 Build the sensor image first, send `program`, wait until status text stops, close the monitor, and upload within 60 seconds.
 
+## MQTT
+
+Programming subscribes to nothing and publishes nothing. The topics the other modules use are in the [MQTT reference](mqtt.md).
+
+While a session is active, `loop()` still runs `network.update()`, so a command that arrives is recorded by the module that owns it. Slot status and sensor, solenoid, and pump results are published when those modules run again after the session.
+
 ## Session
 
 `program` prints those two lines, stores the RTC marker, and gives the USB byte stream to STK500. While the session is active, `loop()` updates Wi-Fi, NTP, and MQTT, then the programmer, and returns. It does not read the console, publish slot status, update the sensor, solenoid, or pump modules, or print the heap lines. Desired-state messages can still arrive. They are applied when those modules run again after the session.

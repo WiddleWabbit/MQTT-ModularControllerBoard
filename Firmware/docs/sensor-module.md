@@ -47,6 +47,7 @@ Serial status prints the slot line (`Online Sensor addr=0x10`). It does not prin
 ## See also
 
 - [Sensor reference](reference/sensor-module.md) — commands, poll order, publish rules, tests.
+- [MQTT reference](reference/mqtt.md) — the sensor topics, and a payload to publish when testing.
 - [Daughter contract](daughter/contract.md)
 - [Module bus](module-bus.md)
 - [Architecture](architecture.md)

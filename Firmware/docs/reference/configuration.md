@@ -79,7 +79,7 @@ watering/sensor/read
 watering/sensor/connected
 ```
 
-`{id}` in the other docs means this segment. After `set mqtt.prefix plant-room` and `apply`, the same tree starts with `plant-room`.
+`{id}` in the other docs means this segment. After `set mqtt.prefix plant-room` and `apply`, the same tree starts with `plant-room`. The payload for each topic, and a line to publish when testing, are in the [MQTT reference](mqtt.md).
 
 Publishers normally stay quiet once the broker has accepted a payload. Changing the prefix bumps the generation counter in `MqttTopicLayout`, forgets those notes, and publishes the current values once:
 

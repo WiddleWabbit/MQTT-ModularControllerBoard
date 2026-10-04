@@ -10,6 +10,8 @@ Source: `lib/Logic/Console/SerialConsole.h`, `SerialConfigController.h`, `Serial
 
 The command grammar is in the [configuration reference](configuration.md). `program` is in the [programming reference](programming.md).
 
+The console subscribes to nothing and publishes nothing. `MQTT Status:` on the snapshot is the client state, printed on USB. The broker topics are in the [MQTT reference](mqtt.md).
+
 ## Classes
 
 `SerialConsole::begin()` starts the reporter at `kSerialStatusIntervalMs` and copies the active `status_report` flag into it. Call it after `Network::begin()`.

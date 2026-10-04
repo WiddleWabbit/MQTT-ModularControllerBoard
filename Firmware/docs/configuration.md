@@ -44,5 +44,6 @@ The layout does not invent `watering`. The hostname, the client id, and the pref
 ## See also
 
 - [Configuration reference](reference/configuration.md) — every key, NVS names, prefix generation.
+- [MQTT reference](reference/mqtt.md) — every topic under that prefix, and a payload to publish when testing.
 - [Serial console](serial-console.md)
 - [Network](networking.md)

@@ -20,7 +20,7 @@ Each of these is a short page: what the module creates, and what one `update()` 
 
 ## When you need a byte, a state, or a test
 
-The [reference index](reference/index.md) is the technical wiki. Each module page there has the commands, the sequences, the errors, and the desktop test that covers them.
+The [reference index](reference/index.md) is the technical wiki. Each module page there has the commands, the sequences, the errors, and the desktop test that covers them. The [MQTT reference](reference/mqtt.md) lists every subscription and publication, with the payload to publish when testing.
 
 ## Building a daughter module
 

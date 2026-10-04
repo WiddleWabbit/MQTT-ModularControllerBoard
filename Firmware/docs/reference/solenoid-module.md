@@ -72,6 +72,8 @@ solenoid 4 off, desired off -> no command
 
 `{id}/solenoids/connected` with payload `N` asks for the connected-output list of slot `N`. The handler records that request. It does not record desired state, and it does not restart the absence window. Extra tokens are ignored.
 
+The reply is retained on `{id}/slot/N/solenoids`. The text is the count, then each connected index, 1-based. An index is listed when that output is `on` or `off`. A `disconnected` output is omitted. Four outputs with 1, 2, and 4 connected is `4 1 2 4`. A count of 0 is `0`. All disconnected is the count alone, such as `4`.
+
 ### Command absence
 
 `{id}/solenoids` is expected about once a minute. If no accepted command arrives for 15 minutes, the controller turns every solenoid output off.
@@ -86,17 +88,17 @@ Each solenoid slot has its own count, states, and poll timer. The poller still r
 
 ## Publication
 
-`{id}` is the device id from [Configuration](../configuration.md). A new id publishes the current output states and the connected-output list once. See the [network reference](networking.md) for the generation counter.
+`{id}` is the device id from [Configuration](../configuration.md). A new id publishes the current output states and the connected-output list once. See the [network reference](networking.md) for the generation counter. A copy-paste publish for each topic is in the [MQTT reference](mqtt.md).
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish | Slot status, such as `Online Solenoid addr=0x10` |
-| `{id}/slot/N/solenoid/M` | publish | `on`, `off`, or `disconnected` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10` |
+| `{id}/slot/N/solenoid/M` | publish, retained, QoS 0 | `on`, `off`, `disconnected`, or `unavailable` |
 | `{id}/solenoids` | subscribe, QoS 1 | `N on off ...` |
 | `{id}/solenoids/connected` | subscribe, QoS 1 | `N` |
-| `{id}/slot/N/solenoids` | publish | count, then connected indexes, such as `4 1 2 4` |
+| `{id}/slot/N/solenoids` | publish, retained, QoS 0 | count, then connected indexes, such as `4 1 2 4` |
 
-`{id}/slot/N` is the slot snapshot. It is not a solenoid state. Outbound publishes use the client default QoS. A rejected publish stays pending.
+`{id}/slot/N` is the slot snapshot. It is not a solenoid state. Outbound publishes are QoS 0. A rejected publish stays pending.
 
 Each stored state is published, including a repeat of the same text, on the bridge pass after it was stored. The next pass, with no new state, does not publish that output again.
 

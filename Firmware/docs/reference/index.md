@@ -18,6 +18,7 @@ These pages are the technical wiki: states, bytes, errors, timing, and the deskt
 ## Network and console
 
 - [Network](networking.md) — Wi-Fi, NTP, MQTT, the generation counter, `INetworkConfigStore`.
+- [MQTT](mqtt.md) — every subscription and publication, the payload text, and a line to publish when testing.
 - [Configuration](configuration.md) — stored fields, `set` / `apply`, topic root.
 - [Serial console](serial-console.md) — the seven-line snapshot and plug gating.
 - [Programming](programming.md) — slot 1 ISP session, STK500, and the RTC latch.

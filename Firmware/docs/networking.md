@@ -54,5 +54,6 @@ The hostname, the MQTT client id, and the topic prefix are three different setti
 ## See also
 
 - [Network reference](reference/networking.md) — states, subscriptions, the generation counter, the config store.
+- [MQTT reference](reference/mqtt.md) — every command, result, and a payload to publish when testing.
 - [Configuration](configuration.md)
 - [Architecture](architecture.md)

@@ -12,7 +12,7 @@ Logic depends on hardware ports in `lib/Interfaces/`. ESP32 adapters live in `li
 
 Global constructors run before `setup()`. The type modules register their MQTT handlers there, so they exist before `Network::begin()`. `startController()` then calls `moduleBus.begin()`, `network.begin()`, and `serialConsole.begin()`. A latched ISP session skips that until the session ends.
 
-`kMqttDeviceId` in `src/main.cpp` is the MQTT topic root used when `mqtt_prefix` is not stored. The layout does not invent that id. `{id}` below means that root. Setting it is described in [configuration.md](configuration.md).
+`kMqttDeviceId` in `src/main.cpp` is the MQTT topic root used when `mqtt_prefix` is not stored. The layout does not invent that id. `{id}` below means that root. Setting it is described in [configuration.md](configuration.md). Every topic, and a payload to publish when testing, is in the [MQTT reference](reference/mqtt.md).
 
 ## What main creates
 

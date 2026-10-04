@@ -46,15 +46,17 @@ The service enters `Connected` only after every configured subscription succeeds
 
 `MqttTopicLayout` builds the five QoS 1 subscriptions. They are not stored in NVS. `set mqtt.prefix` changes the root, and `NetworkRuntime` pushes the new list into `MqttService`.
 
-| Topic | Who handles it |
-| --- | --- |
-| `{id}/solenoids` | Solenoid bridge |
-| `{id}/solenoids/connected` | Solenoid bridge, same handler |
-| `{id}/pump` | Pump bridge |
-| `{id}/sensor/read` | Sensor bridge |
-| `{id}/sensor/connected` | Sensor bridge, same handler |
+| Topic | QoS | Payload | Who handles it |
+| --- | --- | --- | --- |
+| `{id}/solenoids` | 1 | `N on off ...` | Solenoid bridge |
+| `{id}/solenoids/connected` | 1 | `N` | Solenoid bridge, same handler |
+| `{id}/pump` | 1 | `N on`, `N off`, or `N reset` | Pump bridge |
+| `{id}/sensor/read` | 1 | `N M` | Sensor bridge |
+| `{id}/sensor/connected` | 1 | `N` | Sensor bridge, same handler |
 
-`kSubscriptionCount` is 5, and all five are in use. A new command topic means raising that count. Command payloads are on the type reference pages.
+`kSubscriptionCount` is 5, and all five are in use. A new command topic means raising that count. `Network` publishes no topic of its own. `publish` forwards to `MqttService` and is rejected while disconnected. Outbound publishes are QoS 0.
+
+The payload text, the retain flag, and a line to publish when testing are in the [MQTT reference](mqtt.md). What each command does is on the sensor, solenoid, pump, and module-bus reference pages.
 
 `{id}` is one path segment. `kMqttDeviceId` in `src/main.cpp` supplies it when NVS has no `mqtt_prefix`. That constant is `watering`. The hostname and the MQTT client id stay independent. Two boards on one broker need different client ids as well as different prefixes. The character rules are in the [configuration reference](configuration.md).
 

@@ -90,19 +90,19 @@ The list waits until the count is known and every input's presence is known. The
 
 ## Publication
 
-`{id}` is the device id from [Configuration](../configuration.md). It is `watering` until `set mqtt.prefix` is applied. A new id publishes the current readings once under the new topics. The generation counter that causes that is in the [network reference](networking.md).
+`{id}` is the device id from [Configuration](../configuration.md). It is `watering` until `set mqtt.prefix` is applied. A new id publishes the current readings once under the new topics. The generation counter that causes that is in the [network reference](networking.md). A copy-paste publish for each topic is in the [MQTT reference](mqtt.md).
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish | Slot status, such as `Online Sensor addr=0x10` |
-| `{id}/slot/N/sensor/M` | publish | One sensor input |
-| `{id}/slot/N/sensors` | publish | count, then connected indexes, such as `2 1` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10` |
+| `{id}/slot/N/sensor/M` | publish, QoS 0 | `connected <int32>`, `disconnected`, or `unavailable` |
+| `{id}/slot/N/sensors` | publish, retained, QoS 0 | count, then connected indexes, such as `2 1` |
 | `{id}/sensor/read` | subscribe, QoS 1 | `N M` |
 | `{id}/sensor/connected` | subscribe, QoS 1 | `N` |
 
 `{id}/slot/N` is the slot snapshot from `ModuleSlotPublisher`. It is not a sensor reading.
 
-Outbound publishes use the client default QoS. Publication waits until MQTT is connected. A rejected publish stays pending and is retried on a later bridge pass.
+Outbound publishes are QoS 0. Publication waits until MQTT is connected. A rejected publish stays pending and is retried on a later bridge pass.
 
 Successful readings use these retained payloads:
 

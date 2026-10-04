@@ -86,5 +86,6 @@ Each `SlotController` stores that slot:
 ## See also
 
 - [Module bus reference](reference/module-bus.md) — the phase map, the publisher's retry rule, pins, the lock, faults, and health pings.
+- [MQTT reference](reference/mqtt.md) — the slot topics, and the payload text.
 - [What a daughter module must do](daughter/contract.md)
 - [Architecture](architecture.md)

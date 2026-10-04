@@ -167,14 +167,18 @@ Unplugging slot 2 returns slot 2 to `Empty`. When slot 2 was a sensor, its senso
 
 ### Slot publication
 
-`{id}` is the device id from [configuration.md](../configuration.md). It is `watering` until `set mqtt.prefix` is applied.
+`{id}` is the device id from [configuration.md](../configuration.md). It is `watering` until `set mqtt.prefix` is applied. The full command catalog is the [MQTT reference](mqtt.md). This publisher sends the four slot topics and nothing else.
 
-`ModuleSlotPublisher` sends `{id}/slot/1` through `{id}/slot/4` after the host has applied this pass's result. It reads the snapshot with `writeSlotStatusBody`. The phase and the identity stay on the slot controller. Each `update()`:
+| Topic | Direction | Payload |
+| --- | --- | --- |
+| `{id}/slot/1` through `{id}/slot/4` | publish, retained, QoS 0 | `writeSlotStatusBody`, for example `Empty` or `Online Sensor addr=0x10` |
+
+`ModuleSlotPublisher` sends those topics after the host has applied this pass's result. It reads the snapshot with `writeSlotStatusBody`. The phase and the identity stay on the slot controller. Each `update()`:
 
 1. Reads `MqttTopicLayout::generation()`. A new value clears `_published` and `_publishedOk` and stores the new generation. The current bodies go out once under the new root. Retained messages under the old prefix are left on the broker.
 2. For each slot, calls `writeSlotStatusBody` into an 80-byte buffer (`kSlotStatusBodyBytes`). The body is the serial slot line without the `Slot N:` prefix.
 3. Skips the slot when `_publishedOk` is set and the new body matches `_published`.
-4. Otherwise publishes the body retained on `{slotPrefix}/{N}`, where firmware index 0 is topic 1. QoS is the client default.
+4. Otherwise publishes the body retained on `{slotPrefix}/{N}`, where firmware index 0 is topic 1. QoS is 0.
 5. On success, copies the body into `_published` and sets `_publishedOk`. On failure, leaves the flag clear so the next `update()` retries.
 
 `writeSlotStatusBody` reads `state`, and then the fields that state needs:

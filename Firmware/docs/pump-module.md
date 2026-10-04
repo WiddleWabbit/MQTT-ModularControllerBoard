@@ -47,6 +47,7 @@ Serial status prints the slot line only. The pump state is the MQTT payload.
 ## See also
 
 - [Pump reference](reference/pump-module.md) — commands, reset, the cutoff, tests.
+- [MQTT reference](reference/mqtt.md) — the pump topics, and a payload to publish when testing.
 - [Daughter contract](daughter/contract.md)
 - [Module bus](module-bus.md)
 - [Architecture](architecture.md)

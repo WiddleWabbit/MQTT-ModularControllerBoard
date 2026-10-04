@@ -83,17 +83,17 @@ Each pump slot has its own state and poll timer. The poller still runs one query
 
 ## Publication
 
-`{id}` is the device id from [Configuration](../configuration.md). A new id publishes the current pump state once. See the [network reference](networking.md).
+`{id}` is the device id from [Configuration](../configuration.md). A new id publishes the current pump state once. See the [network reference](networking.md). A copy-paste publish for each topic is in the [MQTT reference](mqtt.md).
 
 Module numbers in MQTT are 1-based.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish | Slot status, such as `Online Pump addr=0x10` |
-| `{id}/slot/N/pump` | publish | `on`, `off`, or `fault` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Pump addr=0x10` |
+| `{id}/slot/N/pump` | publish, retained, QoS 0 | `on`, `off`, `fault`, or `unavailable` |
 | `{id}/pump` | subscribe, QoS 1 | `N on`, `N off`, or `N reset` |
 
-`{id}/slot/N` is the slot snapshot. It is not the pump state. Outbound publishes use the client default QoS. A rejected publish stays pending.
+`{id}/slot/N` is the slot snapshot. It is not the pump state. Outbound publishes are QoS 0. A rejected publish stays pending.
 
 Each stored state is published, including a repeat of the same text, on the bridge pass after it was stored. The next pass does not publish that pump again.
 

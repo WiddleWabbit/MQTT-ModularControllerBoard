@@ -44,6 +44,7 @@ The latch is one word in RTC slow memory (`.rtc_noinit`). `setup()` reads it. `l
 ## See also
 
 - [Programming reference](reference/programming.md) — jumper pins, STK500, the unplug rule, tests.
+- [MQTT reference](reference/mqtt.md) — commands that can still arrive while a session is active.
 - [Serial console](serial-console.md)
 - [Module bus](module-bus.md)
 - [Architecture](architecture.md)
