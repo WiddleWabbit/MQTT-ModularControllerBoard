@@ -18,14 +18,14 @@ Publish a command with retain off. A retained command is delivered again each ti
 
 ## Find a command
 
-| You want | Publish to | Payload | Result arrives on |
-| --- | --- | --- | --- |
-| One sensor reading | `{id}/sensor/read` | `1 2` | `{id}/slot/1/sensor/2` |
-| Which sensor inputs are connected | `{id}/sensor/connected` | `1` | `{id}/slot/1/sensors` |
-| Desired state of every solenoid output | `{id}/solenoids` | `1 on on off off` | `{id}/slot/1/solenoid/1` and the other outputs |
-| Which solenoid outputs are connected | `{id}/solenoids/connected` | `1` | `{id}/slot/1/solenoids` |
-| Pump on, off, or reset | `{id}/pump` | `1 on` | `{id}/slot/1/pump` |
-| Whether a slot has a board, and which type | — | the controller publishes this | `{id}/slot/1` through `{id}/slot/4` |
+| You want                                   | Publish to                 | Payload                       | Result arrives on                              |
+| ------------------------------------------ | -------------------------- | ----------------------------- | ---------------------------------------------- |
+| One sensor reading                         | `{id}/sensor/read`         | `1 2`                         | `{id}/slot/1/sensor/2`                         |
+| Which sensor inputs are connected          | `{id}/sensor/connected`    | `1`                           | `{id}/slot/1/sensors`                          |
+| Desired state of every solenoid output     | `{id}/solenoids`           | `1 on on off off`             | `{id}/slot/1/solenoid/1` and the other outputs |
+| Which solenoid outputs are connected       | `{id}/solenoids/connected` | `1`                           | `{id}/slot/1/solenoids`                        |
+| Pump on, off, or reset                     | `{id}/pump`                | `1 on`                        | `{id}/slot/1/pump`                             |
+| Whether a slot has a board, and which type | —                          | the controller publishes this | `{id}/slot/1` through `{id}/slot/4`            |
 
 Slot numbers in every payload are 1..4. Slot 1 is I2C `0x10`, slot 2 is `0x11`, slot 3 is `0x12`, slot 4 is `0x13`. Sensor and solenoid indexes in topics and in connected-list results are 1-based.
 
