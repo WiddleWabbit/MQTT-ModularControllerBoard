@@ -15,7 +15,7 @@ Each of these is a short page: what the module creates, and what one `update()` 
 4. [Network](networking.md) — Wi-Fi, then NTP, then MQTT.
 5. [Serial console](serial-console.md) — USB lines, then the snapshot.
 6. [Configuration](configuration.md) — `set` stages, `apply` stores, and the three names.
-7. [Programming](programming.md) — slot 1 as Arduino as ISP.
+7. [Programming](programming.md) — ISP or UPDI on one slot.
 8. [Hardware ports](interfaces.md) — the interfaces Logic calls.
 
 ## When you need a byte, a state, or a test

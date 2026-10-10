@@ -10,6 +10,7 @@ void runSensorTests();
 void runSolenoidTests();
 void runPumpTests();
 void runProgrammingTests();
+void runUpdiTests();
 void runDeepModuleTests();
 
 /**
@@ -30,6 +31,7 @@ int main()
   runSolenoidTests();
   runPumpTests();
   runProgrammingTests();
+  runUpdiTests();
   runDeepModuleTests();
   return UNITY_END();
 }

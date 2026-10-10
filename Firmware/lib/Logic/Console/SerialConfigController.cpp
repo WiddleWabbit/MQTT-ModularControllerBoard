@@ -1,11 +1,13 @@
 #include "SerialConfigController.h"
 
 #include <cstdlib>
+#include <string>
 
 SerialConfigController::SerialConfigController(ISerialPort& serial,
                                                NetworkRuntime& runtime,
-                                               SerialStatusReporter& status)
-  : _serial(serial), _runtime(runtime), _status(status)
+                                               SerialStatusReporter& status,
+                                               const ProgrammingPins& pins)
+  : _serial(serial), _runtime(runtime), _status(status), _pins(pins)
 {
   const NetworkConfig& active = _runtime.config();
   _ssid = active.wifiSsid == nullptr ? "" : active.wifiSsid;
@@ -23,13 +25,18 @@ SerialConfigController::SerialConfigController(ISerialPort& serial,
 /**
  * Reports and clears a pending programming request.
  *
- * @return True once after `program` or `program isp`.
+ * @param request Receives the slot and method when one is pending.
+ * @return True once after `program <slot> <method>`.
  */
-bool SerialConfigController::takeProgrammingRequest()
+bool SerialConfigController::takeProgrammingRequest(ProgrammingRequest& request)
 {
-  const bool requested = _programmingRequested;
+  if (!_programmingRequested)
+  {
+    return false;
+  }
+  request = _programmingRequest;
   _programmingRequested = false;
-  return requested;
+  return true;
 }
 
 void SerialConfigController::update()
@@ -66,17 +73,18 @@ void SerialConfigController::_handleLine(const std::string& line)
     return;
   }
 
-  if (line == "program" || line == "program isp")
+  if (line == "program" ||
+      (line.size() >= 8 && line.compare(0, 8, "program ") == 0))
   {
-    _programmingRequested = true;
-    _respond("OK programming");
-    _respond("ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, "
-             "RESET GPIO6, 3V3, GND");
-    return;
-  }
-
-  if (line.size() >= 8 && line.compare(0, 8, "program ") == 0)
-  {
+    ProgrammingRequest request;
+    if (_acceptProgram(line, request))
+    {
+      _programmingRequest = request;
+      _programmingRequested = true;
+      _respond("OK programming");
+      _respond(_pinLine(request).c_str());
+      return;
+    }
     _respond("ERR program");
     return;
   }
@@ -204,6 +212,72 @@ void SerialConfigController::_handleLine(const std::string& line)
 
   _refreshStagedPointers();
   _respond("OK staged");
+}
+
+/**
+ * Parses slot and method. The slot is one digit 1..4. The method is
+ * the exact word isp or updi, and the line ends there.
+ *
+ * @param line Command text.
+ * @param request Receives the slot and method.
+ * @return True when the line matches.
+ */
+bool SerialConfigController::_acceptProgram(const std::string& line,
+                                            ProgrammingRequest& request) const
+{
+  if (line.size() != 13 && line.size() != 14)
+  {
+    return false;
+  }
+  if (line.compare(0, 8, "program ") != 0 || line[9] != ' ')
+  {
+    return false;
+  }
+  const char slotChar = line[8];
+  if (slotChar < '1' || slotChar > '4')
+  {
+    return false;
+  }
+  const std::string method = line.substr(10);
+  if (method == "isp")
+  {
+    request.method = ProgrammingMethod::Isp;
+  }
+  else if (method == "updi")
+  {
+    request.method = ProgrammingMethod::Updi;
+  }
+  else
+  {
+    return false;
+  }
+  request.slot = static_cast<uint8_t>(slotChar - '0');
+  return true;
+}
+
+/**
+ * Names the GPIOs for the accepted session. ISP lists the shared SPI
+ * pins and the slot CS pin as RESET. UPDI lists only that CS pin.
+ *
+ * @param request Slot and method.
+ * @return One pin line.
+ */
+std::string SerialConfigController::_pinLine(const ProgrammingRequest& request) const
+{
+  const unsigned gpio = _pins.csGpio[request.slot - 1];
+  const unsigned slot = request.slot;
+  if (request.method == ProgrammingMethod::Isp)
+  {
+    return "ISP slot " + std::to_string(slot) +
+           ": MOSI GPIO" + std::to_string(static_cast<unsigned>(_pins.mosiGpio)) +
+           ", MISO GPIO" + std::to_string(static_cast<unsigned>(_pins.misoGpio)) +
+           ", SCK GPIO" + std::to_string(static_cast<unsigned>(_pins.sckGpio)) +
+           ", RESET GPIO" + std::to_string(gpio) +
+           ", 3V3, GND";
+  }
+  return "UPDI slot " + std::to_string(slot) +
+         ": UPDI GPIO" + std::to_string(gpio) +
+         ", 3V3, GND";
 }
 
 void SerialConfigController::_respond(const char* response)

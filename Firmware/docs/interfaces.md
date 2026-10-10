@@ -103,6 +103,18 @@ It is inside `Network`. The load and save rules are in the
 - Fakes record the clock, the order `begin()` was called, and every byte,
   and they return a scripted MISO stream.
 
+## `IHalfDuplexUart`
+
+- `attach(gpio, baud)` claims one GPIO as both TX and RX.
+- `detach()` stops the UART and releases the pin.
+- `available()` reports pending bytes. `read()` returns one byte, or -1
+  when none arrives.
+- `write()` sends raw bytes. The caller reads the local TX echo before
+  the next byte. The ESP32 adapter is UART1, 8E2, and does not discard
+  that echo. UART0 stays free because GPIO43 and GPIO44 are module pins.
+- Fakes queue the echo ahead of any scripted target byte, and they record
+  the GPIO, the baud, and every transmitted byte.
+
 ## `IDigitalPin`
 
 - `setMode()` selects `DigitalInput`, `DigitalInputPullup`, `DigitalOutput`,

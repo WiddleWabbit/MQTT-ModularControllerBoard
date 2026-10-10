@@ -8,7 +8,7 @@ Source: `lib/Logic/Console/SerialConsole.h`, `SerialConfigController.h`, `Serial
 
 `update()` reads complete USB lines and dispatches them. `updateStatus()` prints the periodic snapshot after the modules have advanced. `status` calls `printStatus()` inside `update()`, so that snapshot is from before this pass's bus and type modules.
 
-The command grammar is in the [configuration reference](configuration.md). `program` is in the [programming reference](programming.md).
+The command grammar is in the [configuration reference](configuration.md). The programming session is in the [programming reference](programming.md).
 
 The console subscribes to nothing and publishes nothing. `MQTT Status:` on the snapshot is the client state, printed on USB. The broker topics are in the [MQTT reference](mqtt.md).
 

@@ -89,7 +89,7 @@ The controller health-pings about once a second. Your type page says which furth
 
 Wire indexes on those pages are 0-based. MQTT slot and channel numbers are 1-based.
 
-The module protocol does not use SPI. Slot 1 CS can be taken as AVR RESET during programming. See [programming.md](../programming.md). Motherboard GPIO numbers for SENSE, MOD, and CS are in the [module bus reference](../reference/module-bus.md).
+The module protocol does not use SPI. During programming the selected slot's CS pin can be taken as AVR RESET or as the UPDI wire. See [programming.md](../programming.md). Motherboard GPIO numbers for SENSE, MOD, and CS are in the [module bus reference](../reference/module-bus.md).
 
 ## Checklist
 

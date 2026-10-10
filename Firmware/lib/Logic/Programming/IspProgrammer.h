@@ -6,6 +6,7 @@
 #include "IBytePort.h"
 #include "IClock.h"
 #include "IDigitalPin.h"
+#include "IProgrammer.h"
 #include "ISpiMaster.h"
 
 /**
@@ -13,8 +14,9 @@
  * Speaks the Arduino-as-ISP subset avrdude uses: sync, parameters,
  * device setup, programming enable, universal, paged read/write,
  * signature, and chip erase. SPI stays at kSpiClockHz.
+ * start() rebinds the reset pin. The constructor pin is used until then.
  */
-class IspProgrammer
+class IspProgrammer : public IProgrammer
 {
 public:
   static const uint32_t kSpiClockHz = 125000;
@@ -36,25 +38,35 @@ public:
                 IClock& clock);
 
   /**
+   * Binds the reset pin and drives it high. gpio is ignored.
+   * Does not start SPI.
+   *
+   * @param line Reset pin for this session.
+   * @param gpio Unused. Present so ISP and UPDI share one start().
+   * @return Nothing.
+   */
+  void start(IDigitalPin& line, uint8_t gpio) override;
+
+  /**
    * Consumes queued STK500 bytes and continues any timed SPI step.
    *
    * @return Nothing.
    */
-  void update();
+  void update() override;
 
   /**
    * Releases SPI and returns reset to an input with pull-up.
    *
    * @return Nothing.
    */
-  void shutdown();
+  void shutdown() override;
 
   /**
    * Counts bytes accepted from the port. Used to detect idle time.
    *
    * @return Monotonic count of accepted bytes.
    */
-  uint32_t activityCount() const;
+  uint32_t activityCount() const override;
 
 private:
   enum class Phase : uint8_t
@@ -79,7 +91,7 @@ private:
 
   IBytePort& _port;
   ISpiMaster& _spi;
-  IDigitalPin& _reset;
+  IDigitalPin* _reset;
   IClock& _clock;
   Phase _phase = Phase::Command;
   AfterWait _afterWait = AfterWait::None;

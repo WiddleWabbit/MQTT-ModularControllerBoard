@@ -7,12 +7,13 @@
 
 SerialConsole::SerialConsole(ISerialPort& serial, IClock& clock,
                              Network& network, ModuleBus& modules,
-                             uint32_t statusIntervalMs)
+                             uint32_t statusIntervalMs,
+                             const ProgrammingPins& pins)
   : _network(network),
     _statusIntervalMs(statusIntervalMs),
     _reporter(serial, clock, network.wifi(), network.ntp(), network.mqtt(),
               modules.host()),
-    _controller(serial, network.runtime(), _reporter)
+    _controller(serial, network.runtime(), _reporter, pins)
 {
 }
 
@@ -53,9 +54,10 @@ void SerialConsole::updateStatus()
 /**
  * Reports and clears a pending program request.
  *
- * @return True once after program or program isp is accepted.
+ * @param request Receives the slot and method when one is pending.
+ * @return True once after `program <slot> <method>` is accepted.
  */
-bool SerialConsole::takeProgrammingRequest()
+bool SerialConsole::takeProgrammingRequest(ProgrammingRequest& request)
 {
-  return _controller.takeProgrammingRequest();
+  return _controller.takeProgrammingRequest(request);
 }

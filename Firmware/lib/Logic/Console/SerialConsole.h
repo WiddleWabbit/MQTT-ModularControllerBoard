@@ -4,6 +4,7 @@
 
 #include "IClock.h"
 #include "ISerialPort.h"
+#include "ProgrammingTarget.h"
 #include "SerialConfigController.h"
 #include "SerialStatusReporter.h"
 
@@ -27,9 +28,11 @@ public:
    * @param network Active configuration and link state.
    * @param modules Slot snapshots.
    * @param statusIntervalMs Periodic snapshot period. It is not stored.
+   * @param pins GPIO numbers for the programming pin line.
    */
   SerialConsole(ISerialPort& serial, IClock& clock, Network& network,
-                ModuleBus& modules, uint32_t statusIntervalMs);
+                ModuleBus& modules, uint32_t statusIntervalMs,
+                const ProgrammingPins& pins);
 
   /**
    * Starts periodic snapshots from the active status-reporting flag.
@@ -57,9 +60,10 @@ public:
   /**
    * Reports and clears a pending program request.
    *
-   * @return True once after program or program isp is accepted.
+   * @param request Receives the slot and method when one is pending.
+   * @return True once after `program <slot> <method>` is accepted.
    */
-  bool takeProgrammingRequest();
+  bool takeProgrammingRequest(ProgrammingRequest& request);
 
 private:
   Network& _network;

@@ -2,14 +2,10 @@
 
 // ========== Construction ==========
 
-ProgrammingSession::ProgrammingSession(IspProgrammer& programmer,
-                                       ModuleHost& host, IDigitalPin& resetPin,
-                                       IBytePort& port, IClock& clock,
-                                       uint32_t idleTimeoutMs,
+ProgrammingSession::ProgrammingSession(ModuleHost& host, IBytePort& port,
+                                       IClock& clock, uint32_t idleTimeoutMs,
                                        uint32_t unplugTimeoutMs)
-  : _programmer(programmer),
-    _host(host),
-    _reset(resetPin),
+  : _host(host),
     _port(port),
     _clock(clock),
     _idleTimeoutMs(idleTimeoutMs),
@@ -21,23 +17,24 @@ ProgrammingSession::ProgrammingSession(IspProgrammer& programmer,
 // ========== Public API ==========
 
 /**
- * Quiesces the host and drives reset high. No-op when already active.
+ * Quiesces the host. No-op when already active. The pin is left as
+ * start() set it.
  *
+ * @param programmer ISP or UPDI programmer for this session.
  * @return Nothing.
  */
-void ProgrammingSession::begin()
+void ProgrammingSession::begin(IProgrammer& programmer)
 {
   if (_active)
   {
     return;
   }
+  _programmer = &programmer;
   _host.quiesce();
-  _reset.setMode(PinMode::DigitalOutput);
-  _reset.write(true);
   _seenPlugged = false;
   _unplugTiming = false;
   _idleMark = _clock.millis();
-  _lastActivity = _programmer.activityCount();
+  _lastActivity = _programmer->activityCount();
   _active = true;
 }
 
@@ -51,7 +48,7 @@ void ProgrammingSession::begin()
  */
 void ProgrammingSession::update()
 {
-  if (!_active)
+  if (!_active || _programmer == nullptr)
   {
     return;
   }
@@ -76,8 +73,8 @@ void ProgrammingSession::update()
     }
   }
 
-  _programmer.update();
-  const uint32_t activity = _programmer.activityCount();
+  _programmer->update();
+  const uint32_t activity = _programmer->activityCount();
   if (activity != _lastActivity)
   {
     _lastActivity = activity;
@@ -103,13 +100,16 @@ bool ProgrammingSession::active() const
 // ========== Shutdown ==========
 
 /**
- * Restores reset and the module host.
+ * Releases the programmer and resumes the module host.
  *
  * @return Nothing.
  */
 void ProgrammingSession::_finish()
 {
-  _programmer.shutdown();
+  if (_programmer != nullptr)
+  {
+    _programmer->shutdown();
+  }
   _host.resume();
   _active = false;
 }

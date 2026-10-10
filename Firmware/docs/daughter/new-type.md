@@ -29,7 +29,7 @@ An id that is not listed in `kModuleTypes` comes online as `Unsupported`. The ho
 4. Keep wire indexes 0-based. Report at most 16 channels when the command is indexed. Check a frame against [Frames](frames.md) before looking at a logic analyser.
 5. Copy `lib/Interfaces/ModuleProtocol.h` into the daughter project, and add your command bytes there in the controller project in the same change.
 
-Sensor and solenoid boards are an ATmega328PB programmed from slot 1. The pump is an ATtiny1614 on UPDI, which this controller does not program yet. See [programming.md](../programming.md).
+Sensor and solenoid boards are an ATmega328PB and use `program N isp`. The pump is an ATtiny1614 and uses `program N updi`. N is the firmware slot the header is jumpered from. See [programming.md](../programming.md).
 
 ## On the controller
 

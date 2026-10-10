@@ -32,8 +32,25 @@ const char kSignOn[] = "AVR ISP";
 
 IspProgrammer::IspProgrammer(IBytePort& port, ISpiMaster& spi,
                              IDigitalPin& reset, IClock& clock)
-  : _port(port), _spi(spi), _reset(reset), _clock(clock)
+  : _port(port), _spi(spi), _reset(&reset), _clock(clock)
 {
+}
+
+/**
+ * Binds the reset pin and drives it high. The GPIO number is unused
+ * because SPI pins are not per slot. Does not start SPI and does not
+ * drive the pin low.
+ *
+ * @param line Reset pin for this session.
+ * @param gpio Unused.
+ * @return Nothing.
+ */
+void IspProgrammer::start(IDigitalPin& line, uint8_t gpio)
+{
+  (void)gpio;
+  _reset = &line;
+  _reset->setMode(PinMode::DigitalOutput);
+  _reset->write(true);
 }
 
 
@@ -82,7 +99,7 @@ void IspProgrammer::shutdown()
     _spi.end();
     _spiActive = false;
   }
-  _reset.setMode(PinMode::DigitalInputPullup);
+  _reset->setMode(PinMode::DigitalInputPullup);
   _programming = false;
   _waiting = false;
   _afterWait = AfterWait::None;
@@ -355,8 +372,8 @@ void IspProgrammer::_dispatchFixed()
       _spi.end();
       _spiActive = false;
     }
-    _reset.setMode(PinMode::DigitalOutput);
-    _reset.write(true);
+    _reset->setMode(PinMode::DigitalOutput);
+    _reset->write(true);
     _programming = false;
     _replyOk();
     return;
@@ -456,8 +473,8 @@ void IspProgrammer::_beginProgramming()
     _spi.begin(kSpiClockHz);
     _spiActive = true;
   }
-  _reset.setMode(PinMode::DigitalOutput);
-  _reset.write(false);
+  _reset->setMode(PinMode::DigitalOutput);
+  _reset->write(false);
   _enableAttempts = 0;
   _defer(AfterWait::ProgrammingEnable, kResetSettleMs);
 }
@@ -480,13 +497,13 @@ void IspProgrammer::_tryProgrammingEnable()
   _enableAttempts++;
   if (_enableAttempts >= 3)
   {
-    _reset.write(true);
+    _reset->write(true);
     _programming = false;
     _replyFailed();
     return;
   }
-  _reset.write(true);
-  _reset.write(false);
+  _reset->write(true);
+  _reset->write(false);
   _defer(AfterWait::ProgrammingEnable, kResetSettleMs);
 }
 

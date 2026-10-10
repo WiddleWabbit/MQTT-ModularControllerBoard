@@ -5,6 +5,7 @@
 #include "NetworkConfigRecord.h"
 #include "NetworkRuntime.h"
 #include "NtpService.h"
+#include "ProgrammingTarget.h"
 #include "SerialConfigController.h"
 #include "SerialStatusReporter.h"
 #include "fakes/EmptyModuleHostFixture.h"
@@ -18,6 +19,8 @@
 
 namespace
 {
+const ProgrammingPins kProgrammingPins = {11, 13, 12, {6, 7, 15, 16}};
+
 NetworkConfig config()
 {
   return {"old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr,
@@ -61,7 +64,7 @@ struct CommandStack
       runtime(store, wifiManager, mqttService, topics),
       reporter(serial, clock, wifiManager, ntpService, mqttService,
                modules.host),
-      controller(serial, runtime, reporter)
+      controller(serial, runtime, reporter, kProgrammingPins)
   {
     const NetworkConfig defaults = {
       "old", "oldpw", "old-broker", 1883, "controller", nullptr, nullptr,
@@ -108,7 +111,7 @@ void testSerialStagesUntilApplyAndGatesOnPlugState()
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
-  SerialConfigController controller(serial, runtime, reporter);
+  SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("set wifi.ssid new-network\n");
   controller.update();
@@ -169,7 +172,7 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
-  SerialConfigController controller(serial, runtime, reporter);
+  SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("set wifi.ssid applied-network\napply\n");
   controller.update();
@@ -199,7 +202,7 @@ void testApplyWithNoChangesDoesNotSave()
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
-  SerialConfigController controller(serial, runtime, reporter);
+  SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("apply\n");
   controller.update();
@@ -228,7 +231,7 @@ void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid()
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
-  SerialConfigController controller(serial, runtime, reporter);
+  SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
   runtime.begin(config());
   const int disconnectsAfterBegin = client.disconnectCallCount;
   const int wifiBeginsAfterBegin = wifi.beginCallCount;
@@ -285,7 +288,7 @@ void testApplyRetriesDirtyFieldsAfterSaveFailure()
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
                                 modules.host);
-  SerialConfigController controller(serial, runtime, reporter);
+  SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
   runtime.begin(config());
   store.saveResult = false;
 
@@ -762,37 +765,94 @@ void testStoredStatusOffLoadsDisabled()
   TEST_ASSERT_EQUAL(0, serial.output.size());
 }
 
-void testProgramCommandRequestsIsp()
+/**
+ * Feeds one line and checks that it does not arm a session.
+ *
+ * @param line Command text without the newline.
+ * @return Nothing.
+ */
+void assertProgramRejected(const char* line)
 {
   CommandStack stack;
-  stack.serial.feed("program\n");
+  ProgrammingRequest request;
+  stack.serial.feed(line);
+  stack.serial.feed("\n");
   stack.controller.update();
-  TEST_ASSERT_TRUE(stack.controller.takeProgrammingRequest());
-  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest());
-  TEST_ASSERT_EQUAL(2, stack.serial.output.size());
-  TEST_ASSERT_EQUAL_STRING("OK programming", stack.serial.output[0].c_str());
-  TEST_ASSERT_EQUAL_STRING(
-    "ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND",
-    stack.serial.output[1].c_str());
-
-  CommandStack isp;
-  isp.serial.feed("program isp\n");
-  isp.controller.update();
-  TEST_ASSERT_TRUE(isp.controller.takeProgrammingRequest());
-  TEST_ASSERT_EQUAL_STRING("OK programming", isp.serial.output[0].c_str());
-  TEST_ASSERT_EQUAL_STRING(
-    "ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND",
-    isp.serial.output[1].c_str());
-}
-
-void testProgramUpdiIsRejected()
-{
-  CommandStack stack;
-  stack.serial.feed("program updi\n");
-  stack.controller.update();
-  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest());
+  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest(request));
   TEST_ASSERT_EQUAL(1, stack.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("ERR program", stack.serial.output[0].c_str());
+}
+
+void testProgramCommandRequiresSlotAndMethod()
+{
+  assertProgramRejected("program");
+  assertProgramRejected("program isp");
+  assertProgramRejected("program updi");
+  assertProgramRejected("program 1");
+  assertProgramRejected("program 1 isp extra");
+  assertProgramRejected("program 5 isp");
+  assertProgramRejected("program 1 udpi");
+  assertProgramRejected("program 01 isp");
+
+  CommandStack named;
+  named.serial.feed("programmable\n");
+  named.controller.update();
+  ProgrammingRequest ignored;
+  TEST_ASSERT_FALSE(named.controller.takeProgrammingRequest(ignored));
+  TEST_ASSERT_EQUAL_STRING("ERR command", named.serial.output[0].c_str());
+}
+
+void testProgramCommandSelectsSlotAndMethod()
+{
+  CommandStack slot1;
+  slot1.serial.feed("program 1 isp\n");
+  slot1.controller.update();
+  ProgrammingRequest request;
+  TEST_ASSERT_TRUE(slot1.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_FALSE(slot1.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(1, request.slot);
+  TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Isp),
+                    static_cast<int>(request.method));
+  TEST_ASSERT_EQUAL_STRING("OK programming", slot1.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "ISP slot 1: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO6, 3V3, GND",
+    slot1.serial.output[1].c_str());
+
+  CommandStack slot2;
+  slot2.serial.feed("program 2 isp\n");
+  slot2.controller.update();
+  TEST_ASSERT_TRUE(slot2.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(2, request.slot);
+  TEST_ASSERT_EQUAL_STRING(
+    "ISP slot 2: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO7, 3V3, GND",
+    slot2.serial.output[1].c_str());
+
+  CommandStack slot3;
+  slot3.serial.feed("program 3 isp\n");
+  slot3.controller.update();
+  TEST_ASSERT_TRUE(slot3.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(3, request.slot);
+  TEST_ASSERT_EQUAL_STRING(
+    "ISP slot 3: MOSI GPIO11, MISO GPIO13, SCK GPIO12, RESET GPIO15, 3V3, GND",
+    slot3.serial.output[1].c_str());
+
+  CommandStack updi1;
+  updi1.serial.feed("program 1 updi\n");
+  updi1.controller.update();
+  TEST_ASSERT_TRUE(updi1.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(1, request.slot);
+  TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Updi),
+                    static_cast<int>(request.method));
+  TEST_ASSERT_EQUAL_STRING(
+    "UPDI slot 1: UPDI GPIO6, 3V3, GND", updi1.serial.output[1].c_str());
+
+  CommandStack updi4;
+  updi4.serial.feed("program 4 updi\n");
+  updi4.controller.update();
+  TEST_ASSERT_TRUE(updi4.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(4, request.slot);
+  TEST_ASSERT_EQUAL_STRING(
+    "UPDI slot 4: UPDI GPIO16, 3V3, GND", updi4.serial.output[1].c_str());
 }
 
 void testMqttPrefixStagesUntilApplyAndRestartsMqttOnly()
@@ -1063,8 +1123,8 @@ void runConfigurationTests()
   RUN_TEST(testRecordSavesHostnameAndStatusOnly);
   RUN_TEST(testRuntimeRejectsInvalidHostnameWithoutSaving);
   RUN_TEST(testStoredStatusOffLoadsDisabled);
-  RUN_TEST(testProgramCommandRequestsIsp);
-  RUN_TEST(testProgramUpdiIsRejected);
+  RUN_TEST(testProgramCommandRequiresSlotAndMethod);
+  RUN_TEST(testProgramCommandSelectsSlotAndMethod);
   RUN_TEST(testMqttPrefixStagesUntilApplyAndRestartsMqttOnly);
   RUN_TEST(testInvalidMqttPrefixIsRejectedBeforeStaging);
   RUN_TEST(testMqttPrefixApplyFailureKeepsOldPrefix);

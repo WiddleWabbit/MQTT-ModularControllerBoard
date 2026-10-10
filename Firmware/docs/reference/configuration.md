@@ -26,8 +26,8 @@ set mqtt.username user
 set mqtt.password password
 apply
 status
-program
-program isp
+program 1 isp
+program 3 updi
 ```
 
 `set` updates a staging copy only. `apply` writes just the fields set since the previous successful `apply`, then restarts Wi-Fi when a Wi-Fi field changed and MQTT when an MQTT field changed. A later `set wifi.password` leaves the stored SSID, hostname, status flag, prefix, and broker settings untouched. An empty credential or broker field is a valid stored value. `apply` with nothing newly set replies `OK applied` and does not reconnect. Unknown keys and invalid ports are rejected.
@@ -109,7 +109,7 @@ apply
 
 `status` is not a `set` command. It prints one snapshot immediately, including while periodic reporting is off and while a status change is still staged. The snapshot is the seven lines in the [serial console reference](serial-console.md). It does not change the on/off flag. A successful print restarts the wait until the next periodic snapshot.
 
-`program` and `program isp` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the ISP session in [Programming](../programming.md). The console does not read further lines until that session ends. `program updi` and any other `program ...` line reply `ERR program`.
+`program N isp` and `program N updi` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the session in [Programming](../programming.md). N is one digit, 1 through 4. The method word is exactly `isp` or `updi`. The console does not read further lines until that session ends. `program`, `program isp`, `program updi`, `program 1`, `program 1 udpi`, a slot outside 1..4, and any extra token reply `ERR program` and do not start a session. `programmable` is `ERR command`.
 
 ## Tests
 

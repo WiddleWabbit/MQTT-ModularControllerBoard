@@ -10,7 +10,7 @@ Logic depends on hardware ports in `lib/Interfaces/`. ESP32 adapters live in `li
 
 ## Where it sits
 
-Global constructors run before `setup()`. The type modules register their MQTT handlers there, so they exist before `Network::begin()`. `startController()` then calls `moduleBus.begin()`, `network.begin()`, and `serialConsole.begin()`. A latched ISP session skips that until the session ends.
+Global constructors run before `setup()`. The type modules register their MQTT handlers there, so they exist before `Network::begin()`. `startController()` then calls `moduleBus.begin()`, `network.begin()`, and `serialConsole.begin()`. A latched programming session skips that until the session ends.
 
 `kMqttDeviceId` in `src/main.cpp` is the MQTT topic root used when `mqtt_prefix` is not stored. The layout does not invent that id. `{id}` below means that root. Setting it is described in [configuration.md](configuration.md). Every topic, and a payload to publish when testing, is in the [MQTT reference](reference/mqtt.md).
 
@@ -44,9 +44,10 @@ main.cpp
   Programming
     ProgrammingSession
     IspProgrammer
+    UpdiProgrammer
 ```
 
-The ESP32 adapters (clock, Wi-Fi, NTP, MQTT, preferences, I2C, GPIO, USB serial, SPI, and the programming latch) are also constructed in `main.cpp` and passed in. Sibling modules reach inside `Network` or `ModuleBus` through a private accessor. `main.cpp` does not call those accessors. On the bus, each `SlotController` holds one slot. `ModuleHost` calls I2C. `ModuleSlotPublisher` publishes that slot's public snapshot. The handoff is on the [module bus](module-bus.md) page.
+The ESP32 adapters (clock, Wi-Fi, NTP, MQTT, preferences, I2C, GPIO, USB serial, SPI, the half-duplex UART, and the programming latch) are also constructed in `main.cpp` and passed in. Sibling modules reach inside `Network` or `ModuleBus` through a private accessor. `main.cpp` does not call those accessors. On the bus, each `SlotController` holds one slot. `ModuleHost` calls I2C. `ModuleSlotPublisher` publishes that slot's public snapshot. The handoff is on the [module bus](module-bus.md) page.
 
 ## One pass
 
@@ -85,7 +86,7 @@ While a session is active, Wi-Fi, NTP, and MQTT keep running. The console, the b
 | `SensorModule` | `update` | At most one sensor exchange, then publish what it stored | [Sensor](sensor-module.md) |
 | `SolenoidModule` | `update` | At most one solenoid exchange, then publish what it stored | [Solenoid](solenoid-module.md) |
 | `PumpModule` | `update` | At most one pump exchange, then publish what it stored | [Pump](pump-module.md) |
-| `Programming` | `begin`, `update`, `active` | STK500 until idle timeout or a confirmed unplug | [Programming](programming.md) |
+| `Programming` | `begin`, `update`, `active` | ISP or UPDI until idle timeout or a confirmed unplug | [Programming](programming.md) |
 
 Poll intervals and command-absence cutoffs are named constants in `src/main.cpp` and are passed into the type modules. Sensor, solenoid, and pump polls are 60 seconds. A solenoid command absent for 15 minutes turns every output off. A pump on/off command absent for 3 minutes turns the pump off. A pump reset does not refresh that window.
 
@@ -93,7 +94,7 @@ Poll intervals and command-absence cutoffs are named constants in `src/main.cpp`
 
 ## Seams
 
-A seam is a contract with two adapters. Hardware ports (`IClock`, `IWifi`, `INtpAdapter`, `IMqttClient`, `IPreferenceStore`, `ISerialPort`, `IBytePort`, `IDigitalPin`, `ISpiMaster`, `I2cMaster`) have an ESP32 driver and a desktop fake. `INetworkConfigStore` lives in `lib/Logic/Network/` because `PreferenceNetworkConfigStore` and `FakeNetworkConfigStore` are both real adapters. It is not a hardware port. Port behaviour is in [interfaces.md](interfaces.md).
+A seam is a contract with two adapters. Hardware ports (`IClock`, `IWifi`, `INtpAdapter`, `IMqttClient`, `IPreferenceStore`, `ISerialPort`, `IBytePort`, `IDigitalPin`, `ISpiMaster`, `IHalfDuplexUart`, `I2cMaster`) have an ESP32 driver and a desktop fake. `INetworkConfigStore` lives in `lib/Logic/Network/` because `PreferenceNetworkConfigStore` and `FakeNetworkConfigStore` are both real adapters. It is not a hardware port. Port behaviour is in [interfaces.md](interfaces.md).
 
 Do not add an interface so one logic class can be replaced by a fake. `WifiManager`, `NtpService`, `MqttService`, `ModuleHost`, and the pollers stay as classes inside their module. Their existing tests stay, because those tests cover edges the module tests do not replace.
 
@@ -116,6 +117,6 @@ Tests run on the desktop with PlatformIO's `native` environment:
 C:\Users\Nathan\.platformio\penv\Scripts\platformio.exe test -e native
 ```
 
-`test_deep_modules.cpp` drives each module through its public interface: connect and backoff, apply and persistence, empty-broker refusal, slot publish and enumeration, prefix changes, sensor and solenoid and pump commands, absence windows, programming quiesce, and the serial console. The older files keep the inner edges: retry sequences, frame codecs, enumeration faults, poller cycles, and the STK500 command set.
+`test_deep_modules.cpp` drives each module through its public interface: connect and backoff, apply and persistence, empty-broker refusal, slot publish and enumeration, prefix changes, sensor and solenoid and pump commands, absence windows, programming quiesce, and the serial console. The older files keep the inner edges: retry sequences, frame codecs, enumeration faults, poller cycles, and the STK500 and jtag2updi command sets.
 
-The fakes simulate link state, RSSI, time, broker outcomes, subscriptions, publications, inbound messages, persisted settings, USB presence, serial bytes, GPIO levels, and I2C slaves. The RTC programming marker is ESP32-only and is not in these tests. Production builds use `lib/Drivers/`. Test code and fakes are not included.
+The fakes simulate link state, RSSI, time, broker outcomes, subscriptions, publications, inbound messages, persisted settings, USB presence, serial bytes, GPIO levels, SPI, a half-duplex UART, and I2C slaves. The RTC programming record is ESP32-only and is not in these tests. Production builds use `lib/Drivers/`. Test code and fakes are not included.

@@ -5,6 +5,7 @@
 
 #include "Esp32Clock.h"
 #include "Esp32DigitalPin.h"
+#include "Esp32HalfDuplexUart.h"
 #include "Esp32I2cMaster.h"
 #include "Esp32NtpAdapter.h"
 #include "Esp32PreferenceStore.h"
@@ -48,12 +49,13 @@ const uint32_t kSerialStatusIntervalMs = 10UL * 1000UL;
 // Heap and PSRAM lines on the USB serial port.
 const uint32_t kMemoryReportIntervalMs = 30UL * 1000UL;
 
-// No STK500 byte for this long ends the ISP session and resumes the
-// module host. Solenoid and pump absence windows keep counting.
+// No protocol byte for this long ends the programming session and
+// resumes the module host. Solenoid and pump absence windows keep counting.
 const uint32_t kProgrammingIdleTimeoutMs = 60UL * 1000UL;
 
 // After the USB link has been seen, this long with no frames ends the
-// ISP session. A monitor close or open can stop frames for less than this.
+// programming session. A monitor close or open can stop frames for less
+// than this.
 const uint32_t kProgrammingUnplugTimeoutMs = 1000UL;
 
 const NetworkTiming kNetworkTiming = {15000, 1000, 30000, 1000, 30000};
@@ -135,12 +137,17 @@ PumpModule pumpModule(moduleBus, network, systemClock, kPumpPollIntervalMs,
 // ========== Serial console and programming ==========
 
 Esp32SerialPort serialPort(Serial);
+const ProgrammingPins kProgrammingPins = {
+  MOSI_PIN, MISO_PIN, SCK_PIN, {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN}};
 SerialConsole serialConsole(serialPort, systemClock, network, moduleBus,
-                            kSerialStatusIntervalMs);
+                            kSerialStatusIntervalMs, kProgrammingPins);
 Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
+Esp32HalfDuplexUart updiUart;
 Esp32ProgrammingLatch programmingLatch;
-Programming programming(serialPort, ispSpi, cs1, moduleBus, systemClock,
-                        kProgrammingIdleTimeoutMs, kProgrammingUnplugTimeoutMs);
+Programming programming(serialPort, ispSpi, updiUart, cs1, cs2, cs3, cs4,
+                        kProgrammingPins, moduleBus, systemClock,
+                        kProgrammingIdleTimeoutMs,
+                        kProgrammingUnplugTimeoutMs);
 bool startupAttempted = false;
 
 
@@ -201,8 +208,9 @@ void startController()
 
 
 /**
- * Opens USB serial. A latched ISP session starts immediately so an
- * avrdude port-open restart reaches STK500 before the banner delay.
+ * Opens USB serial. A latched programming session starts immediately
+ * so an avrdude port-open restart reaches the programmer before the
+ * banner delay.
  *
  * @return Nothing.
  */
@@ -211,7 +219,10 @@ void setup()
   Serial.begin(115200);
   if (programmingLatch.isSet())
   {
-    programming.begin();
+    const ProgrammingMethod method = programmingLatch.method() == 2
+                                       ? ProgrammingMethod::Updi
+                                       : ProgrammingMethod::Isp;
+    programming.begin(programmingLatch.slot(), method);
     return;
   }
   delay(2000);
@@ -220,8 +231,8 @@ void setup()
 
 
 /**
- * One pass of the controller. Network always runs. While an ISP
- * session is active the USB byte stream belongs to STK500, and the
+ * One pass of the controller. Network always runs. While a programming
+ * session is active the USB byte stream belongs to ISP or UPDI, and the
  * module bus, daughter modules, and status lines wait. Otherwise the
  * console reads commands, the bus takes at most one I2C transaction,
  * and each daughter module takes at most one exchange and publishes
@@ -237,7 +248,7 @@ void loop()
 
   if (programming.active())
   {
-    // STK500 only. No console lines, I2C, modules, or status.
+    // Programming session only. No console lines, I2C, modules, or status.
     programming.update();
     if (programming.active())
     {
@@ -252,11 +263,12 @@ void loop()
 
   // Read complete USB serial lines (set, apply, status, program).
   serialConsole.update();
-  if (serialConsole.takeProgrammingRequest())
+  ProgrammingRequest request;
+  if (serialConsole.takeProgrammingRequest(request))
   {
     // Store the latch before the session so a USB restart re-enters.
-    programmingLatch.set();
-    programming.begin();
+    programmingLatch.set(request.slot, static_cast<uint8_t>(request.method));
+    programming.begin(request.slot, request.method);
     return;
   }
 

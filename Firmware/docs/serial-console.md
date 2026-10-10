@@ -10,7 +10,7 @@ USB plug state gates input and both kinds of print. Heap and PSRAM lines stay in
 
 ## Where it sits
 
-`main.cpp` constructs it with the serial port, the clock, `Network`, `ModuleBus`, and `kSerialStatusIntervalMs` (10 seconds). `startController()` calls `serialConsole.begin()` after `network.begin()`. `loop()` calls `update()` before the bus, and `updateStatus()` after the pump module.
+`main.cpp` constructs it with the serial port, the clock, `Network`, `ModuleBus`, `kSerialStatusIntervalMs` (10 seconds), and `kProgrammingPins`. `startController()` calls `serialConsole.begin()` after `network.begin()`. `loop()` calls `update()` before the bus, and `updateStatus()` after the pump module.
 
 ## What it creates
 
@@ -34,7 +34,7 @@ flowchart TD
   cmd -->|set| stage["Stage one field"]
   cmd -->|apply| save["NetworkRuntime saves the staged fields"]
   cmd -->|status| now["Print one snapshot now"]
-  cmd -->|program| arm["Ask loop to start the ISP session"]
+  cmd -->|program| arm["Ask loop to start the programming session"]
 ```
 
 `updateStatus()` prints the same snapshot when periodic reporting is on, the link is plugged in, and `kSerialStatusIntervalMs` has elapsed. `status` prints even when periodic reporting is off. It does not change the on/off flag. A successful immediate print restarts the wait until the next periodic snapshot.

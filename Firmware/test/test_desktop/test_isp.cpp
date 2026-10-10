@@ -537,9 +537,9 @@ void testProgrammingSessionQuiescesHostUntilIdleTimeout()
   FakeBytePort port;
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
-  ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
-  session.begin();
+  ProgrammingSession session(fixture.host, port, clock, 60000, 1000);
+  programmer.start(fixture.cs1, 6);
+  session.begin(programmer);
   TEST_ASSERT_TRUE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
   TEST_ASSERT_TRUE(fixture.cs1.level);
@@ -587,9 +587,9 @@ void testProgrammingSessionStaysUpWhilePortUnseen()
   port.plugged = false;
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
-  ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
-  session.begin();
+  ProgrammingSession session(fixture.host, port, clock, 60000, 1000);
+  programmer.start(fixture.cs1, 6);
+  session.begin(programmer);
 
   clock.set(59999);
   session.update();
@@ -610,9 +610,9 @@ void testProgrammingSessionSurvivesBriefUnplug()
   FakeBytePort port;
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
-  ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
-  session.begin();
+  ProgrammingSession session(fixture.host, port, clock, 60000, 1000);
+  programmer.start(fixture.cs1, 6);
+  session.begin(programmer);
   session.update();
   TEST_ASSERT_TRUE(session.active());
 
@@ -641,9 +641,9 @@ void testProgrammingSessionEndsWhenUnplugged()
   FakeBytePort port;
   FakeSpiMaster spi;
   IspProgrammer programmer(port, spi, fixture.cs1, clock);
-  ProgrammingSession session(
-    programmer, fixture.host, fixture.cs1, port, clock, 60000, 1000);
-  session.begin();
+  ProgrammingSession session(fixture.host, port, clock, 60000, 1000);
+  programmer.start(fixture.cs1, 6);
+  session.begin(programmer);
   session.update();
   TEST_ASSERT_TRUE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalOutput, fixture.cs1.mode);
@@ -660,7 +660,8 @@ void testProgrammingSessionEndsWhenUnplugged()
   TEST_ASSERT_FALSE(session.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, fixture.cs1.mode);
 
-  session.begin();
+  programmer.start(fixture.cs1, 6);
+  session.begin(programmer);
   clock.advance(1000);
   session.update();
   TEST_ASSERT_TRUE(session.active());

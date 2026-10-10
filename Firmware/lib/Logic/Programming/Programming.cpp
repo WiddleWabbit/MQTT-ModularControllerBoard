@@ -4,30 +4,57 @@
 
 // ========== Construction ==========
 
-Programming::Programming(IBytePort& port, ISpiMaster& spi, IDigitalPin& reset,
+Programming::Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart,
+                         IDigitalPin& cs1, IDigitalPin& cs2, IDigitalPin& cs3,
+                         IDigitalPin& cs4, const ProgrammingPins& pins,
                          ModuleBus& modules, IClock& clock,
                          uint32_t idleTimeoutMs, uint32_t unplugTimeoutMs)
-  : _programmer(port, spi, reset, clock),
-    _session(_programmer, modules.host(), reset, port, clock, idleTimeoutMs,
-             unplugTimeoutMs)
+  : _isp(port, spi, cs1, clock),
+    _updi(port, uart, clock),
+    _session(modules.host(), port, clock, idleTimeoutMs, unplugTimeoutMs),
+    _pins(pins)
 {
+  _cs[0] = &cs1;
+  _cs[1] = &cs2;
+  _cs[2] = &cs3;
+  _cs[3] = &cs4;
 }
 
 
 // ========== Public API ==========
 
 /**
- * Quiesces the bus and drives reset high.
+ * Selects the slot pin and starts ISP or UPDI. A slot outside 1..4
+ * does not quiesce the bus. A second call while active does not
+ * rebind the pin or the UART.
  *
+ * @param slot Firmware slot, 1 through 4.
+ * @param method ISP or UPDI.
  * @return Nothing.
  */
-void Programming::begin()
+void Programming::begin(uint8_t slot, ProgrammingMethod method)
 {
-  _session.begin();
+  if (_session.active() || slot < 1 || slot > 4)
+  {
+    return;
+  }
+  IDigitalPin& line = *_cs[slot - 1];
+  const uint8_t gpio = _pins.csGpio[slot - 1];
+  if (method == ProgrammingMethod::Isp)
+  {
+    _isp.start(line, gpio);
+    _session.begin(_isp);
+    return;
+  }
+  if (method == ProgrammingMethod::Updi)
+  {
+    _updi.start(line, gpio);
+    _session.begin(_updi);
+  }
 }
 
 /**
- * Services STK500 until the session ends.
+ * Services the active programmer until the session ends.
  *
  * @return Nothing.
  */
