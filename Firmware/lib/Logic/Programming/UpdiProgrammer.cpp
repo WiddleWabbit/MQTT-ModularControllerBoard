@@ -79,7 +79,7 @@ const uint8_t kSignOn[29] = {
 
 /**
  * AVR067 CRC-16 used by avrdude and jtag2updi. Init 0xFFFF, reflected
- * polynomial 0xA001. The check value of "123456789" is 0x4B37.
+ * polynomial 0x8408. The check value of "123456789" is 0x6F91.
  *
  * @param data Bytes from the start marker through the last body byte.
  * @param length Number of bytes.
@@ -95,7 +95,7 @@ uint16_t crc16Jtag(const uint8_t* data, size_t length)
     {
       if ((crc & 0x0001) != 0)
       {
-        crc = static_cast<uint16_t>((crc >> 1) ^ 0xA001);
+        crc = static_cast<uint16_t>((crc >> 1) ^ 0x8408);
       }
       else
       {
@@ -278,7 +278,7 @@ void UpdiProgrammer::_acceptByte(uint8_t byte)
 }
 
 /**
- * Checks CRC-16/ARC over the start marker through the body. A mismatch
+ * Checks the AVR067 CRC over the start marker through the body. A mismatch
  * replies failed and leaves the programmer in the session.
  *
  * @return Nothing.

@@ -26,7 +26,7 @@ const uint8_t kSignOn[29] = {
   'J', 'T', 'A', 'G', 'I', 'C', 'E', ' ', 'm', 'k', 'I', 'I', 0};
 
 /**
- * AVR067 CRC-16 over a buffer. Init 0xFFFF, reflected polynomial 0xA001.
+ * AVR067 CRC-16 over a buffer. Init 0xFFFF, reflected polynomial 0x8408.
  *
  * @param data Bytes to cover.
  * @param length Number of bytes.
@@ -42,7 +42,7 @@ uint16_t crc16Jtag(const uint8_t* data, size_t length)
     {
       if ((crc & 0x0001) != 0)
       {
-        crc = static_cast<uint16_t>((crc >> 1) ^ 0xA001);
+        crc = static_cast<uint16_t>((crc >> 1) ^ 0x8408);
       }
       else
       {
@@ -243,7 +243,7 @@ void scriptPageWrite(FakeHalfDuplexUart& uart)
 void testCrc16JtagKnownVector()
 {
   const uint8_t text[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
-  TEST_ASSERT_EQUAL_HEX16(0x4B37, crc16Jtag(text, sizeof(text)));
+  TEST_ASSERT_EQUAL_HEX16(0x6F91, crc16Jtag(text, sizeof(text)));
 }
 
 void testUpdiSignOnReturnsJtagiceBody()

@@ -1398,7 +1398,7 @@ void testProgrammingIspUsesSelectedSlotAndLeavesTheOthers()
 }
 
 /**
- * AVR067 CRC-16 over a buffer. Init 0xFFFF, reflected polynomial 0xA001.
+ * AVR067 CRC-16 over a buffer. Init 0xFFFF, reflected polynomial 0x8408.
  *
  * @param data Bytes to cover.
  * @param length Number of bytes.
@@ -1414,7 +1414,7 @@ uint16_t crc16Jtag(const uint8_t* data, size_t length)
     {
       if ((crc & 0x0001) != 0)
       {
-        crc = static_cast<uint16_t>((crc >> 1) ^ 0xA001);
+        crc = static_cast<uint16_t>((crc >> 1) ^ 0x8408);
       }
       else
       {

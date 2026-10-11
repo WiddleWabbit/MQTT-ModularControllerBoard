@@ -120,7 +120,7 @@ A failed programming enable yields `STK_FAILED` to avrdude with no human-readabl
 
 ## UPDI sequence
 
-The host frame is jtagice mkII: start `0x1B`, a little-endian sequence, a 4-byte little-endian body size, token `0x0E`, the body, and the AVR067 CRC-16 little-endian. That CRC starts at `0xFFFF` and uses reflected polynomial `0xA001`. The check value of `123456789` is `0x4B37`. The CRC covers the start byte through the last body byte. A bad CRC replies `RSP_FAILED` (`0xA0`) with the received sequence, and the session stays active. An unknown command replies `RSP_ILLEGAL_COMMAND` (`0xAA`). A bad token or a body longer than 512 bytes is dropped with no reply.
+The host frame is jtagice mkII: start `0x1B`, a little-endian sequence, a 4-byte little-endian body size, token `0x0E`, the body, and the AVR067 CRC-16 little-endian. That CRC starts at `0xFFFF` and uses reflected polynomial `0x8408`. The check value of `123456789` is `0x6F91`. The CRC covers the start byte through the last body byte. A bad CRC replies `RSP_FAILED` (`0xA0`) with the received sequence, and the session stays active. An unknown command replies `RSP_ILLEGAL_COMMAND` (`0xAA`). A bad token or a body longer than 512 bytes is dropped with no reply.
 
 `SET_DEVICE_DESCRIPTOR` always starts a double break, including when the link is already up. The selected CS pin is driven open-drain low for 25 ms, high for 1 ms, then low for 25 ms. One phase advances per `update()`. After the second low, the pin is released high and UART1 attaches on that GPIO at 115200, 8 data bits, even parity, 2 stop bits. UART0 is not used: GPIO43 and GPIO44 are MOD3 and SENSE3. The programmer then writes UPDI `Control_A` `0x06`.
 
