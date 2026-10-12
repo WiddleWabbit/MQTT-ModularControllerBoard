@@ -305,6 +305,32 @@ void testUpdiDescriptorDoubleBreakThenControlA()
   TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
 }
 
+void testUpdiGroupsInstructionIntoOneWrite()
+{
+  UpdiFixture rig;
+  connect(rig);
+  TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
+  TEST_ASSERT_EQUAL(3, rig.uart.writeSizes[0]);
+  const uint8_t stcs[] = {0x55, 0xC2, 0x06};
+  TEST_ASSERT_EQUAL(3, rig.uart.tx.size());
+  TEST_ASSERT_EQUAL_MEMORY(stcs, rig.uart.tx.data(), 3);
+
+  rig.uart.tx.clear();
+  rig.uart.writeSizes.clear();
+  rig.port.output.clear();
+  scriptEnterFromRun(rig.uart);
+  const uint8_t enter[] = {0x14};
+  rig.send(2, enter, sizeof(enter));
+  TEST_ASSERT_TRUE(rig.uart.writeSizes.size() > 0);
+  TEST_ASSERT_EQUAL(2, rig.uart.writeSizes[0]);
+  const uint8_t ldcs[] = {0x55, 0x8B};
+  TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+}
+
 void testUpdiEnterWhileDisconnectedAlsoBreaks()
 {
   UpdiFixture rig;
@@ -463,6 +489,94 @@ void testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup()
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
 }
 
+/**
+ * Steps a link check through 25 ms low, 1 ms high, and 25 ms low.
+ * The last poll is the one that attaches and reads STATUSA.
+ *
+ * @param rig Fixture whose link check has just started.
+ * @param result Receives the finished measurement.
+ * @return Nothing.
+ */
+void finishLinkCheck(UpdiFixture& rig, UpdiLinkCheck& result)
+{
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+
+  rig.clock.advance(24);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_FALSE(rig.line.level);
+
+  rig.clock.advance(1);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_TRUE(rig.line.level);
+
+  rig.clock.advance(1);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_FALSE(rig.line.level);
+
+  rig.clock.advance(24);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+
+  rig.clock.advance(1);
+  TEST_ASSERT_TRUE(rig.programmer.pollLinkCheck(result));
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
+}
+
+void testUpdiLinkCheckSamplesLevelsThenLoadsStatus()
+{
+  UpdiFixture rig;
+  const uint8_t hostByte = 0x1B;
+  rig.port.feed(&hostByte, 1);
+  rig.programmer.beginLinkCheck(rig.line, 6);
+  rig.programmer.update();
+  TEST_ASSERT_EQUAL(1, rig.port.input.size());
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_FALSE(rig.line.pushPullUsed);
+  rig.uart.reply(0x30);
+
+  UpdiLinkCheck result = {};
+  finishLinkCheck(rig, result);
+  TEST_ASSERT_FALSE(result.drivenHigh);
+  TEST_ASSERT_TRUE(result.releasedHigh);
+  TEST_ASSERT_TRUE(result.replied);
+  TEST_ASSERT_EQUAL_HEX8(0x30, result.status);
+  TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
+  TEST_ASSERT_EQUAL(2, rig.uart.writeSizes[0]);
+  const uint8_t ldcs[] = {0x55, 0x80};
+  TEST_ASSERT_EQUAL(2, rig.uart.tx.size());
+  TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
+  TEST_ASSERT_EQUAL(6, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(115200, rig.uart.baud);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_EQUAL(0, rig.port.output.size());
+  TEST_ASSERT_EQUAL(1, rig.port.input.size());
+}
+
+void testUpdiLinkCheckWithNoStatusByteStillReleasesThePin()
+{
+  UpdiFixture rig;
+  rig.programmer.beginLinkCheck(rig.line, 7);
+  UpdiLinkCheck result = {};
+  finishLinkCheck(rig, result);
+  TEST_ASSERT_FALSE(result.drivenHigh);
+  TEST_ASSERT_TRUE(result.releasedHigh);
+  TEST_ASSERT_FALSE(result.replied);
+  TEST_ASSERT_EQUAL(0, result.status);
+  TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
+  TEST_ASSERT_EQUAL(2, rig.uart.writeSizes[0]);
+  const uint8_t ldcs[] = {0x55, 0x80};
+  TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
+  TEST_ASSERT_EQUAL(7, rig.uart.gpio);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+}
+
 void testUpdiSessionDoesNotUseSpi()
 {
   UpdiFixture rig;
@@ -488,10 +602,13 @@ void runUpdiTests()
   RUN_TEST(testCrc16JtagKnownVector);
   RUN_TEST(testUpdiSignOnReturnsJtagiceBody);
   RUN_TEST(testUpdiDescriptorDoubleBreakThenControlA);
+  RUN_TEST(testUpdiGroupsInstructionIntoOneWrite);
   RUN_TEST(testUpdiEnterWhileDisconnectedAlsoBreaks);
   RUN_TEST(testUpdiReadsSignature);
   RUN_TEST(testUpdiChipEraseAndPageWrite);
   RUN_TEST(testUpdiBadCrcAndUnknownCommandStayInSession);
   RUN_TEST(testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup);
+  RUN_TEST(testUpdiLinkCheckSamplesLevelsThenLoadsStatus);
+  RUN_TEST(testUpdiLinkCheckWithNoStatusByteStillReleasesThePin);
   RUN_TEST(testUpdiSessionDoesNotUseSpi);
 }

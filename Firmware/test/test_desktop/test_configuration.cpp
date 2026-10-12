@@ -855,6 +855,127 @@ void testProgramCommandSelectsSlotAndMethod()
     "UPDI slot 4: UPDI GPIO16, 3V3, GND", updi4.serial.output[1].c_str());
 }
 
+/**
+ * Feeds one line and checks that it does not arm a link check.
+ *
+ * @param line Command text without the newline.
+ * @return Nothing.
+ */
+void assertCheckRejected(const char* line)
+{
+  CommandStack stack;
+  uint8_t slot = 9;
+  stack.serial.feed(line);
+  stack.serial.feed("\n");
+  stack.controller.update();
+  TEST_ASSERT_FALSE(stack.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(9, slot);
+  ProgrammingRequest request;
+  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(1, stack.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("ERR check", stack.serial.output[0].c_str());
+}
+
+void testCheckCommandRequiresOneSlot()
+{
+  assertCheckRejected("check");
+  assertCheckRejected("check 0");
+  assertCheckRejected("check 5");
+  assertCheckRejected("check 01");
+  assertCheckRejected("check 1 extra");
+
+  CommandStack named;
+  named.serial.feed("checkout\n");
+  named.controller.update();
+  uint8_t slot = 9;
+  ProgrammingRequest request;
+  TEST_ASSERT_FALSE(named.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(9, slot);
+  TEST_ASSERT_FALSE(named.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL_STRING("ERR command", named.serial.output[0].c_str());
+}
+
+void testCheckCommandSelectsSlotAndPrintsTheLink()
+{
+  CommandStack slot1;
+  slot1.serial.feed("check 1\n");
+  slot1.controller.update();
+  uint8_t slot = 0;
+  ProgrammingRequest request;
+  TEST_ASSERT_TRUE(slot1.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_FALSE(slot1.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(1, slot);
+  TEST_ASSERT_EQUAL(0, slot1.serial.output.size());
+  TEST_ASSERT_FALSE(slot1.controller.takeProgrammingRequest(request));
+
+  UpdiLinkCheck quiet = {};
+  quiet.drivenHigh = false;
+  quiet.releasedHigh = true;
+  quiet.replied = false;
+  slot1.controller.reportUpdiCheck(quiet);
+  TEST_ASSERT_EQUAL(3, slot1.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("drive low: 0", slot1.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("release: 1", slot1.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: no reply", slot1.serial.output[2].c_str());
+
+  CommandStack slot2;
+  slot2.serial.feed("check 2\n");
+  slot2.controller.update();
+  TEST_ASSERT_TRUE(slot2.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(2, slot);
+  TEST_ASSERT_EQUAL(0, slot2.serial.output.size());
+
+  CommandStack slot3;
+  slot3.serial.feed("check 3\n");
+  slot3.controller.update();
+  TEST_ASSERT_TRUE(slot3.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(3, slot);
+  TEST_ASSERT_EQUAL(0, slot3.serial.output.size());
+
+  CommandStack answered;
+  answered.serial.feed("check 4\n");
+  answered.controller.update();
+  TEST_ASSERT_TRUE(answered.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(4, slot);
+  UpdiLinkCheck status = {};
+  status.drivenHigh = false;
+  status.releasedHigh = true;
+  status.replied = true;
+  status.status = 0x30;
+  answered.controller.reportUpdiCheck(status);
+  TEST_ASSERT_EQUAL_STRING("drive low: 0", answered.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("release: 1", answered.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: 0x30", answered.serial.output[2].c_str());
+
+  CommandStack padded;
+  UpdiLinkCheck lowNibble = {};
+  lowNibble.drivenHigh = true;
+  lowNibble.releasedHigh = false;
+  lowNibble.replied = true;
+  lowNibble.status = 0x0A;
+  padded.controller.reportUpdiCheck(lowNibble);
+  TEST_ASSERT_EQUAL_STRING("drive low: 1", padded.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("release: 0", padded.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: 0x0A", padded.serial.output[2].c_str());
+}
+
+void testCheckStaysPendingWhenProgramIsAlsoAccepted()
+{
+  CommandStack stack;
+  stack.serial.feed("check 1\nprogram 2 updi\n");
+  stack.controller.update();
+  ProgrammingRequest request;
+  uint8_t slot = 0;
+  TEST_ASSERT_TRUE(stack.controller.takeProgrammingRequest(request));
+  TEST_ASSERT_EQUAL(2, request.slot);
+  TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Updi),
+                    static_cast<int>(request.method));
+  TEST_ASSERT_TRUE(stack.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_EQUAL(1, slot);
+  TEST_ASSERT_FALSE(stack.controller.takeUpdiCheck(slot));
+  TEST_ASSERT_FALSE(stack.controller.takeProgrammingRequest(request));
+}
+
 void testMqttPrefixStagesUntilApplyAndRestartsMqttOnly()
 {
   CommandStack stack;
@@ -1125,6 +1246,9 @@ void runConfigurationTests()
   RUN_TEST(testStoredStatusOffLoadsDisabled);
   RUN_TEST(testProgramCommandRequiresSlotAndMethod);
   RUN_TEST(testProgramCommandSelectsSlotAndMethod);
+  RUN_TEST(testCheckCommandRequiresOneSlot);
+  RUN_TEST(testCheckCommandSelectsSlotAndPrintsTheLink);
+  RUN_TEST(testCheckStaysPendingWhenProgramIsAlsoAccepted);
   RUN_TEST(testMqttPrefixStagesUntilApplyAndRestartsMqttOnly);
   RUN_TEST(testInvalidMqttPrefixIsRejectedBeforeStaging);
   RUN_TEST(testMqttPrefixApplyFailureKeepsOldPrefix);

@@ -4,13 +4,13 @@
 
 ## Summary
 
-`Programming` is an ISP or UPDI session on one firmware slot, 1 through 4. `program 1 isp` uses the shared SPI pins and that slot's CS pin as RESET. `program 3 updi` uses only that slot's CS pin as the UPDI wire. A line without both a slot and a method replies `ERR program` and does not start a session.
+`Programming` is an ISP or UPDI session on one firmware slot, 1 through 4. `program 1 isp` uses the shared SPI pins and that slot's CS pin as RESET. `program 3 updi` uses only that slot's CS pin as the UPDI wire. A line without both a slot and a method replies `ERR program` and does not start a session. `check N` measures that CS pin and does not start a session.
 
 ## Where it sits
 
 `main.cpp` constructs it with the USB byte port, the SPI master, the half-duplex UART, the four CS pins, `kProgrammingPins`, `ModuleBus`, the clock, `kProgrammingIdleTimeoutMs` (60 seconds), and `kProgrammingUnplugTimeoutMs` (1 second). `loop()` calls `network.update()` first. While `active()` is true it calls `programming.update()` and returns, unless the session ended on that pass.
 
-`serialConsole.update()` recognizes the program line and returns before the bus. `loop()` then stores the RTC latch and calls `begin(slot, method)`.
+`serialConsole.update()` recognizes the program line and returns before the bus. `loop()` then stores the RTC latch and calls `begin(slot, method)`. A `check` line does not store the latch. While that measurement runs, `loop()` still reads console lines, then returns before the bus.
 
 ## What it creates
 
@@ -36,7 +36,7 @@ flowchart TD
   done -->|yes| resume["Release the claimed CS pin, clear the record, resume the bus"]
 ```
 
-A USB-open restart keeps the record, so `setup()` enters the same slot and method without the banner and without `startController()`. The reset button and a power cycle clear it. An older single-word ISP marker does not resume. Pins, the two host tools, and the wire sequences are in the reference.
+A USB-open restart keeps the record, so `setup()` enters the same slot and method without the banner and without `startController()`. The reset button and a power cycle clear it. An older single-word ISP marker does not resume. Pins, the two host tools, the wire sequences, and the `check` measurement are in the reference.
 
 ## What is stored, and who reads it
 
@@ -45,7 +45,7 @@ The latch is one record in RTC slow memory (`.rtc_noinit`): magic, slot, and met
 ## See also
 
 - [Programming reference](reference/programming.md) — jumper pins, STK500, jtag2updi, the unplug rule, tests.
-- [Configuration reference](reference/configuration.md) — the accepted `program` lines and `ERR program`.
+- [Configuration reference](reference/configuration.md) — the accepted `program` and `check` lines, `ERR program`, and `ERR check`.
 - [MQTT reference](reference/mqtt.md) — commands that can still arrive while a session is active.
 - [Serial console](serial-console.md)
 - [Module bus](module-bus.md)

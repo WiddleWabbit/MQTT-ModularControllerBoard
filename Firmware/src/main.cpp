@@ -58,6 +58,13 @@ const uint32_t kProgrammingIdleTimeoutMs = 60UL * 1000UL;
 // than this.
 const uint32_t kProgrammingUnplugTimeoutMs = 1000UL;
 
+// USB CDC RX and TX queues. The hardware driver drops a received byte
+// when the RX queue is full, and it has already accepted the USB packet.
+// avrdude's SET_DEVICE_DESCRIPTOR frame is 309 bytes. The default queue
+// is 256, so that tail was lost and the next commands were parsed as
+// part of it. 1024 holds the largest frame this programmer accepts.
+const size_t kUsbByteBufferBytes = 1024;
+
 const NetworkTiming kNetworkTiming = {15000, 1000, 30000, 1000, 30000};
 
 const NtpConfig kNtpConfig = {
@@ -216,6 +223,10 @@ void startController()
  */
 void setup()
 {
+  // The queues must exist before begin(). begin() keeps a queue that
+  // is already allocated and otherwise installs the 256-byte default.
+  Serial.setRxBufferSize(kUsbByteBufferBytes);
+  Serial.setTxBufferSize(kUsbByteBufferBytes);
   Serial.begin(115200);
   if (programmingLatch.isSet())
   {
@@ -233,10 +244,11 @@ void setup()
 /**
  * One pass of the controller. Network always runs. While a programming
  * session is active the USB byte stream belongs to ISP or UPDI, and the
- * module bus, daughter modules, and status lines wait. Otherwise the
- * console reads commands, the bus takes at most one I2C transaction,
- * and each daughter module takes at most one exchange and publishes
- * what it stored. The periodic USB snapshot is last.
+ * module bus, daughter modules, and status lines wait. A UPDI link
+ * check also returns before the bus, without taking that byte stream.
+ * Otherwise the console reads commands, the bus takes at most one I2C
+ * transaction, and each daughter module takes at most one exchange and
+ * publishes what it stored. The periodic USB snapshot is last.
  *
  * @return Nothing.
  */
@@ -261,14 +273,33 @@ void loop()
     }
   }
 
-  // Read complete USB serial lines (set, apply, status, program).
+  // Read complete USB serial lines (set, apply, status, program, check).
   serialConsole.update();
   ProgrammingRequest request;
   if (serialConsole.takeProgrammingRequest(request))
   {
+    // A check queued in the same read must not start after the session.
+    uint8_t ignoredSlot = 0;
+    serialConsole.takeUpdiCheck(ignoredSlot);
     // Store the latch before the session so a USB restart re-enters.
     programmingLatch.set(request.slot, static_cast<uint8_t>(request.method));
     programming.begin(request.slot, request.method);
+    return;
+  }
+
+  uint8_t checkSlot = 0;
+  if (serialConsole.takeUpdiCheck(checkSlot))
+  {
+    programming.startUpdiCheck(checkSlot);
+  }
+  if (programming.updiCheckActive())
+  {
+    // The bus stays off this pin until the measurement restores it.
+    UpdiLinkCheck check;
+    if (programming.pollUpdiCheck(check))
+    {
+      serialConsole.reportUpdiCheck(check);
+    }
     return;
   }
 

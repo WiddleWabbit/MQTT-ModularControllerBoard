@@ -42,6 +42,24 @@ public:
    */
   bool takeProgrammingRequest(ProgrammingRequest& request);
 
+  /**
+   * Reports and clears a pending `check <slot>` request.
+   *
+   * @param slot Receives the slot, 1 through 4, when one is pending.
+   * @return True once after that command is accepted.
+   */
+  bool takeUpdiCheck(uint8_t& slot);
+
+  /**
+   * Prints the three link-check lines. Levels are 0 or 1. A missing
+   * status byte prints `no reply`. A byte prints as `0x` and two
+   * uppercase hex digits.
+   *
+   * @param result Samples and the STATUSA byte.
+   * @return Nothing.
+   */
+  void reportUpdiCheck(const UpdiLinkCheck& result);
+
 private:
   ISerialPort& _serial;
   NetworkRuntime& _runtime;
@@ -50,6 +68,8 @@ private:
   std::string _line;
   bool _programmingRequested = false;
   ProgrammingRequest _programmingRequest = {};
+  bool _checkRequested = false;
+  uint8_t _checkSlot = 0;
   NetworkConfig _staged{};
   std::string _ssid;
   std::string _wifiPassword;
@@ -77,6 +97,15 @@ private:
    * @return True when the line is that command.
    */
   bool _acceptProgram(const std::string& line, ProgrammingRequest& request) const;
+
+  /**
+   * Parses `check <1-4>` with nothing else on the line.
+   *
+   * @param line Command text.
+   * @param slot Receives the slot when the line matches.
+   * @return True when the line is that command.
+   */
+  bool _acceptCheck(const std::string& line, uint8_t& slot) const;
 
   /**
    * Builds the jumper reminder for an accepted request.

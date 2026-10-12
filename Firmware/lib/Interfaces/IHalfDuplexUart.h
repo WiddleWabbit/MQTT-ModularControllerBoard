@@ -4,9 +4,8 @@
 #include <cstdint>
 
 /**
- * Single-wire UART. TX and RX share one GPIO. The driver owns echo
- * removal only in the sense that the wire loops TX back into RX;
- * the caller reads that echo before the next byte.
+ * Single-wire UART. TX and RX share one GPIO. The wire loops TX back
+ * into RX. The caller reads the echoes of one write before a target byte.
  */
 class IHalfDuplexUart
 {

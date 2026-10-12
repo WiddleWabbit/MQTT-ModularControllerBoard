@@ -19,9 +19,9 @@ public:
   Esp32HalfDuplexUart();
 
   /**
-   * Claims gpio, installs UART1, and applies open-drain after the
-   * pin matrix is connected. uart_set_pin forces a push-pull output,
-   * so the open-drain mode is applied again afterwards.
+   * Claims gpio and installs UART1. Open-drain is applied after
+   * uart_set_pin. That direction change binds the pad to GPIO output,
+   * so the UART TX and RX signals are connected again afterwards.
    *
    * @param gpio Pin number. The same pin is TX and RX.
    * @param baud Bit rate.

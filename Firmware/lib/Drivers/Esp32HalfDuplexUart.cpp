@@ -4,12 +4,14 @@
 
 #include "driver/gpio.h"
 #include "driver/uart.h"
+#include "esp_rom_gpio.h"
+#include "soc/uart_periph.h"
 
 namespace
 {
 const uart_port_t kPort = UART_NUM_1;
 const int kRxBytes = 256;
-const int kReadTimeoutMs = 5;
+const int kReadTimeoutMs = 20;
 }
 
 
@@ -23,8 +25,9 @@ Esp32HalfDuplexUart::Esp32HalfDuplexUart()
 // ========== Public API ==========
 
 /**
- * Installs UART1 on one GPIO. Open-drain is applied after uart_set_pin
- * because that call selects the matrix and forces a push-pull pad.
+ * Installs UART1 on one GPIO. Open-drain comes after uart_set_pin.
+ * gpio_set_direction then binds the pad to GPIO output, so the UART
+ * signals are connected again and any glitch byte is discarded.
  *
  * @param gpio Pin number.
  * @param baud Bit rate.
@@ -55,6 +58,12 @@ void Esp32HalfDuplexUart::attach(uint8_t gpio, uint32_t baud)
   gpio_set_direction(pin, GPIO_MODE_INPUT_OUTPUT_OD);
   gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
   gpio_set_level(pin, 1);
+  const uint32_t pad = static_cast<uint32_t>(gpio);
+  esp_rom_gpio_connect_out_signal(
+    pad, UART_PERIPH_SIGNAL(kPort, SOC_UART_TX_PIN_IDX), false, false);
+  esp_rom_gpio_connect_in_signal(
+    pad, UART_PERIPH_SIGNAL(kPort, SOC_UART_RX_PIN_IDX), false);
+  uart_flush_input(kPort);
   _installed = true;
 }
 
@@ -93,7 +102,7 @@ int Esp32HalfDuplexUart::available() const
 }
 
 /**
- * Reads one byte. The short wait covers the ack after the stop bit.
+ * Reads one byte. 20 ms covers the 16.4 ms maximum UPDI reply.
  *
  * @return Byte value, or -1 on timeout.
  */

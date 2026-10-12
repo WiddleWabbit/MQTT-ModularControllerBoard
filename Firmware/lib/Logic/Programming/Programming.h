@@ -18,7 +18,8 @@ class ModuleBus;
  * Programming session for one firmware slot. begin() selects ISP or
  * UPDI, quiesces the module bus, and hands the USB byte stream to that
  * programmer. update() runs until the session's idle or unplug rule
- * ends it.
+ * ends it. startUpdiCheck() measures one CS pin and does not start
+ * a session.
  */
 class Programming
 {
@@ -49,9 +50,10 @@ public:
               uint32_t unplugTimeoutMs);
 
   /**
-   * Starts a session on slot 1..4. No-op when a session is active or
-   * the slot is outside that range. ISP drives the slot CS pin high.
-   * UPDI leaves it idle and does not start SPI.
+   * Starts a session on slot 1..4. An in-progress link check is
+   * released first. No-op when a session is active or the slot is
+   * outside that range. ISP drives the slot CS pin high. UPDI leaves
+   * it idle and does not start SPI.
    *
    * @param slot Firmware slot, 1 through 4.
    * @param method ISP or UPDI.
@@ -74,10 +76,36 @@ public:
    */
   bool active() const;
 
+  /**
+   * Starts a UPDI link check on slot 1..4. No-op when a session is
+   * active, a check is already running, or the slot is outside that
+   * range. Does not quiesce the bus and does not take the USB stream.
+   *
+   * @param slot Firmware slot, 1 through 4.
+   * @return True when the measurement started.
+   */
+  bool startUpdiCheck(uint8_t slot);
+
+  /**
+   * Advances the link check by one break phase.
+   *
+   * @param result Receives the measurement when this call finishes it.
+   * @return True once, on the call that finishes the measurement.
+   */
+  bool pollUpdiCheck(UpdiLinkCheck& result);
+
+  /**
+   * Reports whether a link check is waiting on the break or its result.
+   *
+   * @return True until pollUpdiCheck finishes it, or begin() cancels it.
+   */
+  bool updiCheckActive() const;
+
 private:
   IspProgrammer _isp;
   UpdiProgrammer _updi;
   ProgrammingSession _session;
   IDigitalPin* _cs[4];
   const ProgrammingPins& _pins;
+  bool _checkActive = false;
 };

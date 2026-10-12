@@ -52,6 +52,7 @@ const uint8_t kEraseBootPage = 5;
 const uint8_t kEraseEepromPage = 6;
 const uint8_t kEraseUsersig = 7;
 
+const uint8_t kRegStatusA = 0;
 const uint8_t kRegControlA = 2;
 const uint8_t kRegControlB = 3;
 const uint8_t kRegReset = 8;
@@ -136,12 +137,16 @@ void UpdiProgrammer::start(IDigitalPin& line, uint8_t gpio)
 
 /**
  * Advances one break phase, then reads host bytes until a new break
- * starts or the port is empty.
+ * starts or the port is empty. A link check leaves those bytes unread.
  *
  * @return Nothing.
  */
 void UpdiProgrammer::update()
 {
+  if (_checkRunning)
+  {
+    return;
+  }
   if (_breakPhase != BreakPhase::Idle)
   {
     if (!_advanceBreak())
@@ -184,8 +189,58 @@ void UpdiProgrammer::shutdown()
   _connected = false;
   _inProg = false;
   _linkOk = false;
+  _checkRunning = false;
   _rx = Rx::Start;
   _crcCount = 0;
+}
+
+/**
+ * Drives the pin low, samples it, releases it, samples it again,
+ * then holds it low for the first break phase.
+ *
+ * @param line Slot CS pin.
+ * @param gpio GPIO number of that pin.
+ * @return Nothing.
+ */
+void UpdiProgrammer::beginLinkCheck(IDigitalPin& line, uint8_t gpio)
+{
+  _line = &line;
+  _gpio = gpio;
+  _line->setMode(PinMode::DigitalOutputOpenDrain);
+  _line->write(false);
+  _checkResult.drivenHigh = _line->read();
+  _line->write(true);
+  _checkResult.releasedHigh = _line->read();
+  _checkResult.replied = false;
+  _checkResult.status = 0;
+  _checkRunning = true;
+  _startBreak(Pending::Check);
+}
+
+/**
+ * Moves the break one phase. Host bytes stay unread. The completing
+ * call loads STATUSA and restores the pull-up.
+ *
+ * @param result Receives the measurement when this call finishes it.
+ * @return True once, after the status load.
+ */
+bool UpdiProgrammer::pollLinkCheck(UpdiLinkCheck& result)
+{
+  if (!_checkRunning)
+  {
+    return false;
+  }
+  if (_breakPhase != BreakPhase::Idle)
+  {
+    if (!_advanceBreak())
+    {
+      return false;
+    }
+    _finishLinkCheck();
+  }
+  result = _checkResult;
+  _checkRunning = false;
+  return true;
 }
 
 /**
@@ -624,6 +679,29 @@ void UpdiProgrammer::_runPending()
   {
     _erase();
   }
+}
+
+/**
+ * Reads UPDI STATUSA, then detaches the UART and restores the pull-up.
+ * The samples taken before the break stay in _checkResult.
+ *
+ * @return Nothing.
+ */
+void UpdiProgrammer::_finishLinkCheck()
+{
+  _linkOk = _uartAttached;
+  const int value = _ldcs(kRegStatusA);
+  if (value < 0)
+  {
+    _checkResult.replied = false;
+    _checkResult.status = 0;
+  }
+  else
+  {
+    _checkResult.replied = true;
+    _checkResult.status = static_cast<uint8_t>(value);
+  }
+  shutdown();
 }
 
 /**
@@ -1222,29 +1300,25 @@ bool UpdiProgrammer::_cpuReset()
 // ========== UPDI link ==========
 
 /**
- * Sends SYNCH, the key opcode, and eight key bytes.
+ * Sends SYNCH, the key opcode, and eight key bytes as one write.
  *
  * @param key Wire-order key.
  * @return False when an echo mismatches.
  */
 bool UpdiProgrammer::_writeKey(const uint8_t* key)
 {
-  if (!_put(kSynch) || !_put(0xE0))
-  {
-    return false;
-  }
+  uint8_t frame[10];
+  frame[0] = kSynch;
+  frame[1] = 0xE0;
   for (uint8_t index = 0; index < 8; ++index)
   {
-    if (!_put(key[index]))
-    {
-      return false;
-    }
+    frame[2 + index] = key[index];
   }
-  return true;
+  return _send(frame, sizeof(frame));
 }
 
 /**
- * STCS. Three bytes, no response.
+ * STCS. One three-byte write, no response.
  *
  * @param reg Control register index.
  * @param data Value.
@@ -1252,20 +1326,22 @@ bool UpdiProgrammer::_writeKey(const uint8_t* key)
  */
 bool UpdiProgrammer::_stcs(uint8_t reg, uint8_t data)
 {
-  return _put(kSynch) &&
-         _put(static_cast<uint8_t>(0xC0 + reg)) &&
-         _put(data);
+  const uint8_t frame[] = {
+    kSynch, static_cast<uint8_t>(0xC0 + reg), data};
+  return _send(frame, sizeof(frame));
 }
 
 /**
- * LDCS. Two bytes out, one byte back.
+ * LDCS. One two-byte write, then one byte back.
  *
  * @param reg Control register index.
  * @return Register value, or -1.
  */
 int UpdiProgrammer::_ldcs(uint8_t reg)
 {
-  if (!_put(kSynch) || !_put(static_cast<uint8_t>(0x80 + reg)))
+  const uint8_t frame[] = {
+    kSynch, static_cast<uint8_t>(0x80 + reg)};
+  if (!_send(frame, sizeof(frame)))
   {
     return -1;
   }
@@ -1280,9 +1356,12 @@ int UpdiProgrammer::_ldcs(uint8_t reg)
  */
 int UpdiProgrammer::_lds(uint16_t address)
 {
-  if (!_put(kSynch) || !_put(0x04) ||
-      !_put(static_cast<uint8_t>(address & 0xFF)) ||
-      !_put(static_cast<uint8_t>(address >> 8)))
+  const uint8_t frame[] = {
+    kSynch,
+    0x04,
+    static_cast<uint8_t>(address & 0xFF),
+    static_cast<uint8_t>(address >> 8)};
+  if (!_send(frame, sizeof(frame)))
   {
     return -1;
   }
@@ -1290,7 +1369,8 @@ int UpdiProgrammer::_lds(uint16_t address)
 }
 
 /**
- * STS of one byte. The address is acknowledged, then the data.
+ * STS of one byte. The address is one write and is acknowledged,
+ * then the data byte is its own write.
  *
  * @param address UPDI address.
  * @param data Byte to store.
@@ -1298,10 +1378,12 @@ int UpdiProgrammer::_lds(uint16_t address)
  */
 bool UpdiProgrammer::_sts(uint16_t address, uint8_t data)
 {
-  if (!_put(kSynch) || !_put(0x44) ||
-      !_put(static_cast<uint8_t>(address & 0xFF)) ||
-      !_put(static_cast<uint8_t>(address >> 8)) ||
-      !_ack() || !_put(data))
+  const uint8_t frame[] = {
+    kSynch,
+    0x44,
+    static_cast<uint8_t>(address & 0xFF),
+    static_cast<uint8_t>(address >> 8)};
+  if (!_send(frame, sizeof(frame)) || !_ack() || !_put(data))
   {
     return false;
   }
@@ -1309,16 +1391,19 @@ bool UpdiProgrammer::_sts(uint16_t address, uint8_t data)
 }
 
 /**
- * Sets the 16-bit address pointer.
+ * Sets the 16-bit address pointer. One four-byte write, then an ack.
  *
  * @param address Pointer value.
  * @return False when the ack is missing.
  */
 bool UpdiProgrammer::_stptr(uint16_t address)
 {
-  if (!_put(kSynch) || !_put(0x69) ||
-      !_put(static_cast<uint8_t>(address & 0xFF)) ||
-      !_put(static_cast<uint8_t>(address >> 8)))
+  const uint8_t frame[] = {
+    kSynch,
+    0x69,
+    static_cast<uint8_t>(address & 0xFF),
+    static_cast<uint8_t>(address >> 8)};
+  if (!_send(frame, sizeof(frame)))
   {
     return false;
   }
@@ -1333,7 +1418,8 @@ bool UpdiProgrammer::_stptr(uint16_t address)
  */
 bool UpdiProgrammer::_ldptr(uint16_t& address)
 {
-  if (!_put(kSynch) || !_put(0x29))
+  const uint8_t frame[] = {kSynch, 0x29};
+  if (!_send(frame, sizeof(frame)))
   {
     return false;
   }
@@ -1348,14 +1434,15 @@ bool UpdiProgrammer::_ldptr(uint16_t& address)
 }
 
 /**
- * STINC of one byte.
+ * STINC of one byte. One three-byte write, then an ack.
  *
  * @param data Byte to store.
  * @return False when the ack is missing.
  */
 bool UpdiProgrammer::_stinc(uint8_t data)
 {
-  if (!_put(kSynch) || !_put(0x64) || !_put(data))
+  const uint8_t frame[] = {kSynch, 0x64, data};
+  if (!_send(frame, sizeof(frame)))
   {
     return false;
   }
@@ -1369,7 +1456,8 @@ bool UpdiProgrammer::_stinc(uint8_t data)
  */
 int UpdiProgrammer::_ldinc()
 {
-  if (!_put(kSynch) || !_put(0x24))
+  const uint8_t frame[] = {kSynch, 0x24};
+  if (!_send(frame, sizeof(frame)))
   {
     return -1;
   }
@@ -1384,7 +1472,34 @@ int UpdiProgrammer::_ldinc()
  */
 bool UpdiProgrammer::_rep(uint8_t repeats)
 {
-  return _put(kSynch) && _put(0xA0) && _put(repeats);
+  const uint8_t frame[] = {kSynch, 0xA0, repeats};
+  return _send(frame, sizeof(frame));
+}
+
+/**
+ * Writes one instruction and requires each local echo to match.
+ *
+ * @param data Instruction bytes, including SYNCH.
+ * @param length Number of bytes.
+ * @return False when an echo mismatches.
+ */
+bool UpdiProgrammer::_send(const uint8_t* data, size_t length)
+{
+  if (!_linkOk || data == nullptr || length == 0)
+  {
+    return false;
+  }
+  _uart.write(data, length);
+  for (size_t index = 0; index < length; ++index)
+  {
+    const int echo = _uart.read();
+    if (echo != static_cast<int>(data[index]))
+    {
+      _linkOk = false;
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -1395,18 +1510,7 @@ bool UpdiProgrammer::_rep(uint8_t repeats)
  */
 bool UpdiProgrammer::_put(uint8_t byte)
 {
-  if (!_linkOk)
-  {
-    return false;
-  }
-  _uart.write(&byte, 1);
-  const int echo = _uart.read();
-  if (echo != static_cast<int>(byte))
-  {
-    _linkOk = false;
-    return false;
-  }
-  return true;
+  return _send(&byte, 1);
 }
 
 /**

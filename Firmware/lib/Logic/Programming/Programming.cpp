@@ -24,9 +24,9 @@ Programming::Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart
 // ========== Public API ==========
 
 /**
- * Selects the slot pin and starts ISP or UPDI. A slot outside 1..4
- * does not quiesce the bus. A second call while active does not
- * rebind the pin or the UART.
+ * Selects the slot pin and starts ISP or UPDI. An in-progress link
+ * check is released first. A slot outside 1..4 does not quiesce the
+ * bus. A second call while active does not rebind the pin or the UART.
  *
  * @param slot Firmware slot, 1 through 4.
  * @param method ISP or UPDI.
@@ -34,6 +34,11 @@ Programming::Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart
  */
 void Programming::begin(uint8_t slot, ProgrammingMethod method)
 {
+  if (_checkActive)
+  {
+    _updi.shutdown();
+    _checkActive = false;
+  }
   if (_session.active() || slot < 1 || slot > 4)
   {
     return;
@@ -71,4 +76,53 @@ void Programming::update()
 bool Programming::active() const
 {
   return _session.active();
+}
+
+/**
+ * Binds the slot CS pin and starts the open-drain sample. A session
+ * or a check already in progress is left as it is.
+ *
+ * @param slot Firmware slot, 1 through 4.
+ * @return True when this call started the measurement.
+ */
+bool Programming::startUpdiCheck(uint8_t slot)
+{
+  if (_checkActive || _session.active() || slot < 1 || slot > 4)
+  {
+    return false;
+  }
+  _updi.beginLinkCheck(*_cs[slot - 1], _pins.csGpio[slot - 1]);
+  _checkActive = true;
+  return true;
+}
+
+/**
+ * Forwards one break phase. Clears the running flag on the call that
+ * finishes the measurement.
+ *
+ * @param result Receives the measurement when this call finishes it.
+ * @return True once, after STATUSA is loaded and the pin is restored.
+ */
+bool Programming::pollUpdiCheck(UpdiLinkCheck& result)
+{
+  if (!_checkActive)
+  {
+    return false;
+  }
+  if (!_updi.pollLinkCheck(result))
+  {
+    return false;
+  }
+  _checkActive = false;
+  return true;
+}
+
+/**
+ * Reports the link check that startUpdiCheck started.
+ *
+ * @return True until the measurement is finished or cancelled.
+ */
+bool Programming::updiCheckActive() const
+{
+  return _checkActive;
 }

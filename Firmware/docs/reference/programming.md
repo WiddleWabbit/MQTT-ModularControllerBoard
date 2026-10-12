@@ -16,7 +16,7 @@ Accepted command lines and `ERR program` are in the [configuration reference](co
 
 `Programming::begin(slot, method)` selects CS for that slot. ISP calls `IspProgrammer::start`, which drives that pin high as an output. UPDI calls `UpdiProgrammer::start`, which leaves the pin as an input with a pull-up until a break. Both then call `ProgrammingSession::begin`, which quiesces `ModuleBus` and does not drive the pin. A slot outside 1..4 returns before that, so the bus keeps polling. A second `begin` while `active()` is true returns without pulsing reset or attaching the UART.
 
-`update()` services the active programmer until `ProgrammingSession` ends the session. `active()` is what `loop()` branches on. `STK_LEAVE` and jtagice leave do not end the session.
+`update()` services the active programmer until `ProgrammingSession` ends the session. `active()` is what `loop()` branches on. `STK_LEAVE` and jtagice leave do not end the session. `startUpdiCheck` and `pollUpdiCheck` measure one CS pin without a session. That sequence is below.
 
 `IspProgrammer` speaks the STK500v1 subset. `UpdiProgrammer` speaks jtag2updi for NVM controller version 1. `ProgrammingSession` owns the silence timer and the unplug rule.
 
@@ -122,13 +122,23 @@ A failed programming enable yields `STK_FAILED` to avrdude with no human-readabl
 
 The host frame is jtagice mkII: start `0x1B`, a little-endian sequence, a 4-byte little-endian body size, token `0x0E`, the body, and the AVR067 CRC-16 little-endian. That CRC starts at `0xFFFF` and uses reflected polynomial `0x8408`. The check value of `123456789` is `0x6F91`. The CRC covers the start byte through the last body byte. A bad CRC replies `RSP_FAILED` (`0xA0`) with the received sequence, and the session stays active. An unknown command replies `RSP_ILLEGAL_COMMAND` (`0xAA`). A bad token or a body longer than 512 bytes is dropped with no reply.
 
-`SET_DEVICE_DESCRIPTOR` always starts a double break, including when the link is already up. The selected CS pin is driven open-drain low for 25 ms, high for 1 ms, then low for 25 ms. One phase advances per `update()`. After the second low, the pin is released high and UART1 attaches on that GPIO at 115200, 8 data bits, even parity, 2 stop bits. UART0 is not used: GPIO43 and GPIO44 are MOD3 and SENSE3. The programmer then writes UPDI `Control_A` `0x06`.
+`SET_DEVICE_DESCRIPTOR` for this part is a 309-byte frame. `kUsbByteBufferBytes` in `src/main.cpp` is 1024, applied to both USB queues before `Serial.begin()`. The CDC driver drops a received byte once the RX queue is full. The 256-byte default dropped the end of that frame, the parser waited, and avrdude reported the resulting `RSP_FAILED` against a later command.
+
+`SET_DEVICE_DESCRIPTOR` always starts a double break, including when the link is already up. The selected CS pin is driven open-drain low for 25 ms, high for 1 ms, then low for 25 ms. One phase advances per `update()`. After the second low, the pin is released high and UART1 attaches on that GPIO at 115200, 8 data bits, even parity, 2 stop bits. Open-drain is applied after `uart_set_pin`. On this SDK that direction change binds the pad to GPIO output, so attach connects the UART1 TX and RX signals again and discards any byte already in the RX FIFO. UART0 is not used: GPIO43 and GPIO44 are MOD3 and SENSE3. The programmer then writes UPDI `Control_A` `0x06`.
 
 `ENTER_PROGMODE` starts the same break when the link is not up yet. Host bytes wait until the break finishes. The status that follows the break selects the NVM key path. A locked part replies `RSP_ILLEGAL_MCU_STATE`. NVM version is 1 when the flash page in the descriptor is under 256 bytes. The ATtiny1614 page is 64. A page of 256 or more is recorded as version 2, and memory commands then fail. Flash addresses are used as avrdude sends them.
 
-The target wire is one byte out and the local echo back before the next byte. A missing echo or a missing target byte fails the command. Leave programming stops driving the line and leaves the UART attached. `shutdown()`, when the session ends, detaches UART1 and restores the CS pull-up.
+Each UPDI instruction is one UART write. The programmer reads that write's echoes before any target byte. A repeated store sends the later data bytes as their own writes, because an ack sits between them. A missing echo or a missing target byte fails the command. The UART read wait is 20 ms, which covers the 16.4 ms maximum reply at the default 4 MHz UPDI clock. Leave programming stops driving the line and leaves the UART attached. `shutdown()`, when the session ends, detaches UART1 and restores the CS pull-up.
 
 The physical check is avrdude reporting signature `0x1E9422` (ATtiny1614).
+
+## UPDI link check
+
+`check N` does not call `ProgrammingSession::begin`. `active()` stays false, the bus is not quiesced, SPI is not started, and the RTC latch is not written. `startUpdiCheck` refuses a slot outside 1..4, a session that is already active, and a second check while one is running. `begin` releases a check that has already started, then opens the session.
+
+The selected CS pin is set open-drain, driven low, and read. It is then released and read again. A double break follows: 25 ms low, 1 ms high, 25 ms low, one phase per `pollUpdiCheck`. UART1 then attaches at 115200 8E2 and loads `STATUSA` (register 0) with one two-byte write `55 80`. The UART is detached and the pin returns to an input with pull-up. The other CS pins are not driven. `loop()` returns before the bus until that restore. It still reads console lines during the wait. A `program` command on that pass is taken first, and the pending check is discarded.
+
+A low that reads high means the jumper is not on that GPIO. A release that stays low means the wire is held down. Low, then high, with no status byte, means the pin moved and the chip did not answer. A status byte means the chip is on the wire. The three printed lines are in the [configuration reference](configuration.md).
 
 ## Configuration
 
@@ -137,6 +147,7 @@ The physical check is avrdude reporting signature `0x1E9422` (ATtiny1614).
 | `kProgrammingIdleTimeoutMs` | 60 seconds | No protocol byte ends the session |
 | `kProgrammingUnplugTimeoutMs` | 1 second | Absent frames after the link has been seen |
 | `kProgrammingPins` | GPIO11, GPIO13, GPIO12, CS GPIO6 / GPIO7 / GPIO15 / GPIO16 | Pin line and the UPDI GPIO |
+| `kUsbByteBufferBytes` | 1024 | USB CDC RX and TX queue, set before `Serial.begin()` |
 
 ISP SPI is fixed at 125 kHz. UPDI is fixed at 115200 8E2. avrdude's baud parameter does not change either.
 
@@ -144,9 +155,9 @@ ISP SPI is fixed at 125 kHz. UPDI is fixed at 115200 8E2. avrdude's baud paramet
 
 `test/test_desktop/test_isp.cpp` covers the STK500 subset, the reset-before-SPI order, the fixed 125 kHz clock, the session idle path, an unplug before the port has been seen, a sub-second unplug that leaves the session running, and a full one-second unplug. A second `begin()` after that confirmed unplug starts a new seen-port count.
 
-`test/test_desktop/test_updi.cpp` covers the AVR067 CRC check value, the jtagice sign-on body, the 25/1/25 ms break and `Control_A`, a signature read of `1E 94 22`, chip erase and a 64-byte flash page, a bad CRC, an unknown command, leave versus shutdown, and that the UPDI programmer object does not own an SPI master.
+`test/test_desktop/test_updi.cpp` covers the AVR067 CRC check value, the jtagice sign-on body, the 25/1/25 ms break and `Control_A`, a `Control_A` store as one 3-byte write and the following system-status load as one 2-byte write, a signature read of `1E 94 22`, chip erase and a 64-byte flash page, a bad CRC, an unknown command, leave versus shutdown, the link check's 25/1/25 ms break and one `55 80` write with and without a status byte, and that the UPDI programmer object does not own an SPI master.
 
-`test/test_desktop/test_deep_modules.cpp` covers slot 3 ISP leaving the other CS pins alone, slot 2 UPDI attaching GPIO7 at 115200 without starting SPI, a second `begin` that does not pulse or reattach, 60 s silence and a seen-then-absent 1 s unplug for both methods, and `begin(0)` / `begin(5)` leaving the bus polling. `test/test_desktop/test_configuration.cpp` covers the accepted lines and `ERR program`.
+`test/test_desktop/test_deep_modules.cpp` covers slot 3 ISP leaving the other CS pins alone, slot 2 UPDI attaching GPIO7 at 115200 without starting SPI, a second `begin` that does not pulse or reattach, 60 s silence and a seen-then-absent 1 s unplug for both methods, `begin(0)` / `begin(5)` leaving the bus polling, a slot 3 link check that stays inactive and then lets the bus poll, and `begin` releasing a check already in progress. `test/test_desktop/test_configuration.cpp` covers the accepted lines, `ERR program`, and `ERR check`.
 
 The `.rtc_noinit` record is ESP32-only. The first check on the board, after a `custom-esp32` build, is that avrdude syncs after the USB-open restart. A 328PB returns `0x1E9516`. An ATtiny1614 returns `0x1E9422`. The controller was not flashed as part of writing this page.
 
@@ -155,6 +166,8 @@ The `.rtc_noinit` record is ESP32-only. The first check on the board, after a `c
 | Condition | Result |
 | --- | --- |
 | Line is not `program N isp` or `program N updi` with N in 1..4 | `ERR program`, no session |
+| `check` with a slot outside 1..4, during a session, or during a check | No measurement. The command text is in the [configuration reference](configuration.md) |
+| `STATUSA` does not return a byte | Check ends, pin restored |
 | `begin` with a slot outside 1..4 | Inactive, bus not quiesced |
 | Second `begin` while active | No extra reset pulse, no UART reattach |
 | ISP programming enable fails three times | `STK_FAILED`, reset left high |

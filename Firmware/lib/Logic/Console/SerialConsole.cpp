@@ -61,3 +61,25 @@ bool SerialConsole::takeProgrammingRequest(ProgrammingRequest& request)
 {
   return _controller.takeProgrammingRequest(request);
 }
+
+/**
+ * Reports and clears a pending link check.
+ *
+ * @param slot Receives the slot when one is pending.
+ * @return True once after `check <slot>` is accepted.
+ */
+bool SerialConsole::takeUpdiCheck(uint8_t& slot)
+{
+  return _controller.takeUpdiCheck(slot);
+}
+
+/**
+ * Prints the three link-check lines.
+ *
+ * @param result Samples and the STATUSA byte.
+ * @return Nothing.
+ */
+void SerialConsole::reportUpdiCheck(const UpdiLinkCheck& result)
+{
+  _controller.reportUpdiCheck(result);
+}

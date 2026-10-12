@@ -39,6 +39,47 @@ bool SerialConfigController::takeProgrammingRequest(ProgrammingRequest& request)
   return true;
 }
 
+/**
+ * Reports and clears a pending link check. Nothing is printed when
+ * the command is accepted.
+ *
+ * @param slot Receives the slot when one is pending.
+ * @return True once after `check <slot>`.
+ */
+bool SerialConfigController::takeUpdiCheck(uint8_t& slot)
+{
+  if (!_checkRequested)
+  {
+    return false;
+  }
+  slot = _checkSlot;
+  _checkRequested = false;
+  return true;
+}
+
+/**
+ * Prints drive low, release, and status. A missing byte is
+ * `status: no reply`. A byte is `status: 0x` plus two uppercase digits.
+ *
+ * @param result Samples and the STATUSA byte.
+ * @return Nothing.
+ */
+void SerialConfigController::reportUpdiCheck(const UpdiLinkCheck& result)
+{
+  _respond(result.drivenHigh ? "drive low: 1" : "drive low: 0");
+  _respond(result.releasedHigh ? "release: 1" : "release: 0");
+  if (!result.replied)
+  {
+    _respond("status: no reply");
+    return;
+  }
+  const char digits[] = "0123456789ABCDEF";
+  char text[] = "status: 0x00";
+  text[10] = digits[(result.status >> 4) & 0x0F];
+  text[11] = digits[result.status & 0x0F];
+  _respond(text);
+}
+
 void SerialConfigController::update()
 {
   if (!_serial.isPlugged())
@@ -86,6 +127,20 @@ void SerialConfigController::_handleLine(const std::string& line)
       return;
     }
     _respond("ERR program");
+    return;
+  }
+
+  if (line == "check" ||
+      (line.size() >= 6 && line.compare(0, 6, "check ") == 0))
+  {
+    uint8_t slot = 0;
+    if (_acceptCheck(line, slot))
+    {
+      _checkSlot = slot;
+      _checkRequested = true;
+      return;
+    }
+    _respond("ERR check");
     return;
   }
 
@@ -252,6 +307,29 @@ bool SerialConfigController::_acceptProgram(const std::string& line,
     return false;
   }
   request.slot = static_cast<uint8_t>(slotChar - '0');
+  return true;
+}
+
+/**
+ * Parses the slot. It is one digit 1..4, and the line ends there.
+ *
+ * @param line Command text.
+ * @param slot Receives the slot.
+ * @return True when the line matches.
+ */
+bool SerialConfigController::_acceptCheck(const std::string& line,
+                                          uint8_t& slot) const
+{
+  if (line.size() != 7 || line.compare(0, 6, "check ") != 0)
+  {
+    return false;
+  }
+  const char slotChar = line[6];
+  if (slotChar < '1' || slotChar > '4')
+  {
+    return false;
+  }
+  slot = static_cast<uint8_t>(slotChar - '0');
   return true;
 }
 

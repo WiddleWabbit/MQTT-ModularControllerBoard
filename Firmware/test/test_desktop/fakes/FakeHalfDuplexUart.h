@@ -73,7 +73,7 @@ public:
   }
 
   /**
-   * Records transmitted bytes and queues an echo for each one.
+   * Records one write, then queues an echo for each byte.
    *
    * @param data Bytes to write.
    * @param length Number of bytes.
@@ -85,6 +85,7 @@ public:
     {
       return;
     }
+    writeSizes.push_back(length);
     for (size_t index = 0; index < length; ++index)
     {
       tx.push_back(data[index]);
@@ -123,6 +124,7 @@ public:
   }
 
   std::vector<uint8_t> tx;
+  std::vector<size_t> writeSizes;
   uint8_t gpio = 0;
   uint32_t baud = 0;
   bool attached = false;

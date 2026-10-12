@@ -69,7 +69,7 @@ The interval stays in session RAM. Reboot restores `kSerialStatusIntervalMs` (10
 
 ## Errors
 
-Lines that are not a known command are rejected by `SerialConfigController`. The reply strings (`ERR hostname`, `ERR prefix`, `ERR status`, `ERR program`, `OK applied`) are in the [configuration reference](configuration.md).
+Lines that are not a known command are rejected by `SerialConfigController`. The reply strings (`ERR hostname`, `ERR prefix`, `ERR status`, `ERR program`, `ERR check`, `OK applied`) are in the [configuration reference](configuration.md).
 
 `printStatus()` writes nothing when USB is unplugged.
 

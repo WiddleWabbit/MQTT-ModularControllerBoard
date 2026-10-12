@@ -65,6 +65,22 @@ public:
    */
   bool takeProgrammingRequest(ProgrammingRequest& request);
 
+  /**
+   * Reports and clears a pending `check <slot>` request.
+   *
+   * @param slot Receives the slot, 1 through 4, when one is pending.
+   * @return True once after that command is accepted.
+   */
+  bool takeUpdiCheck(uint8_t& slot);
+
+  /**
+   * Prints the three link-check lines.
+   *
+   * @param result Samples and the STATUSA byte.
+   * @return Nothing.
+   */
+  void reportUpdiCheck(const UpdiLinkCheck& result);
+
 private:
   Network& _network;
   uint32_t _statusIntervalMs;

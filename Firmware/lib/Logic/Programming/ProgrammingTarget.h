@@ -31,3 +31,16 @@ struct ProgrammingRequest
   uint8_t slot;
   ProgrammingMethod method;
 };
+
+/**
+ * Result of one `check <slot>` measurement. The two levels are the
+ * pin read-back before the break. `replied` is false when STATUSA
+ * does not return a byte.
+ */
+struct UpdiLinkCheck
+{
+  bool drivenHigh;
+  bool releasedHigh;
+  bool replied;
+  uint8_t status;
+};

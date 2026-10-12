@@ -8,6 +8,7 @@
 #include "IDigitalPin.h"
 #include "IHalfDuplexUart.h"
 #include "IProgrammer.h"
+#include "ProgrammingTarget.h"
 
 /**
  * jtag2updi programmer for a tinyAVR 1-series part. The host link is
@@ -45,7 +46,8 @@ public:
 
   /**
    * Advances a double break by one phase, then consumes host bytes.
-   * Host bytes wait while a break is in progress.
+   * Host bytes wait while a break is in progress. A link check
+   * leaves those bytes unread.
    *
    * @return Nothing.
    */
@@ -64,6 +66,25 @@ public:
    * @return Monotonic count of accepted bytes.
    */
   uint32_t activityCount() const override;
+
+  /**
+   * Samples the open-drain low and the released high, then starts
+   * the double break. Does not read the USB byte stream.
+   *
+   * @param line Slot CS pin used as the UPDI wire.
+   * @param gpio GPIO number passed to attach().
+   * @return Nothing.
+   */
+  void beginLinkCheck(IDigitalPin& line, uint8_t gpio);
+
+  /**
+   * Advances the link-check break by one phase. The completing call
+   * loads STATUSA, restores the pin, and fills result.
+   *
+   * @param result Receives the samples and the status byte when done.
+   * @return True once, on the call that finishes the measurement.
+   */
+  bool pollLinkCheck(UpdiLinkCheck& result);
 
 private:
   enum class Rx : uint8_t
@@ -89,7 +110,8 @@ private:
     None,
     Descriptor,
     Enter,
-    Erase
+    Erase,
+    Check
   };
 
   IBytePort& _port;
@@ -104,6 +126,8 @@ private:
   bool _inProg = false;
   bool _uartAttached = false;
   bool _linkOk = false;
+  bool _checkRunning = false;
+  UpdiLinkCheck _checkResult = {};
   uint8_t _nvmVersion = 1;
   uint8_t _emuMode = 0;
   uint8_t _baudCode = 4;
@@ -161,6 +185,13 @@ private:
    * @return Nothing.
    */
   void _runPending();
+
+  /**
+   * Loads STATUSA after the link-check break and releases the pin.
+   *
+   * @return Nothing.
+   */
+  void _finishLinkCheck();
 
   /**
    * Applies flash and EEPROM page sizes, then breaks and enables UPDI.
@@ -383,7 +414,18 @@ private:
   bool _rep(uint8_t repeats);
 
   /**
-   * Writes one byte and consumes its echo.
+   * Writes one instruction and consumes an echo for every byte.
+   * The bytes share one write so the target sees no gap inside it.
+   *
+   * @param data Instruction bytes, including the leading SYNCH.
+   * @param length Number of bytes.
+   * @return False when an echo is missing or different.
+   */
+  bool _send(const uint8_t* data, size_t length);
+
+  /**
+   * Writes one byte and consumes its echo. Used where an ack
+   * separates the byte from the previous instruction.
    *
    * @param byte Byte to send.
    * @return False when the echo is missing or different.

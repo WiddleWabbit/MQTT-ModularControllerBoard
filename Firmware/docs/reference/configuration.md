@@ -111,6 +111,16 @@ apply
 
 `program N isp` and `program N updi` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the session in [Programming](../programming.md). N is one digit, 1 through 4. The method word is exactly `isp` or `updi`. The console does not read further lines until that session ends. `program`, `program isp`, `program updi`, `program 1`, `program 1 udpi`, a slot outside 1..4, and any extra token reply `ERR program` and do not start a session. `programmable` is `ERR command`.
 
+`check N` measures the UPDI wire on that slot and does not start a session. N is one digit, 1 through 4. Accepting it prints nothing. When the measurement finishes the console prints three lines:
+
+```text
+drive low: 0
+release: 1
+status: no reply
+```
+
+Each level is `0` or `1`. A status byte replaces the last line with `status: 0x` and two uppercase hex digits, for example `status: 0x30`. `check`, `check 0`, `check 5`, `check 01`, and `check 1 extra` reply `ERR check` and do nothing. `checkout` is `ERR command`. The pin sequence and how to read the three lines are in the [programming reference](programming.md). A `program` line in the same read stays pending as well. `loop()` takes the program line first and discards the check.
+
 ## Tests
 
-`test/test_desktop/test_configuration.cpp` uses `FakeNetworkConfigStore` and `FakeSerialPort` for staging, apply, persistence failure, USB plug gating, hostname and prefix rejection, and `program`. `test_mqtt_topics.cpp` covers the generation move. `test_deep_modules.cpp` covers apply through `Network`.
+`test/test_desktop/test_configuration.cpp` uses `FakeNetworkConfigStore` and `FakeSerialPort` for staging, apply, persistence failure, USB plug gating, hostname and prefix rejection, `program`, and `check`. `test_mqtt_topics.cpp` covers the generation move. `test_deep_modules.cpp` covers apply through `Network`.
