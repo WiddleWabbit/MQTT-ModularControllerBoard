@@ -111,15 +111,27 @@ apply
 
 `program N isp` and `program N updi` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the session in [Programming](../programming.md). N is one digit, 1 through 4. The method word is exactly `isp` or `updi`. The console does not read further lines until that session ends. `program`, `program isp`, `program updi`, `program 1`, `program 1 udpi`, a slot outside 1..4, and any extra token reply `ERR program` and do not start a session. `programmable` is `ERR command`.
 
-`check N` measures the UPDI wire on that slot and does not start a session. N is one digit, 1 through 4. Accepting it prints nothing. When the measurement finishes the console prints three lines:
+`check N` measures the UPDI wire on that slot's MOD pin and does not start a session. N is one digit, 1 through 4. Accepting it prints nothing. When the reply wait stayed high the console prints four lines:
 
 ```text
 drive low: 0
 release: 1
+listen: high
 status: no reply
 ```
 
-Each level is `0` or `1`. A status byte replaces the last line with `status: 0x` and two uppercase hex digits, for example `status: 0x30`. `check`, `check 0`, `check 5`, `check 01`, and `check 1 extra` reply `ERR check` and do nothing. `checkout` is `ERR command`. The pin sequence and how to read the three lines are in the [programming reference](programming.md). A `program` line in the same read stays pending as well. `loop()` takes the program line first and discards the check.
+A low during the reply wait adds the pulse lines after the listen line:
+
+```text
+listen: low
+pulse: 140 us in, 9 us wide
+edges: 4
+widths: 2, 2, 2, 2 us
+uart: none
+status: no reply
+```
+
+The first two levels are `0` or `1`. `drive low` is the pin while the first 25 ms low is driven. `release` is the pin at the end of the 3 ms pull-up between the lows. The listen line is `listen: high` or `listen: low`. The pulse line's first number is microseconds from the start of the wait until the line fell. Zero means it was already low. The second number is how long that first low lasted. `edges` counts every low in the wait. `widths` lists the first four, in microseconds. One low prints as `widths: 2 us`. The uart line is `none`, `frame`, `parity`, `break`, or `glitch`. The status line is `status: no echo`, `status: no reply`, or `status: 0x` and two uppercase hex digits, for example `status: 0x30`. `check`, `check 0`, `check 5`, `check 01`, and `check 1 extra` reply `ERR check` and do nothing. `checkout` is `ERR command`. The pin sequence and how to read the lines are in the [programming reference](programming.md). A `program` line in the same read stays pending as well. `loop()` takes the program line first and discards the check.
 
 ## Tests
 

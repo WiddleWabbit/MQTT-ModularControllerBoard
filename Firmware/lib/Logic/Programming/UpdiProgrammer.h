@@ -22,7 +22,8 @@ class UpdiProgrammer : public IProgrammer
 public:
   static const uint32_t kBaud = 115200;
   static const uint32_t kBreakLowMs = 25;
-  static const uint32_t kBreakHighMs = 1;
+  static const uint32_t kBreakHighMs = 3;
+  static const uint32_t kResetWaitMs = 200;
   static const size_t kMaxBody = 512;
 
   /**
@@ -30,16 +31,16 @@ public:
    *
    * @param port Binary USB byte stream.
    * @param uart Single-wire UART for the UPDI pin.
-   * @param clock Monotonic clock for the double break.
+   * @param clock Monotonic clock for the double break and the reset wait.
    */
   UpdiProgrammer(IBytePort& port, IHalfDuplexUart& uart, IClock& clock);
 
   /**
-   * Stores the UPDI pin and leaves it as an input with pull-up.
+   * Stores the UPDI pin and leaves it as an input with no pull-up.
    * Does not attach the UART.
    *
-   * @param line Slot CS pin used as the UPDI wire.
-   * @param gpio GPIO number passed to attach().
+   * @param line Slot MOD pin used as the UPDI wire.
+   * @param gpio GPIO number passed to install().
    * @return Nothing.
    */
   void start(IDigitalPin& line, uint8_t gpio) override;
@@ -54,7 +55,7 @@ public:
   void update() override;
 
   /**
-   * Detaches the UART and returns the line to an input with pull-up.
+   * Detaches the UART and returns the line to an input with no pull-up.
    *
    * @return Nothing.
    */
@@ -68,21 +69,22 @@ public:
   uint32_t activityCount() const override;
 
   /**
-   * Samples the open-drain low and the released high, then starts
-   * the double break. Does not read the USB byte stream.
+   * Installs the UART with the pad still a GPIO, then drives the
+   * open-drain low that starts the double break. The driven level is
+   * stored for the report. Does not read the USB byte stream.
    *
-   * @param line Slot CS pin used as the UPDI wire.
-   * @param gpio GPIO number passed to attach().
+   * @param line Slot MOD pin used as the UPDI wire.
+   * @param gpio GPIO number passed to install().
    * @return Nothing.
    */
   void beginLinkCheck(IDigitalPin& line, uint8_t gpio);
 
   /**
-   * Advances the link-check break by one phase. The completing call
-   * loads STATUSA, restores the pin, and fills result.
+   * Advances one phase of the double break. The call that finishes
+   * the second low claims the pad, loads STATUSA, and restores the pin.
    *
    * @param result Receives the samples and the status byte when done.
-   * @return True once, on the call that finishes the measurement.
+   * @return True once, on the call that finishes the break.
    */
   bool pollLinkCheck(UpdiLinkCheck& result);
 
@@ -110,8 +112,7 @@ private:
     None,
     Descriptor,
     Enter,
-    Erase,
-    Check
+    Erase
   };
 
   IBytePort& _port;
@@ -124,6 +125,7 @@ private:
   Pending _pending = Pending::None;
   bool _connected = false;
   bool _inProg = false;
+  bool _uartInstalled = false;
   bool _uartAttached = false;
   bool _linkOk = false;
   bool _checkRunning = false;
@@ -175,7 +177,7 @@ private:
   /**
    * Advances the double break by one phase.
    *
-   * @return True on the update that releases the line and attaches.
+   * @return True on the update that releases the line and claims the pad.
    */
   bool _advanceBreak();
 
@@ -187,7 +189,7 @@ private:
   void _runPending();
 
   /**
-   * Loads STATUSA after the link-check break and releases the pin.
+   * Loads STATUSA after the double break and releases the pin.
    *
    * @return Nothing.
    */
@@ -201,7 +203,8 @@ private:
   void _setDescriptor();
 
   /**
-   * Stores Control A after the break and replies OK.
+   * Stores Control A as 0x00 after the break and replies OK.
+   * The guard stays 128 bit times.
    *
    * @return Nothing.
    */
@@ -326,9 +329,11 @@ private:
   bool _nvmCommand(bool preserve, uint8_t command);
 
   /**
-   * Asserts and releases reset, then polls until the part responds.
+   * Asserts and releases reset, then polls system status until bit 1,
+   * 2, or 3 is set or kResetWaitMs elapses.
    *
-   * @return False when the poll budget runs out or the link fails.
+   * @return False when the window ends with those bits clear, or the
+   *         echo check fails.
    */
   bool _cpuReset();
 

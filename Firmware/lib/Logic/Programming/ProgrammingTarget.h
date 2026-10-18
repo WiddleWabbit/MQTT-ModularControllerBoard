@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "IHalfDuplexUart.h"
+
 /**
  * How the selected slot is programmed. Values match the RTC latch.
  */
@@ -13,7 +15,8 @@ enum class ProgrammingMethod : uint8_t
 
 /**
  * GPIO numbers for the programming header. The composition root owns
- * the board values and passes this struct in.
+ * the board values and passes this struct in. `csGpio` is ISP RESET.
+ * `modGpio` is the UPDI wire. Slots are stored in order, 1 through 4.
  */
 struct ProgrammingPins
 {
@@ -21,6 +24,7 @@ struct ProgrammingPins
   uint8_t misoGpio;
   uint8_t sckGpio;
   uint8_t csGpio[4];
+  uint8_t modGpio[4];
 };
 
 /**
@@ -33,14 +37,26 @@ struct ProgrammingRequest
 };
 
 /**
- * Result of one `check <slot>` measurement. The two levels are the
- * pin read-back before the break. `replied` is false when STATUSA
- * does not return a byte.
+ * Result of one `check <slot>` measurement. `drivenHigh` is the pin
+ * while the first break low is driven. `releasedHigh` is the pin at
+ * the end of the 3 ms pull-up between the lows. `listenLow` is the
+ * pin during the reply wait. `pulseAtUs` is when that wait first saw a
+ * low, and `pulseUs` is how long that first low lasted. `edgeCount`
+ * counts every low. `widthUs` keeps the first `kUartListenWidths` of
+ * them. `uartFault` is the receiver flag from that wait. `echoSeen`
+ * is the instruction's own echo. `replied` is the STATUSA byte.
  */
 struct UpdiLinkCheck
 {
   bool drivenHigh;
   bool releasedHigh;
+  bool listenLow;
+  uint16_t pulseAtUs;
+  uint16_t pulseUs;
+  uint8_t edgeCount;
+  uint16_t widthUs[kUartListenWidths];
+  UartListenFault uartFault;
+  bool echoSeen;
   bool replied;
   uint8_t status;
 };

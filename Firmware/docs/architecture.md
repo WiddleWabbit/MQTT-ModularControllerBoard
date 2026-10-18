@@ -74,7 +74,7 @@ flowchart TD
   pump --> snap["serialConsole.updateStatus()"]
 ```
 
-An immediate `status` prints inside `serialConsole.update()`, before the modules. The periodic snapshot is `updateStatus()`, after them, so it matches this pass. Heap and PSRAM lines stay in `main.cpp` and print when USB is plugged in. A `check` does not store the latch. While it runs, this pass still reads console lines, then returns before the bus. A program command on that pass is taken first.
+An immediate `status` prints inside `serialConsole.update()`, before the modules. The periodic snapshot is `updateStatus()`, after them, so it matches this pass. Heap and PSRAM lines stay in `main.cpp` and print when USB is plugged in. `delay(10)` is the last step of a pass that reaches it. It yields to the idle task. A `check` does not store the latch. Each pass while it is running polls one phase of the double break and returns before the bus and before `delay(10)`. The pass that finishes the second low reads the status byte. A program command on that pass is taken first.
 
 While a session is active, Wi-Fi, NTP, and MQTT keep running. The console, the bus, and the type modules do not. Desired solenoid and pump commands wait. Their absence windows keep counting, so a session longer than the cutoff turns those outputs off on the next module update.
 

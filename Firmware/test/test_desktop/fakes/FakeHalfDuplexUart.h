@@ -14,18 +14,38 @@ class FakeHalfDuplexUart : public IHalfDuplexUart
 {
 public:
   /**
-   * Records the GPIO and baud and marks the UART attached.
+   * Records the GPIO and baud. The pad stays disconnected.
    *
    * @param pin GPIO number.
    * @param rate Bit rate.
    * @return Nothing.
    */
-  void attach(uint8_t pin, uint32_t rate) override
+  void install(uint8_t pin, uint32_t rate) override
   {
     gpio = pin;
     baud = rate;
+    installed = true;
+    attached = false;
+    transmitterEnabled = false;
+    _clearListenRecord();
+    installCount++;
+  }
+
+  /**
+   * Marks the pad connected. Does nothing until install(), and does
+   * nothing again once the pad is already connected.
+   *
+   * @return Nothing.
+   */
+  void claim() override
+  {
+    if (!installed || attached)
+    {
+      return;
+    }
     attached = true;
-    attachCount++;
+    transmitterEnabled = true;
+    claimCount++;
   }
 
   /**
@@ -35,23 +55,32 @@ public:
    */
   void detach() override
   {
+    installed = false;
     attached = false;
+    transmitterEnabled = false;
+    pullUpEnabled = true;
     detachCount++;
     _echo.clear();
+    _late.clear();
   }
 
   /**
-   * Reports echoed bytes plus scripted responses.
+   * Reports bytes already buffered: echoes and planted late bytes.
+   * A scripted reply is not buffered until read() waits for it.
    *
-   * @return Number of bytes read() can return.
+   * @return Number of bytes read() can return without waiting.
    */
   int available() const override
   {
-    return static_cast<int>(_echo.size() + _replies.size());
+    return static_cast<int>(_echo.size() + _late.size());
   }
 
   /**
-   * Returns the next echo, else the next scripted response, else -1.
+   * Returns the next echo, or a planted late byte, with the
+   * transmitter still enabled. A read with neither disconnects the
+   * transmitter and removes the pull-up for that wait, then restores
+   * both. missReplyIndex selects one target read that returns -1 and
+   * can plant a late byte for the next available() check.
    *
    * @return Next byte, or -1.
    */
@@ -63,13 +92,122 @@ public:
       _echo.pop_front();
       return value;
     }
-    if (!_replies.empty())
+    if (!_late.empty())
     {
-      const int value = _replies.front();
-      _replies.pop_front();
+      const int value = _late.front();
+      _late.pop_front();
       return value;
     }
-    return -1;
+    releaseCount++;
+    pullUpOffCount++;
+    transmitterEnabled = false;
+    pullUpEnabled = false;
+    if (scriptListenLow)
+    {
+      _listenWentLow = true;
+      _pulseAtUs = scriptPulseAtUs;
+      _pulseUs = scriptPulseUs;
+      _listenFault = scriptListenFault;
+      _edgeCount = scriptEdgeCount;
+      for (uint8_t index = 0; index < kUartListenWidths; ++index)
+      {
+        _widthUs[index] = scriptWidthUs[index];
+      }
+    }
+    int value = -1;
+    if (missReplyIndex >= 0 && _targetReads == missReplyIndex)
+    {
+      _targetReads++;
+      if (plantLateOnMiss)
+      {
+        _late.push_back(lateOnMiss);
+      }
+    }
+    else if (!_replies.empty())
+    {
+      _targetReads++;
+      value = _replies.front();
+      _replies.pop_front();
+    }
+    pullUpEnabled = true;
+    transmitterEnabled = true;
+    rearmCount++;
+    return value;
+  }
+
+  /**
+   * Clears the low sample from reply waits.
+   *
+   * @return Nothing.
+   */
+  void clearListen() override
+  {
+    _clearListenRecord();
+  }
+
+  /**
+   * Reports whether an empty read was scripted as a low pin.
+   *
+   * @return True when a reply wait saw scriptListenLow.
+   */
+  bool listenWentLow() const override
+  {
+    return _listenWentLow;
+  }
+
+  /**
+   * Reports the scripted delay until the first low.
+   *
+   * @return Microseconds from scriptPulseAtUs after a low read.
+   */
+  uint16_t listenPulseAtUs() const override
+  {
+    return _pulseAtUs;
+  }
+
+  /**
+   * Reports the scripted width of that low.
+   *
+   * @return Microseconds from scriptPulseUs after a low read.
+   */
+  uint16_t listenPulseWidthUs() const override
+  {
+    return _pulseUs;
+  }
+
+  /**
+   * Reports the scripted UART fault.
+   *
+   * @return scriptListenFault after a low read, otherwise None.
+   */
+  UartListenFault listenFault() const override
+  {
+    return _listenFault;
+  }
+
+  /**
+   * Reports the scripted number of lows.
+   *
+   * @return scriptEdgeCount after a low read, otherwise 0.
+   */
+  uint8_t listenEdgeCount() const override
+  {
+    return _edgeCount;
+  }
+
+  /**
+   * Reports one scripted low width.
+   *
+   * @param index Zero-based width.
+   * @return Microseconds, or 0 when that slot was not scripted.
+   */
+  uint16_t listenWidthUs(uint8_t index) const override
+  {
+    if (index >= kUartListenWidths)
+    {
+      return 0;
+    }
+    return _widthUs[index];
   }
 
   /**
@@ -89,7 +227,10 @@ public:
     for (size_t index = 0; index < length; ++index)
     {
       tx.push_back(data[index]);
-      _echo.push_back(data[index]);
+      if (!dropEcho)
+      {
+        _echo.push_back(data[index]);
+      }
     }
   }
 
@@ -127,11 +268,54 @@ public:
   std::vector<size_t> writeSizes;
   uint8_t gpio = 0;
   uint32_t baud = 0;
+  bool installed = false;
   bool attached = false;
-  int attachCount = 0;
+  bool transmitterEnabled = false;
+  bool pullUpEnabled = true;
+  int installCount = 0;
+  int claimCount = 0;
   int detachCount = 0;
+  int releaseCount = 0;
+  int pullUpOffCount = 0;
+  int rearmCount = 0;
+  bool scriptListenLow = false;
+  uint16_t scriptPulseAtUs = 0;
+  uint16_t scriptPulseUs = 0;
+  UartListenFault scriptListenFault = UartListenFault::None;
+  uint8_t scriptEdgeCount = 0;
+  uint16_t scriptWidthUs[kUartListenWidths] = {};
+  bool dropEcho = false;
+  int missReplyIndex = -1;
+  bool plantLateOnMiss = false;
+  uint8_t lateOnMiss = 0;
 
 private:
+  /**
+   * Clears the recorded low, pulse, and fault. The script values stay.
+   *
+   * @return Nothing.
+   */
+  void _clearListenRecord()
+  {
+    _listenWentLow = false;
+    _pulseAtUs = 0;
+    _pulseUs = 0;
+    _listenFault = UartListenFault::None;
+    _edgeCount = 0;
+    for (uint8_t index = 0; index < kUartListenWidths; ++index)
+    {
+      _widthUs[index] = 0;
+    }
+  }
+
   std::deque<uint8_t> _echo;
+  std::deque<uint8_t> _late;
   std::deque<uint8_t> _replies;
+  int _targetReads = 0;
+  bool _listenWentLow = false;
+  uint16_t _pulseAtUs = 0;
+  uint16_t _pulseUs = 0;
+  UartListenFault _listenFault = UartListenFault::None;
+  uint8_t _edgeCount = 0;
+  uint16_t _widthUs[kUartListenWidths] = {};
 };

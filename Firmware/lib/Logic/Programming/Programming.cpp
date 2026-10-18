@@ -6,9 +6,11 @@
 
 Programming::Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart,
                          IDigitalPin& cs1, IDigitalPin& cs2, IDigitalPin& cs3,
-                         IDigitalPin& cs4, const ProgrammingPins& pins,
-                         ModuleBus& modules, IClock& clock,
-                         uint32_t idleTimeoutMs, uint32_t unplugTimeoutMs)
+                         IDigitalPin& cs4, IDigitalPin& mod1, IDigitalPin& mod2,
+                         IDigitalPin& mod3, IDigitalPin& mod4,
+                         const ProgrammingPins& pins, ModuleBus& modules,
+                         IClock& clock, uint32_t idleTimeoutMs,
+                         uint32_t unplugTimeoutMs)
   : _isp(port, spi, cs1, clock),
     _updi(port, uart, clock),
     _session(modules.host(), port, clock, idleTimeoutMs, unplugTimeoutMs),
@@ -18,6 +20,10 @@ Programming::Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart
   _cs[1] = &cs2;
   _cs[2] = &cs3;
   _cs[3] = &cs4;
+  _mod[0] = &mod1;
+  _mod[1] = &mod2;
+  _mod[2] = &mod3;
+  _mod[3] = &mod4;
 }
 
 
@@ -43,17 +49,15 @@ void Programming::begin(uint8_t slot, ProgrammingMethod method)
   {
     return;
   }
-  IDigitalPin& line = *_cs[slot - 1];
-  const uint8_t gpio = _pins.csGpio[slot - 1];
   if (method == ProgrammingMethod::Isp)
   {
-    _isp.start(line, gpio);
+    _isp.start(*_cs[slot - 1], _pins.csGpio[slot - 1]);
     _session.begin(_isp);
     return;
   }
   if (method == ProgrammingMethod::Updi)
   {
-    _updi.start(line, gpio);
+    _updi.start(*_mod[slot - 1], _pins.modGpio[slot - 1]);
     _session.begin(_updi);
   }
 }
@@ -79,8 +83,8 @@ bool Programming::active() const
 }
 
 /**
- * Binds the slot CS pin and starts the open-drain sample. A session
- * or a check already in progress is left as it is.
+ * Binds the slot MOD pin and samples it. A session or a check already
+ * in progress is left as it is.
  *
  * @param slot Firmware slot, 1 through 4.
  * @return True when this call started the measurement.
@@ -91,17 +95,18 @@ bool Programming::startUpdiCheck(uint8_t slot)
   {
     return false;
   }
-  _updi.beginLinkCheck(*_cs[slot - 1], _pins.csGpio[slot - 1]);
+  _updi.beginLinkCheck(*_mod[slot - 1], _pins.modGpio[slot - 1]);
   _checkActive = true;
   return true;
 }
 
 /**
- * Forwards one break phase. Clears the running flag on the call that
- * finishes the measurement.
+ * Advances one phase of the check's double break. Clears the running
+ * flag on the call that finishes the second low.
  *
  * @param result Receives the measurement when this call finishes it.
- * @return True once, after STATUSA is loaded and the pin is restored.
+ * @return True once, after the measurement is finished and the pin
+ *         is restored.
  */
 bool Programming::pollUpdiCheck(UpdiLinkCheck& result)
 {

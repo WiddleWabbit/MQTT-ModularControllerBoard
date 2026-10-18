@@ -3,6 +3,66 @@
 #include <cstdlib>
 #include <string>
 
+namespace
+{
+/**
+ * Names one UART listen fault for the check report.
+ *
+ * @param fault Fault recorded while the transmitter was released.
+ * @return `uart:` and `none`, `frame`, `parity`, `break`, or `glitch`.
+ */
+const char* uartFaultLine(UartListenFault fault)
+{
+  switch (fault)
+  {
+    case UartListenFault::Frame:
+      return "uart: frame";
+    case UartListenFault::Parity:
+      return "uart: parity";
+    case UartListenFault::Break:
+      return "uart: break";
+    case UartListenFault::Glitch:
+      return "uart: glitch";
+    case UartListenFault::None:
+    default:
+      return "uart: none";
+  }
+}
+
+/**
+ * Formats the stored low widths. A count above the stored set prints
+ * only the first kUartListenWidths. An empty set prints `0 us`.
+ *
+ * @param result Link-check measurement.
+ * @return The `widths:` line without a newline.
+ */
+std::string listenWidths(const UpdiLinkCheck& result)
+{
+  uint8_t shown = result.edgeCount;
+  if (shown > kUartListenWidths)
+  {
+    shown = kUartListenWidths;
+  }
+  std::string text = "widths:";
+  if (shown == 0)
+  {
+    text += " 0 us";
+    return text;
+  }
+  for (uint8_t index = 0; index < shown; ++index)
+  {
+    text += " ";
+    text += std::to_string(result.widthUs[index]);
+    if (index + 1 < shown)
+    {
+      text += ",";
+    }
+  }
+  text += " us";
+  return text;
+}
+}
+
 SerialConfigController::SerialConfigController(ISerialPort& serial,
                                                NetworkRuntime& runtime,
                                                SerialStatusReporter& status,
@@ -58,7 +118,10 @@ bool SerialConfigController::takeUpdiCheck(uint8_t& slot)
 }
 
 /**
- * Prints drive low, release, and status. A missing byte is
+ * Prints drive low, release, listen, and status. A low listen also
+ * prints when the line fell, how wide that first low was, how many
+ * lows followed, the first widths, and the UART fault. No instruction
+ * echo is `status: no echo`. An echo with no status byte is
  * `status: no reply`. A byte is `status: 0x` plus two uppercase digits.
  *
  * @param result Samples and the STATUSA byte.
@@ -68,6 +131,24 @@ void SerialConfigController::reportUpdiCheck(const UpdiLinkCheck& result)
 {
   _respond(result.drivenHigh ? "drive low: 1" : "drive low: 0");
   _respond(result.releasedHigh ? "release: 1" : "release: 0");
+  _respond(result.listenLow ? "listen: low" : "listen: high");
+  if (result.listenLow)
+  {
+    const std::string pulse =
+      "pulse: " + std::to_string(result.pulseAtUs) +
+      " us in, " + std::to_string(result.pulseUs) + " us wide";
+    _respond(pulse.c_str());
+    const std::string edges = "edges: " + std::to_string(result.edgeCount);
+    _respond(edges.c_str());
+    const std::string widths = listenWidths(result);
+    _respond(widths.c_str());
+    _respond(uartFaultLine(result.uartFault));
+  }
+  if (!result.echoSeen)
+  {
+    _respond("status: no echo");
+    return;
+  }
   if (!result.replied)
   {
     _respond("status: no reply");
@@ -335,17 +416,17 @@ bool SerialConfigController::_acceptCheck(const std::string& line,
 
 /**
  * Names the GPIOs for the accepted session. ISP lists the shared SPI
- * pins and the slot CS pin as RESET. UPDI lists only that CS pin.
+ * pins and the slot CS pin as RESET. UPDI lists only that MOD pin.
  *
  * @param request Slot and method.
  * @return One pin line.
  */
 std::string SerialConfigController::_pinLine(const ProgrammingRequest& request) const
 {
-  const unsigned gpio = _pins.csGpio[request.slot - 1];
   const unsigned slot = request.slot;
   if (request.method == ProgrammingMethod::Isp)
   {
+    const unsigned gpio = _pins.csGpio[request.slot - 1];
     return "ISP slot " + std::to_string(slot) +
            ": MOSI GPIO" + std::to_string(static_cast<unsigned>(_pins.mosiGpio)) +
            ", MISO GPIO" + std::to_string(static_cast<unsigned>(_pins.misoGpio)) +
@@ -353,6 +434,7 @@ std::string SerialConfigController::_pinLine(const ProgrammingRequest& request) 
            ", RESET GPIO" + std::to_string(gpio) +
            ", 3V3, GND";
   }
+  const unsigned gpio = _pins.modGpio[request.slot - 1];
   return "UPDI slot " + std::to_string(slot) +
          ": UPDI GPIO" + std::to_string(gpio) +
          ", 3V3, GND";

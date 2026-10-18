@@ -184,7 +184,7 @@ bool parse(const std::vector<uint8_t>& bytes, uint16_t& sequence,
 }
 
 /**
- * Connects with a 64-byte flash page and runs the 25/1/25 break.
+ * Connects with a 64-byte flash page and runs the 25/3/25 break.
  *
  * @param rig Fixture whose pin is already bound.
  * @return Nothing.
@@ -200,7 +200,7 @@ void connect(UpdiFixture& rig)
   rig.programmer.update();
   rig.clock.advance(25);
   rig.programmer.update();
-  rig.clock.advance(1);
+  rig.clock.advance(3);
   rig.programmer.update();
   rig.clock.advance(25);
   rig.programmer.update();
@@ -217,6 +217,79 @@ void scriptEnterFromRun(FakeHalfDuplexUart& uart)
   const uint8_t replies[] = {0x82, 0x08, 0x00, 0x08, 0x40, 0x40};
   uart.reply(replies, sizeof(replies));
 }
+
+/**
+ * Queues enter replies whose first reset polls are still clear.
+ * Four 0x00 bytes, then BOOTDONE in bit 1.
+ *
+ * @param uart UART whose reply queue receives the script.
+ * @return Nothing.
+ */
+void scriptEnterAfterSlowBoot(FakeHalfDuplexUart& uart)
+{
+  const uint8_t replies[] = {
+    0x82, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x08, 0x40, 0x40};
+  uart.reply(replies, sizeof(replies));
+}
+
+/**
+ * Counts recorded writes of one length.
+ *
+ * @param sizes Recorded write lengths.
+ * @param length Length to count.
+ * @return How many writes had that length.
+ */
+int writesOf(const std::vector<size_t>& sizes, size_t length)
+{
+  int count = 0;
+  for (size_t entry : sizes)
+  {
+    if (entry == length)
+    {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Clock that can step forward on every millis() call.
+ */
+class StepClock : public IClock
+{
+public:
+  /**
+   * Returns the current time. When autoStep is set, each call adds
+   * stepMs first.
+   *
+   * @return Current time in milliseconds.
+   */
+  uint32_t millis() const override
+  {
+    if (autoStep)
+    {
+      _now += stepMs;
+    }
+    return _now;
+  }
+
+  /**
+   * Moves the clock forward without a per-call step.
+   *
+   * @param milliseconds Amount of time to advance.
+   * @return Nothing.
+   */
+  void advance(uint32_t milliseconds)
+  {
+    _now += milliseconds;
+  }
+
+  bool autoStep = false;
+  uint32_t stepMs = 25;
+
+private:
+  mutable uint32_t _now = 0;
+};
 
 /**
  * Queues the replies for one aligned 64-byte flash page write.
@@ -257,7 +330,7 @@ void testUpdiSignOnReturnsJtagiceBody()
   TEST_ASSERT_EQUAL_HEX16(0x1234, sequence);
   TEST_ASSERT_EQUAL(29, answer.size());
   TEST_ASSERT_EQUAL_MEMORY(kSignOn, answer.data(), 29);
-  TEST_ASSERT_EQUAL(0, rig.uart.attachCount);
+  TEST_ASSERT_EQUAL(0, rig.uart.installCount);
 }
 
 void testUpdiDescriptorDoubleBreakThenControlA()
@@ -271,32 +344,51 @@ void testUpdiDescriptorDoubleBreakThenControlA()
   rig.programmer.update();
   TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
   TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_TRUE(rig.uart.installed);
   TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(1, rig.uart.installCount);
+  TEST_ASSERT_EQUAL(0, rig.uart.claimCount);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
   TEST_ASSERT_EQUAL(0, rig.port.output.size());
 
   rig.clock.advance(24);
   rig.programmer.update();
   TEST_ASSERT_FALSE(rig.line.level);
   TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
 
   rig.clock.advance(1);
   rig.programmer.update();
-  TEST_ASSERT_TRUE(rig.line.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_TRUE(rig.line.read());
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  rig.clock.advance(2);
+  rig.programmer.update();
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_TRUE(rig.line.read());
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
   rig.clock.advance(1);
   rig.programmer.update();
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
   TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
   rig.clock.advance(24);
   rig.programmer.update();
   TEST_ASSERT_FALSE(rig.line.level);
   TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
 
   rig.clock.advance(1);
   rig.programmer.update();
   TEST_ASSERT_TRUE(rig.line.level);
   TEST_ASSERT_TRUE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(1, rig.uart.installCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.claimCount);
   TEST_ASSERT_EQUAL(6, rig.uart.gpio);
   TEST_ASSERT_EQUAL(115200, rig.uart.baud);
-  const uint8_t stcs[] = {0x55, 0xC2, 0x06};
+  const uint8_t stcs[] = {0x55, 0xC2, 0x00};
   TEST_ASSERT_TRUE(contains(rig.uart.tx, stcs, sizeof(stcs)));
   uint16_t sequence = 0;
   std::vector<uint8_t> answer;
@@ -311,9 +403,11 @@ void testUpdiGroupsInstructionIntoOneWrite()
   connect(rig);
   TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
   TEST_ASSERT_EQUAL(3, rig.uart.writeSizes[0]);
-  const uint8_t stcs[] = {0x55, 0xC2, 0x06};
+  const uint8_t stcs[] = {0x55, 0xC2, 0x00};
   TEST_ASSERT_EQUAL(3, rig.uart.tx.size());
   TEST_ASSERT_EQUAL_MEMORY(stcs, rig.uart.tx.data(), 3);
+  TEST_ASSERT_EQUAL(0, rig.uart.releaseCount);
+  TEST_ASSERT_EQUAL(0, rig.uart.pullUpOffCount);
 
   rig.uart.tx.clear();
   rig.uart.writeSizes.clear();
@@ -340,10 +434,12 @@ void testUpdiEnterWhileDisconnectedAlsoBreaks()
   rig.port.feed(bytes.data(), bytes.size());
   rig.programmer.update();
   TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_TRUE(rig.uart.installed);
+  TEST_ASSERT_FALSE(rig.uart.attached);
   TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
   rig.clock.advance(25);
   rig.programmer.update();
-  rig.clock.advance(1);
+  rig.clock.advance(3);
   rig.programmer.update();
   rig.clock.advance(25);
   rig.programmer.update();
@@ -363,7 +459,7 @@ void testUpdiReadsSignature()
   connect(rig);
   rig.port.output.clear();
   rig.uart.tx.clear();
-  scriptEnterFromRun(rig.uart);
+  scriptEnterAfterSlowBoot(rig.uart);
   const uint8_t enter[] = {0x14};
   rig.send(2, enter, sizeof(enter));
   const uint8_t readReplies[] = {0x08, 0x40, 0x1E, 0x94, 0x22};
@@ -465,7 +561,7 @@ void testUpdiBadCrcAndUnknownCommandStayInSession()
   TEST_ASSERT_EQUAL(0, spi.beginCount);
 }
 
-void testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup()
+void testUpdiLeaveReleasesTheLineAndShutdownRestoresInput()
 {
   UpdiFixture rig;
   connect(rig);
@@ -486,12 +582,12 @@ void testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup()
 
   rig.programmer.shutdown();
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
 }
 
 /**
- * Steps a link check through 25 ms low, 1 ms high, and 25 ms low.
- * The last poll is the one that attaches and reads STATUSA.
+ * Steps the 25/3/25 break. Early polls leave the pin unclaimed and
+ * transmit nothing. The last poll loads STATUSA.
  *
  * @param rig Fixture whose link check has just started.
  * @param result Receives the finished measurement.
@@ -499,27 +595,46 @@ void testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup()
  */
 void finishLinkCheck(UpdiFixture& rig, UpdiLinkCheck& result)
 {
-  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
   TEST_ASSERT_FALSE(rig.line.level);
-  TEST_ASSERT_FALSE(rig.uart.attached);
-
-  rig.clock.advance(24);
-  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
-  TEST_ASSERT_FALSE(rig.line.level);
-
-  rig.clock.advance(1);
-  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
-  TEST_ASSERT_TRUE(rig.line.level);
-
-  rig.clock.advance(1);
-  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
-  TEST_ASSERT_FALSE(rig.line.level);
-
-  rig.clock.advance(24);
-  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(result));
-  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
+  TEST_ASSERT_TRUE(rig.uart.installed);
   TEST_ASSERT_FALSE(rig.uart.attached);
   TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+  TEST_ASSERT_EQUAL(1, rig.uart.installCount);
+
+  UpdiLinkCheck pending = {};
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+  TEST_ASSERT_EQUAL(0, rig.uart.claimCount);
+
+  rig.clock.advance(24);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+
+  rig.clock.advance(1);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+
+  rig.clock.advance(2);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_EQUAL(0, rig.uart.claimCount);
+
+  rig.clock.advance(1);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.line.mode);
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+
+  rig.clock.advance(24);
+  TEST_ASSERT_FALSE(rig.programmer.pollLinkCheck(pending));
+  TEST_ASSERT_FALSE(rig.line.level);
+  TEST_ASSERT_EQUAL(0, rig.uart.claimCount);
 
   rig.clock.advance(1);
   TEST_ASSERT_TRUE(rig.programmer.pollLinkCheck(result));
@@ -543,6 +658,14 @@ void testUpdiLinkCheckSamplesLevelsThenLoadsStatus()
   finishLinkCheck(rig, result);
   TEST_ASSERT_FALSE(result.drivenHigh);
   TEST_ASSERT_TRUE(result.releasedHigh);
+  TEST_ASSERT_EQUAL(1, rig.uart.claimCount);
+  TEST_ASSERT_FALSE(result.listenLow);
+  TEST_ASSERT_EQUAL(0, result.pulseAtUs);
+  TEST_ASSERT_EQUAL(0, result.pulseUs);
+  TEST_ASSERT_EQUAL(0, result.edgeCount);
+  TEST_ASSERT_EQUAL(static_cast<int>(UartListenFault::None),
+                    static_cast<int>(result.uartFault));
+  TEST_ASSERT_TRUE(result.echoSeen);
   TEST_ASSERT_TRUE(result.replied);
   TEST_ASSERT_EQUAL_HEX8(0x30, result.status);
   TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
@@ -552,8 +675,12 @@ void testUpdiLinkCheckSamplesLevelsThenLoadsStatus()
   TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
   TEST_ASSERT_EQUAL(6, rig.uart.gpio);
   TEST_ASSERT_EQUAL(115200, rig.uart.baud);
+  TEST_ASSERT_EQUAL(1, rig.uart.releaseCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.pullUpOffCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.rearmCount);
+  TEST_ASSERT_TRUE(rig.uart.pullUpEnabled);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
   TEST_ASSERT_EQUAL(0, rig.port.output.size());
   TEST_ASSERT_EQUAL(1, rig.port.input.size());
 }
@@ -566,6 +693,12 @@ void testUpdiLinkCheckWithNoStatusByteStillReleasesThePin()
   finishLinkCheck(rig, result);
   TEST_ASSERT_FALSE(result.drivenHigh);
   TEST_ASSERT_TRUE(result.releasedHigh);
+  TEST_ASSERT_FALSE(result.listenLow);
+  TEST_ASSERT_EQUAL(0, result.pulseAtUs);
+  TEST_ASSERT_EQUAL(0, result.pulseUs);
+  TEST_ASSERT_EQUAL(static_cast<int>(UartListenFault::None),
+                    static_cast<int>(result.uartFault));
+  TEST_ASSERT_TRUE(result.echoSeen);
   TEST_ASSERT_FALSE(result.replied);
   TEST_ASSERT_EQUAL(0, result.status);
   TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
@@ -573,8 +706,230 @@ void testUpdiLinkCheckWithNoStatusByteStillReleasesThePin()
   const uint8_t ldcs[] = {0x55, 0x80};
   TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
   TEST_ASSERT_EQUAL(7, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(1, rig.uart.releaseCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.pullUpOffCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.rearmCount);
+  TEST_ASSERT_TRUE(rig.uart.pullUpEnabled);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+}
+
+void testUpdiLinkCheckReportsADipAndAMissingEcho()
+{
+  UpdiFixture dipped;
+  dipped.uart.scriptListenLow = true;
+  dipped.uart.scriptPulseAtUs = 140;
+  dipped.uart.scriptPulseUs = 9;
+  dipped.uart.scriptEdgeCount = 4;
+  dipped.uart.scriptWidthUs[0] = 2;
+  dipped.uart.scriptWidthUs[1] = 2;
+  dipped.uart.scriptWidthUs[2] = 2;
+  dipped.uart.scriptWidthUs[3] = 2;
+  dipped.uart.scriptListenFault = UartListenFault::Frame;
+  dipped.programmer.beginLinkCheck(dipped.line, 6);
+  UpdiLinkCheck low = {};
+  finishLinkCheck(dipped, low);
+  TEST_ASSERT_TRUE(low.listenLow);
+  TEST_ASSERT_EQUAL(140, low.pulseAtUs);
+  TEST_ASSERT_EQUAL(9, low.pulseUs);
+  TEST_ASSERT_EQUAL(4, low.edgeCount);
+  TEST_ASSERT_EQUAL(2, low.widthUs[0]);
+  TEST_ASSERT_EQUAL(2, low.widthUs[3]);
+  TEST_ASSERT_EQUAL(static_cast<int>(UartListenFault::Frame),
+                    static_cast<int>(low.uartFault));
+  TEST_ASSERT_TRUE(low.echoSeen);
+  TEST_ASSERT_FALSE(low.replied);
+
+  UpdiFixture silent;
+  silent.uart.dropEcho = true;
+  silent.programmer.beginLinkCheck(silent.line, 6);
+  UpdiLinkCheck noEcho = {};
+  finishLinkCheck(silent, noEcho);
+  TEST_ASSERT_FALSE(noEcho.listenLow);
+  TEST_ASSERT_EQUAL(0, noEcho.pulseAtUs);
+  TEST_ASSERT_EQUAL(0, noEcho.pulseUs);
+  TEST_ASSERT_EQUAL(static_cast<int>(UartListenFault::None),
+                    static_cast<int>(noEcho.uartFault));
+  TEST_ASSERT_FALSE(noEcho.echoSeen);
+  TEST_ASSERT_FALSE(noEcho.replied);
+  TEST_ASSERT_EQUAL(1, silent.uart.releaseCount);
+  TEST_ASSERT_EQUAL(1, silent.uart.pullUpOffCount);
+  TEST_ASSERT_EQUAL(1, silent.uart.rearmCount);
+  const uint8_t ldcs[] = {0x55, 0x80};
+  TEST_ASSERT_EQUAL_MEMORY(ldcs, silent.uart.tx.data(), 2);
+}
+
+void testUpdiLinkCheckSendsWhenTheGapStaysLow()
+{
+  UpdiFixture rig;
+  rig.line.externalLevel = false;
+  rig.uart.reply(0x30);
+  rig.programmer.beginLinkCheck(rig.line, 6);
+  UpdiLinkCheck result = {};
+  finishLinkCheck(rig, result);
+  TEST_ASSERT_FALSE(result.drivenHigh);
+  TEST_ASSERT_FALSE(result.releasedHigh);
+  TEST_ASSERT_EQUAL(1, rig.uart.claimCount);
+  TEST_ASSERT_EQUAL(1, rig.uart.writeSizes.size());
+  TEST_ASSERT_EQUAL(2, rig.uart.writeSizes[0]);
+  const uint8_t ldcs[] = {0x55, 0x80};
+  TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
+  TEST_ASSERT_TRUE(result.echoSeen);
+  TEST_ASSERT_TRUE(result.replied);
+  TEST_ASSERT_EQUAL_HEX8(0x30, result.status);
+  TEST_ASSERT_FALSE(rig.uart.attached);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+}
+
+void testUpdiEnterWaitsForBootDone()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  scriptEnterAfterSlowBoot(rig.uart);
+  const uint8_t enter[] = {0x14};
+  rig.send(4, enter, sizeof(enter));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiEnterRetriesAMissedStatusByte()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.uart.writeSizes.clear();
+  rig.uart.missReplyIndex = 1;
+  rig.uart.plantLateOnMiss = true;
+  rig.uart.lateOnMiss = 0x00;
+  const uint8_t replies[] = {0x82, 0x02, 0x00, 0x08, 0x40, 0x40};
+  rig.uart.reply(replies, sizeof(replies));
+  const uint8_t enter[] = {0x14};
+  rig.send(5, enter, sizeof(enter));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+  TEST_ASSERT_EQUAL(5, writesOf(rig.uart.writeSizes, 2));
+}
+
+void testUpdiEnterGivesUpWhenResetStaysClear()
+{
+  StepClock clock;
+  FakeBytePort port;
+  FakeHalfDuplexUart uart;
+  FakeDigitalPin line;
+  UpdiProgrammer programmer(port, uart, clock);
+  programmer.start(line, 6);
+  uint8_t descriptor[247] = {};
+  descriptor[0] = 0x0C;
+  descriptor[244] = 64;
+  descriptor[246] = 32;
+  const std::vector<uint8_t> setup = frame(7, descriptor, sizeof(descriptor));
+  port.feed(setup.data(), setup.size());
+  programmer.update();
+  clock.advance(25);
+  programmer.update();
+  clock.advance(3);
+  programmer.update();
+  clock.advance(25);
+  programmer.update();
+
+  const uint8_t replies[] = {
+    0x82,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  uart.reply(replies, sizeof(replies));
+  clock.autoStep = true;
+  port.output.clear();
+  uart.tx.clear();
+  uart.writeSizes.clear();
+  const uint8_t enter[] = {0x14};
+  const std::vector<uint8_t> command = frame(3, enter, sizeof(enter));
+  port.feed(command.data(), command.size());
+  programmer.update();
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  TEST_ASSERT_TRUE(writesOf(uart.writeSizes, 2) > 5);
+  TEST_ASSERT_FALSE(contains(uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiEnterEchoMismatchDoesNotWait()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.uart.writeSizes.clear();
+  rig.uart.dropEcho = true;
+  const uint8_t replies[] = {0x55, 0x8B, 0x82, 0x00};
+  rig.uart.reply(replies, sizeof(replies));
+  const uint8_t enter[] = {0x14};
+  rig.send(6, enter, sizeof(enter));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  TEST_ASSERT_EQUAL(1, writesOf(rig.uart.writeSizes, 2));
+  TEST_ASSERT_EQUAL(1, writesOf(rig.uart.writeSizes, 3));
+}
+
+void testUpdiGoBeforeProgrammingLeavesThePinEnabled()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  const uint8_t go[] = {0x08};
+  rig.send(8, go, sizeof(go));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+}
+
+void testUpdiGoAfterEnterDisablesThePin()
+{
+  UpdiFixture rig;
+  connect(rig);
+  scriptEnterFromRun(rig.uart);
+  const uint8_t enter[] = {0x14};
+  rig.send(2, enter, sizeof(enter));
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  const uint8_t go[] = {0x08};
+  rig.send(8, go, sizeof(go));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  const uint8_t disable[] = {0x55, 0xC3, 0x04};
+  TEST_ASSERT_EQUAL(3, rig.uart.tx.size());
+  TEST_ASSERT_EQUAL_MEMORY(disable, rig.uart.tx.data(), 3);
+}
+
+void testUpdiSignOffBeforeProgrammingLeavesThePinEnabled()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  const uint8_t signOff[] = {0x00};
+  rig.send(9, signOff, sizeof(signOff));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
 }
 
 void testUpdiSessionDoesNotUseSpi()
@@ -605,10 +960,19 @@ void runUpdiTests()
   RUN_TEST(testUpdiGroupsInstructionIntoOneWrite);
   RUN_TEST(testUpdiEnterWhileDisconnectedAlsoBreaks);
   RUN_TEST(testUpdiReadsSignature);
+  RUN_TEST(testUpdiEnterWaitsForBootDone);
+  RUN_TEST(testUpdiEnterRetriesAMissedStatusByte);
+  RUN_TEST(testUpdiEnterGivesUpWhenResetStaysClear);
+  RUN_TEST(testUpdiEnterEchoMismatchDoesNotWait);
+  RUN_TEST(testUpdiGoBeforeProgrammingLeavesThePinEnabled);
+  RUN_TEST(testUpdiGoAfterEnterDisablesThePin);
+  RUN_TEST(testUpdiSignOffBeforeProgrammingLeavesThePinEnabled);
   RUN_TEST(testUpdiChipEraseAndPageWrite);
   RUN_TEST(testUpdiBadCrcAndUnknownCommandStayInSession);
-  RUN_TEST(testUpdiLeaveReleasesTheLineAndShutdownRestoresPullup);
+  RUN_TEST(testUpdiLeaveReleasesTheLineAndShutdownRestoresInput);
   RUN_TEST(testUpdiLinkCheckSamplesLevelsThenLoadsStatus);
   RUN_TEST(testUpdiLinkCheckWithNoStatusByteStillReleasesThePin);
+  RUN_TEST(testUpdiLinkCheckReportsADipAndAMissingEcho);
+  RUN_TEST(testUpdiLinkCheckSendsWhenTheGapStaysLow);
   RUN_TEST(testUpdiSessionDoesNotUseSpi);
 }

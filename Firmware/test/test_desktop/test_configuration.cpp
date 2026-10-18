@@ -19,7 +19,8 @@
 
 namespace
 {
-const ProgrammingPins kProgrammingPins = {11, 13, 12, {6, 7, 15, 16}};
+const ProgrammingPins kProgrammingPins = {
+  11, 13, 12, {6, 7, 15, 16}, {40, 42, 43, 1}};
 
 NetworkConfig config()
 {
@@ -844,7 +845,7 @@ void testProgramCommandSelectsSlotAndMethod()
   TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Updi),
                     static_cast<int>(request.method));
   TEST_ASSERT_EQUAL_STRING(
-    "UPDI slot 1: UPDI GPIO6, 3V3, GND", updi1.serial.output[1].c_str());
+    "UPDI slot 1: UPDI GPIO40, 3V3, GND", updi1.serial.output[1].c_str());
 
   CommandStack updi4;
   updi4.serial.feed("program 4 updi\n");
@@ -852,7 +853,7 @@ void testProgramCommandSelectsSlotAndMethod()
   TEST_ASSERT_TRUE(updi4.controller.takeProgrammingRequest(request));
   TEST_ASSERT_EQUAL(4, request.slot);
   TEST_ASSERT_EQUAL_STRING(
-    "UPDI slot 4: UPDI GPIO16, 3V3, GND", updi4.serial.output[1].c_str());
+    "UPDI slot 4: UPDI GPIO1, 3V3, GND", updi4.serial.output[1].c_str());
 }
 
 /**
@@ -911,12 +912,15 @@ void testCheckCommandSelectsSlotAndPrintsTheLink()
   UpdiLinkCheck quiet = {};
   quiet.drivenHigh = false;
   quiet.releasedHigh = true;
+  quiet.listenLow = false;
+  quiet.echoSeen = true;
   quiet.replied = false;
   slot1.controller.reportUpdiCheck(quiet);
-  TEST_ASSERT_EQUAL(3, slot1.serial.output.size());
+  TEST_ASSERT_EQUAL(4, slot1.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("drive low: 0", slot1.serial.output[0].c_str());
   TEST_ASSERT_EQUAL_STRING("release: 1", slot1.serial.output[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("status: no reply", slot1.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("listen: high", slot1.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: no reply", slot1.serial.output[3].c_str());
 
   CommandStack slot2;
   slot2.serial.feed("check 2\n");
@@ -940,23 +944,73 @@ void testCheckCommandSelectsSlotAndPrintsTheLink()
   UpdiLinkCheck status = {};
   status.drivenHigh = false;
   status.releasedHigh = true;
+  status.listenLow = false;
+  status.echoSeen = true;
   status.replied = true;
   status.status = 0x30;
   answered.controller.reportUpdiCheck(status);
   TEST_ASSERT_EQUAL_STRING("drive low: 0", answered.serial.output[0].c_str());
   TEST_ASSERT_EQUAL_STRING("release: 1", answered.serial.output[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("status: 0x30", answered.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("listen: high", answered.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: 0x30", answered.serial.output[3].c_str());
 
   CommandStack padded;
   UpdiLinkCheck lowNibble = {};
   lowNibble.drivenHigh = true;
   lowNibble.releasedHigh = false;
+  lowNibble.listenLow = true;
+  lowNibble.pulseAtUs = 140;
+  lowNibble.pulseUs = 9;
+  lowNibble.edgeCount = 4;
+  lowNibble.widthUs[0] = 2;
+  lowNibble.widthUs[1] = 2;
+  lowNibble.widthUs[2] = 2;
+  lowNibble.widthUs[3] = 2;
+  lowNibble.uartFault = UartListenFault::Frame;
+  lowNibble.echoSeen = true;
   lowNibble.replied = true;
   lowNibble.status = 0x0A;
   padded.controller.reportUpdiCheck(lowNibble);
   TEST_ASSERT_EQUAL_STRING("drive low: 1", padded.serial.output[0].c_str());
   TEST_ASSERT_EQUAL_STRING("release: 0", padded.serial.output[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("status: 0x0A", padded.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("listen: low", padded.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "pulse: 140 us in, 9 us wide", padded.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("edges: 4", padded.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "widths: 2, 2, 2, 2 us", padded.serial.output[5].c_str());
+  TEST_ASSERT_EQUAL_STRING("uart: frame", padded.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: 0x0A", padded.serial.output[7].c_str());
+
+  CommandStack settled;
+  UpdiLinkCheck early = {};
+  early.releasedHigh = true;
+  early.listenLow = true;
+  early.pulseAtUs = 0;
+  early.pulseUs = 2;
+  early.edgeCount = 1;
+  early.widthUs[0] = 2;
+  early.uartFault = UartListenFault::None;
+  early.echoSeen = true;
+  settled.controller.reportUpdiCheck(early);
+  TEST_ASSERT_EQUAL_STRING("listen: low", settled.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING(
+    "pulse: 0 us in, 2 us wide", settled.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("edges: 1", settled.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("widths: 2 us", settled.serial.output[5].c_str());
+  TEST_ASSERT_EQUAL_STRING("uart: none", settled.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: no reply", settled.serial.output[7].c_str());
+
+  CommandStack missingEcho;
+  UpdiLinkCheck noEcho = {};
+  noEcho.drivenHigh = false;
+  noEcho.releasedHigh = true;
+  noEcho.listenLow = false;
+  noEcho.echoSeen = false;
+  noEcho.replied = false;
+  missingEcho.controller.reportUpdiCheck(noEcho);
+  TEST_ASSERT_EQUAL_STRING("listen: high", missingEcho.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("status: no echo", missingEcho.serial.output[3].c_str());
 }
 
 void testCheckStaysPendingWhenProgramIsAlsoAccepted()

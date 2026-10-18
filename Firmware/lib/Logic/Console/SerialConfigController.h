@@ -51,9 +51,10 @@ public:
   bool takeUpdiCheck(uint8_t& slot);
 
   /**
-   * Prints the three link-check lines. Levels are 0 or 1. A missing
-   * status byte prints `no reply`. A byte prints as `0x` and two
-   * uppercase hex digits.
+   * Prints the link-check lines. Levels are 0 or 1. The listen line is
+   * `low` or `high`. A low adds the pulse time, the edge count, the
+   * first widths, and the UART fault. Status is `no echo`, `no reply`,
+   * or `0x` and two uppercase hex digits.
    *
    * @param result Samples and the STATUSA byte.
    * @return Nothing.

@@ -121,10 +121,10 @@ UpdiProgrammer::UpdiProgrammer(IBytePort& port, IHalfDuplexUart& uart,
 // ========== Public API ==========
 
 /**
- * Stores the UPDI pin and leaves it idle. The UART stays detached
- * until a connect break finishes.
+ * Stores the UPDI pin and leaves it as an input with no pull-up.
+ * The UART stays detached until a connect break finishes.
  *
- * @param line Slot CS pin.
+ * @param line Slot MOD pin.
  * @param gpio GPIO number of that pin.
  * @return Nothing.
  */
@@ -132,7 +132,7 @@ void UpdiProgrammer::start(IDigitalPin& line, uint8_t gpio)
 {
   _line = &line;
   _gpio = gpio;
-  _line->setMode(PinMode::DigitalInputPullup);
+  _line->setMode(PinMode::DigitalInput);
 }
 
 /**
@@ -169,20 +169,22 @@ void UpdiProgrammer::update()
 }
 
 /**
- * Detaches the UART and returns the line to an input with pull-up.
+ * Detaches the UART and returns the line to an input with no pull-up.
+ * That matches the bus idle state of a MOD pin.
  *
  * @return Nothing.
  */
 void UpdiProgrammer::shutdown()
 {
-  if (_uartAttached)
+  if (_uartInstalled)
   {
     _uart.detach();
+    _uartInstalled = false;
     _uartAttached = false;
   }
   if (_line != nullptr)
   {
-    _line->setMode(PinMode::DigitalInputPullup);
+    _line->setMode(PinMode::DigitalInput);
   }
   _breakPhase = BreakPhase::Idle;
   _pending = Pending::None;
@@ -195,10 +197,12 @@ void UpdiProgrammer::shutdown()
 }
 
 /**
- * Drives the pin low, samples it, releases it, samples it again,
- * then holds it low for the first break phase.
+ * Installs the UART with the pad still a GPIO, then drives the
+ * open-drain low that starts the double break. The driven level is
+ * stored for the report. Host bytes stay unread. Later polls advance
+ * the phases, so this call does not release the pin.
  *
- * @param line Slot CS pin.
+ * @param line Slot MOD pin.
  * @param gpio GPIO number of that pin.
  * @return Nothing.
  */
@@ -206,23 +210,46 @@ void UpdiProgrammer::beginLinkCheck(IDigitalPin& line, uint8_t gpio)
 {
   _line = &line;
   _gpio = gpio;
+  _checkResult.drivenHigh = false;
+  _checkResult.releasedHigh = false;
+  _checkResult.replied = false;
+  _checkResult.echoSeen = false;
+  _checkResult.listenLow = false;
+  _checkResult.pulseAtUs = 0;
+  _checkResult.pulseUs = 0;
+  _checkResult.edgeCount = 0;
+  for (uint8_t index = 0; index < kUartListenWidths; ++index)
+  {
+    _checkResult.widthUs[index] = 0;
+  }
+  _checkResult.uartFault = UartListenFault::None;
+  _checkResult.status = 0;
+  _checkRunning = true;
+  _pending = Pending::None;
+  _connected = false;
+  if (_uartInstalled)
+  {
+    _uart.detach();
+    _uartInstalled = false;
+    _uartAttached = false;
+  }
+  _uart.install(_gpio, kBaud);
+  _uartInstalled = true;
+  _uartAttached = false;
   _line->setMode(PinMode::DigitalOutputOpenDrain);
   _line->write(false);
   _checkResult.drivenHigh = _line->read();
-  _line->write(true);
-  _checkResult.releasedHigh = _line->read();
-  _checkResult.replied = false;
-  _checkResult.status = 0;
-  _checkRunning = true;
-  _startBreak(Pending::Check);
+  _breakMark = _clock.millis();
+  _breakPhase = BreakPhase::Low1;
 }
 
 /**
- * Moves the break one phase. Host bytes stay unread. The completing
- * call loads STATUSA and restores the pull-up.
+ * Advances one phase of the double break. The call that finishes the
+ * second low claims the pad, loads STATUSA, and restores the pin.
+ * Host bytes stay unread.
  *
  * @param result Receives the measurement when this call finishes it.
- * @return True once, after the status load.
+ * @return True once, after the pin is restored.
  */
 bool UpdiProgrammer::pollLinkCheck(UpdiLinkCheck& result)
 {
@@ -230,16 +257,12 @@ bool UpdiProgrammer::pollLinkCheck(UpdiLinkCheck& result)
   {
     return false;
   }
-  if (_breakPhase != BreakPhase::Idle)
+  if (!_advanceBreak())
   {
-    if (!_advanceBreak())
-    {
-      return false;
-    }
-    _finishLinkCheck();
+    return false;
   }
+  _finishLinkCheck();
   result = _checkResult;
-  _checkRunning = false;
   return true;
 }
 
@@ -376,8 +399,15 @@ void UpdiProgrammer::_dispatch()
       if (_connected)
       {
         _linkOk = _uartAttached;
-        _leaveTarget();
-        _disableUpdi();
+        if (_inProg)
+        {
+          _leaveTarget();
+          _disableUpdi();
+        }
+        else
+        {
+          _connected = false;
+        }
       }
       _baudCode = 4;
       if (_connected)
@@ -458,7 +488,7 @@ void UpdiProgrammer::_dispatch()
       _leaveProgmode();
       return;
     case kCmdGo:
-      if (_connected)
+      if (_connected && _inProg)
       {
         _linkOk = _uartAttached;
         if (_disableUpdi())
@@ -582,8 +612,9 @@ void UpdiProgrammer::_reply(const uint8_t* body, uint16_t length)
 // ========== Break ==========
 
 /**
- * Drops the UART and holds the line low. One later update() moves
- * each of the three timed phases.
+ * Installs the UART, then holds the line low. The driver install
+ * finishes before the break timer starts. One later update() moves
+ * each of the three timed phases. The pad stays a GPIO until claim().
  *
  * @param pending Command to run when the line is released.
  * @return Nothing.
@@ -591,7 +622,14 @@ void UpdiProgrammer::_reply(const uint8_t* body, uint16_t length)
 void UpdiProgrammer::_startBreak(Pending pending)
 {
   _pending = pending;
-  _uart.detach();
+  if (_uartInstalled)
+  {
+    _uart.detach();
+    _uartInstalled = false;
+    _uartAttached = false;
+  }
+  _uart.install(_gpio, kBaud);
+  _uartInstalled = true;
   _uartAttached = false;
   _connected = false;
   if (_line != nullptr)
@@ -604,8 +642,12 @@ void UpdiProgrammer::_startBreak(Pending pending)
 }
 
 /**
- * Moves 25 ms low, 1 ms high, then 25 ms low. The completing call
- * releases the line and attaches the UART at 115200.
+ * Moves 25 ms open-drain low, 3 ms input pull-up, then 25 ms
+ * open-drain low. The pull-up is the high between the breaks. A MOD
+ * pin has no board pull-up, and open-drain high only releases the
+ * driver. A link check samples the pin at the end of that pull-up.
+ * The completing call releases the line, claims the pad, and returns
+ * so the waiting instruction is written in that same call.
  *
  * @return True when this call finished the break.
  */
@@ -621,7 +663,7 @@ bool UpdiProgrammer::_advanceBreak()
     }
     if (_line != nullptr)
     {
-      _line->write(true);
+      _line->setMode(PinMode::DigitalInputPullup);
     }
     _breakMark = now;
     _breakPhase = BreakPhase::High;
@@ -633,9 +675,13 @@ bool UpdiProgrammer::_advanceBreak()
     {
       return false;
     }
+    if (_checkRunning && _line != nullptr)
+    {
+      _checkResult.releasedHigh = _line->read();
+    }
     if (_line != nullptr)
     {
-      _line->write(false);
+      _line->setMode(PinMode::DigitalOutputOpenDrain);
     }
     _breakMark = now;
     _breakPhase = BreakPhase::Low2;
@@ -649,7 +695,7 @@ bool UpdiProgrammer::_advanceBreak()
   {
     _line->write(true);
   }
-  _uart.attach(_gpio, kBaud);
+  _uart.claim();
   _uartAttached = true;
   _connected = true;
   _breakPhase = BreakPhase::Idle;
@@ -682,25 +728,47 @@ void UpdiProgrammer::_runPending()
 }
 
 /**
- * Reads UPDI STATUSA, then detaches the UART and restores the pull-up.
- * The samples taken before the break stay in _checkResult.
+ * Reads UPDI STATUSA, then detaches the UART and restores the pin to
+ * an input with no pull-up. The drive and release samples stay in
+ * _checkResult.
  *
  * @return Nothing.
  */
 void UpdiProgrammer::_finishLinkCheck()
 {
   _linkOk = _uartAttached;
-  const int value = _ldcs(kRegStatusA);
-  if (value < 0)
+  _uart.clearListen();
+  const uint8_t frame[] = {
+    kSynch, static_cast<uint8_t>(0x80 + kRegStatusA)};
+  _checkResult.echoSeen = _send(frame, sizeof(frame));
+  if (!_checkResult.echoSeen)
   {
     _checkResult.replied = false;
     _checkResult.status = 0;
   }
   else
   {
-    _checkResult.replied = true;
-    _checkResult.status = static_cast<uint8_t>(value);
+    const int value = _get();
+    if (value < 0)
+    {
+      _checkResult.replied = false;
+      _checkResult.status = 0;
+    }
+    else
+    {
+      _checkResult.replied = true;
+      _checkResult.status = static_cast<uint8_t>(value);
+    }
   }
+  _checkResult.listenLow = _uart.listenWentLow();
+  _checkResult.pulseAtUs = _uart.listenPulseAtUs();
+  _checkResult.pulseUs = _uart.listenPulseWidthUs();
+  _checkResult.edgeCount = _uart.listenEdgeCount();
+  for (uint8_t index = 0; index < kUartListenWidths; ++index)
+  {
+    _checkResult.widthUs[index] = _uart.listenWidthUs(index);
+  }
+  _checkResult.uartFault = _uart.listenFault();
   shutdown();
 }
 
@@ -727,13 +795,17 @@ void UpdiProgrammer::_setDescriptor()
 }
 
 /**
- * Enables UPDI by storing 0x06 in Control A, then replies OK.
+ * Stores Control A as 0x00 after the break, then replies OK.
+ * 0x00 is the reset value, so the guard stays 128 bit times, about
+ * 1.1 ms at 115200. The pull-up stays on until the reply read starts,
+ * and a 2-bit guard lets the target pulse before that. This store is
+ * the SYNCH that keeps a fuse-enabled pin from disabling itself.
  *
  * @return Nothing.
  */
 void UpdiProgrammer::_finishDescriptor()
 {
-  if (!_stcs(kRegControlA, 0x06))
+  if (!_stcs(kRegControlA, 0x00))
   {
     _replyNoPower();
     return;
@@ -1270,10 +1342,13 @@ bool UpdiProgrammer::_nvmCommand(bool preserve, uint8_t command)
 }
 
 /**
- * Holds reset, releases it, and polls system status at most four times
- * until bits 1..3 are not all clear.
+ * Holds reset, releases it, and polls system status until bit 1, 2,
+ * or 3 is set. A clear byte or a missing byte is tried again until
+ * kResetWaitMs elapses. An echo mismatch fails immediately. A late
+ * byte already buffered is dropped before the next load.
  *
- * @return False when the part never answers.
+ * @return False when the window ends with those bits clear, or an
+ *         echo mismatches.
  */
 bool UpdiProgrammer::_cpuReset()
 {
@@ -1281,16 +1356,31 @@ bool UpdiProgrammer::_cpuReset()
   {
     return false;
   }
-  for (uint8_t attempt = 0; attempt < 4; ++attempt)
+  const uint32_t start = _clock.millis();
+  while (static_cast<uint32_t>(_clock.millis() - start) < kResetWaitMs)
   {
-    const int status = _ldcs(kRegSysStatus);
-    if (status < 0)
+    const uint8_t frame[] = {
+      kSynch, static_cast<uint8_t>(0x80 + kRegSysStatus)};
+    if (!_send(frame, sizeof(frame)))
     {
       return false;
     }
-    if ((status & 0x0E) != 0)
+    const int status = _get();
+    if (status >= 0 && (status & 0x0E) != 0)
     {
       return true;
+    }
+    if (status < 0)
+    {
+      if (!_uartAttached)
+      {
+        return false;
+      }
+      _linkOk = true;
+      while (_uart.available() > 0)
+      {
+        _uart.read();
+      }
     }
   }
   return false;

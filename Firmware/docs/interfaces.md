@@ -105,15 +105,33 @@ It is inside `Network`. The load and save rules are in the
 
 ## `IHalfDuplexUart`
 
-- `attach(gpio, baud)` claims one GPIO as both TX and RX.
+- `install(gpio, baud)` starts the UART and leaves the pad disconnected.
+  A second call replaces the driver.
+- `claim()` connects that GPIO as both TX and RX. It does nothing when
+  the driver is absent or the pad is already connected.
 - `detach()` stops the UART and releases the pin.
-- `available()` reports pending bytes. `read()` returns one byte, or -1
-  when none arrives.
+- `available()` reports pending bytes. `read()` returns one buffered
+  byte with the transmitter still connected, or -1 when none arrives.
+  A read with nothing buffered disconnects the transmitter and removes
+  the pull-up for the wait, records a low from the pad level and from a
+  falling-edge latch, then connects the transmitter and the pull-up again.
+  On the ESP32 adapter that wait is 20 ms and RX stays connected.
+  `clearListen()` clears the low sample. `listenWentLow()`
+  reports it. `listenPulseAtUs()` is how long after the wait started the
+  first low began, and `listenPulseWidthUs()` is how long it stayed low.
+  `listenEdgeCount()` counts every low, saturated at 255.
+  `listenWidthUs()` returns one of the first four widths.
+  `listenFault()` is `None`, or break ahead of frame, parity, and glitch.
 - `write()` sends raw bytes. The caller reads the echoes of that write
-  before a target response. The ESP32 adapter is UART1, 8E2, and does not
-  discard that echo. UART0 stays free because GPIO43 and GPIO44 are module pins.
-- Fakes queue the echo ahead of any scripted target byte, and they record
-  the GPIO, the baud, and every transmitted byte.
+  before a target response. The ESP32 adapter is UART1, 8E2. It drives
+  the bytes push-pull, waits until the shifter is empty, then releases
+  the pad. The echoes are already in the FIFO, and it does not discard
+  them. UART0 stays free because GPIO43 and GPIO44 are module pins.
+- Fakes queue the echo ahead of any scripted target byte. An echo read
+  does not count as a release. A read with no echo increments the release
+  count, the pull-up-off count, and the rearm count, and the pull-up is
+  enabled again when that read returns. Fakes also record the GPIO, the
+  baud, and every transmitted byte.
 
 ## `IDigitalPin`
 

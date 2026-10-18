@@ -145,15 +145,17 @@ PumpModule pumpModule(moduleBus, network, systemClock, kPumpPollIntervalMs,
 
 Esp32SerialPort serialPort(Serial);
 const ProgrammingPins kProgrammingPins = {
-  MOSI_PIN, MISO_PIN, SCK_PIN, {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN}};
+  MOSI_PIN, MISO_PIN, SCK_PIN,
+  {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN},
+  {MOD1_PIN, MOD2_PIN, MOD3_PIN, MOD4_PIN}};
 SerialConsole serialConsole(serialPort, systemClock, network, moduleBus,
                             kSerialStatusIntervalMs, kProgrammingPins);
 Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
 Esp32HalfDuplexUart updiUart;
 Esp32ProgrammingLatch programmingLatch;
 Programming programming(serialPort, ispSpi, updiUart, cs1, cs2, cs3, cs4,
-                        kProgrammingPins, moduleBus, systemClock,
-                        kProgrammingIdleTimeoutMs,
+                        mod1, mod2, mod3, mod4, kProgrammingPins, moduleBus,
+                        systemClock, kProgrammingIdleTimeoutMs,
                         kProgrammingUnplugTimeoutMs);
 bool startupAttempted = false;
 
@@ -294,7 +296,8 @@ void loop()
   }
   if (programming.updiCheckActive())
   {
-    // The bus stays off this pin until the measurement restores it.
+    // One break phase per pass. The status read is the pass that
+    // finishes the second low. The bus stays off this pin until then.
     UpdiLinkCheck check;
     if (programming.pollUpdiCheck(check))
     {
@@ -331,5 +334,7 @@ void loop()
     }
   }
 
+  // Pace a normal pass and let the idle task run. A link check
+  // returned above, so this delay is outside that measurement.
   delay(10);
 }
