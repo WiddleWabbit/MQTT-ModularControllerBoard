@@ -232,7 +232,8 @@ private:
   void _leaveProgmode();
 
   /**
-   * Reset, NVM key, and page-buffer clear. No USB reply.
+   * Reset, NVM key, and page-buffer clear, then Control A 0x03.
+   * Chip erase does not call this. No USB reply.
    *
    * @return True when the part is in programming mode.
    */
@@ -312,10 +313,12 @@ private:
   bool _sendBlock(const uint8_t* data, uint8_t count);
 
   /**
-   * Polls NVM status. Optionally saves and restores the pointer.
+   * Polls NVM status until bits 0 and 1 are clear or 20 ms elapses.
+   * Optionally saves and restores the pointer.
    *
    * @param preserve True to restore the pointer around the poll.
-   * @return False when the link fails or the controller stays busy.
+   * @return False when the link fails or the busy bits stay set
+   *         for the whole 20 ms.
    */
   bool _nvmWait(bool preserve);
 
@@ -327,6 +330,29 @@ private:
    * @return False when the link fails.
    */
   bool _nvmCommand(bool preserve, uint8_t command);
+
+  /**
+   * Result of the chip-erase reset poll. PulseNotSent means a reset
+   * store failed and the progmode flag must stay as it was.
+   */
+  enum class LockWait : uint8_t
+  {
+    Unlocked,
+    NotUnlocked,
+    PulseNotSent
+  };
+
+  /**
+   * Pulses reset and polls LOCKSTATUS (bit 0) until it clears or
+   * kResetWaitMs elapses. Does not check bits 1-3. Does not reply
+   * on USB. Does not assign the progmode flag. A missing status
+   * byte is retried. An echo mismatch fails immediately.
+   *
+   * @return Unlocked when bit 0 was clear. NotUnlocked when both
+   *         reset stores were sent and the poll did not see bit 0
+   *         clear. PulseNotSent when a reset store failed.
+   */
+  LockWait _waitLockClear();
 
   /**
    * Asserts and releases reset, then polls system status until bit 1,

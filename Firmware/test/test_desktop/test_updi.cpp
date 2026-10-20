@@ -149,6 +149,45 @@ bool contains(const std::vector<uint8_t>& hay, const uint8_t* needle, size_t len
 }
 
 /**
+ * Counts non-overlapping occurrences of needle inside hay.
+ *
+ * @param hay Bytes to search.
+ * @param needle Sequence to count.
+ * @param length Needle length.
+ * @return How many times the sequence occurs.
+ */
+int countOf(const std::vector<uint8_t>& hay, const uint8_t* needle, size_t length)
+{
+  int count = 0;
+  if (length == 0 || hay.size() < length)
+  {
+    return 0;
+  }
+  for (size_t start = 0; start + length <= hay.size();)
+  {
+    bool match = true;
+    for (size_t index = 0; index < length; ++index)
+    {
+      if (hay[start + index] != needle[index])
+      {
+        match = false;
+        break;
+      }
+    }
+    if (match)
+    {
+      count++;
+      start += length;
+    }
+    else
+    {
+      start++;
+    }
+  }
+  return count;
+}
+
+/**
  * Parses one answer frame from the USB port.
  *
  * @param bytes Port output.
@@ -292,6 +331,32 @@ private:
 };
 
 /**
+ * Connects a StepClock programmer and runs the 25/3/25 break.
+ * autoStep stays off so the break uses advance().
+ *
+ * @param programmer Programmer already started on its pin.
+ * @param port USB port that receives the descriptor.
+ * @param clock Clock advanced by the break phases.
+ * @return Nothing.
+ */
+void connectStep(UpdiProgrammer& programmer, FakeBytePort& port, StepClock& clock)
+{
+  uint8_t descriptor[247] = {};
+  descriptor[0] = 0x0C;
+  descriptor[244] = 64;
+  descriptor[246] = 32;
+  const std::vector<uint8_t> setup = frame(7, descriptor, sizeof(descriptor));
+  port.feed(setup.data(), setup.size());
+  programmer.update();
+  clock.advance(25);
+  programmer.update();
+  clock.advance(3);
+  programmer.update();
+  clock.advance(25);
+  programmer.update();
+}
+
+/**
  * Queues the replies for one aligned 64-byte flash page write.
  *
  * @param uart UART whose reply queue receives the script.
@@ -423,6 +488,10 @@ void testUpdiGroupsInstructionIntoOneWrite()
   std::vector<uint8_t> answer;
   TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
   TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  const uint8_t forbidden[] = {0x55, 0xC2, 0x06};
+  TEST_ASSERT_EQUAL(1, countOf(rig.uart.tx, guard, sizeof(guard)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, forbidden, sizeof(forbidden)));
 }
 
 void testUpdiEnterWhileDisconnectedAlsoBreaks()
@@ -484,7 +553,7 @@ void testUpdiChipEraseAndPageWrite()
 {
   UpdiFixture rig;
   connect(rig);
-  const uint8_t eraseReplies[] = {0x08, 0x82, 0x08, 0x00, 0x08, 0x40, 0x40};
+  const uint8_t eraseReplies[] = {0x08, 0x08};
   rig.uart.reply(eraseReplies, sizeof(eraseReplies));
   const uint8_t erase[] = {0x34, 0x00};
   rig.port.output.clear();
@@ -495,7 +564,19 @@ void testUpdiChipEraseAndPageWrite()
   TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
   TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
   TEST_ASSERT_TRUE(contains(rig.uart.tx, kEraseKey, sizeof(kEraseKey)));
-  TEST_ASSERT_TRUE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+  const uint8_t keyStatus[] = {0x55, 0x87};
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  const uint8_t release[] = {0x55, 0xC8, 0x00};
+  const uint8_t status[] = {0x55, 0x8B};
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  const uint8_t forbidden[] = {0x55, 0xC2, 0x06};
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, keyStatus, sizeof(keyStatus)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, release, sizeof(release)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, status, sizeof(status)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, guard, sizeof(guard)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, forbidden, sizeof(forbidden)));
 
   scriptPageWrite(rig.uart);
   uint8_t body[10 + 64] = {};
@@ -520,7 +601,7 @@ void testUpdiChipEraseAndPageWrite()
   TEST_ASSERT_TRUE(contains(rig.uart.tx, expectPayload, 64));
   const uint8_t commit[] = {0x55, 0x44, 0x00, 0x10, 0x01};
   TEST_ASSERT_TRUE(contains(rig.uart.tx, commit, sizeof(commit)));
-  TEST_ASSERT_TRUE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
   TEST_ASSERT_TRUE(contains(rig.uart.tx, kEraseKey, sizeof(kEraseKey)));
 }
 
@@ -795,6 +876,8 @@ void testUpdiEnterWaitsForBootDone()
   TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
   TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
   TEST_ASSERT_TRUE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  TEST_ASSERT_EQUAL(1, countOf(rig.uart.tx, guard, sizeof(guard)));
 }
 
 void testUpdiEnterRetriesAMissedStatusByte()
@@ -860,6 +943,8 @@ void testUpdiEnterGivesUpWhenResetStaysClear()
   TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
   TEST_ASSERT_TRUE(writesOf(uart.writeSizes, 2) > 5);
   TEST_ASSERT_FALSE(contains(uart.tx, kNvmKey, sizeof(kNvmKey)));
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  TEST_ASSERT_FALSE(contains(uart.tx, guard, sizeof(guard)));
 }
 
 void testUpdiEnterEchoMismatchDoesNotWait()
@@ -880,6 +965,8 @@ void testUpdiEnterEchoMismatchDoesNotWait()
   TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
   TEST_ASSERT_EQUAL(1, writesOf(rig.uart.writeSizes, 2));
   TEST_ASSERT_EQUAL(1, writesOf(rig.uart.writeSizes, 3));
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, guard, sizeof(guard)));
 }
 
 void testUpdiGoBeforeProgrammingLeavesThePinEnabled()
@@ -932,6 +1019,217 @@ void testUpdiSignOffBeforeProgrammingLeavesThePinEnabled()
   TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
 }
 
+void testUpdiChipEraseLockStaysSet()
+{
+  StepClock clock;
+  clock.stepMs = 25;
+  FakeBytePort port;
+  FakeHalfDuplexUart uart;
+  FakeDigitalPin line;
+  UpdiProgrammer programmer(port, uart, clock);
+  programmer.start(line, 6);
+  connectStep(programmer, port, clock);
+
+  uint8_t replies[17];
+  replies[0] = 0x08;
+  for (int index = 1; index < 17; ++index)
+  {
+    replies[index] = 0x01;
+  }
+  uart.reply(replies, sizeof(replies));
+  clock.autoStep = true;
+  port.output.clear();
+  uart.tx.clear();
+  uart.writeSizes.clear();
+  const uint8_t erase[] = {0x34, 0x00};
+  const std::vector<uint8_t> command = frame(4, erase, sizeof(erase));
+  port.feed(command.data(), command.size());
+  programmer.update();
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  TEST_ASSERT_TRUE(contains(uart.tx, kEraseKey, sizeof(kEraseKey)));
+  TEST_ASSERT_FALSE(contains(uart.tx, kNvmKey, sizeof(kNvmKey)));
+  const uint8_t keyStatus[] = {0x55, 0x87};
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  const uint8_t release[] = {0x55, 0xC8, 0x00};
+  const uint8_t status[] = {0x55, 0x8B};
+  TEST_ASSERT_EQUAL(1, countOf(uart.tx, keyStatus, sizeof(keyStatus)));
+  TEST_ASSERT_TRUE(contains(uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_TRUE(contains(uart.tx, release, sizeof(release)));
+  TEST_ASSERT_EQUAL(7, countOf(uart.tx, status, sizeof(status)));
+}
+
+void testUpdiChipEraseStatusZeroIsOk()
+{
+  UpdiFixture rig;
+  connect(rig);
+  const uint8_t replies[] = {0x08, 0x00};
+  rig.uart.reply(replies, sizeof(replies));
+  const uint8_t erase[] = {0x34, 0x00};
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.send(4, erase, sizeof(erase));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  const uint8_t keyStatus[] = {0x55, 0x87};
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  const uint8_t release[] = {0x55, 0xC8, 0x00};
+  const uint8_t status[] = {0x55, 0x8B};
+  TEST_ASSERT_EQUAL(1, countOf(rig.uart.tx, keyStatus, sizeof(keyStatus)));
+  TEST_ASSERT_EQUAL(1, countOf(rig.uart.tx, status, sizeof(status)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, release, sizeof(release)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiChipEraseKeyStatusRejected()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.uart.reply(0x07);
+  const uint8_t erase[] = {0x34, 0x00};
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.send(4, erase, sizeof(erase));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, kEraseKey, sizeof(kEraseKey)));
+  const uint8_t keyStatus[] = {0x55, 0x87};
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  const uint8_t release[] = {0x55, 0xC8, 0x00};
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, keyStatus, sizeof(keyStatus)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, release, sizeof(release)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiChipEraseKeyEchoMismatch()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.uart.writeSizes.clear();
+  rig.uart.dropEcho = true;
+  const uint8_t erase[] = {0x34, 0x00};
+  rig.send(4, erase, sizeof(erase));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  TEST_ASSERT_EQUAL(1, writesOf(rig.uart.writeSizes, 10));
+  TEST_ASSERT_EQUAL(0, writesOf(rig.uart.writeSizes, 3));
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiChipEraseRetriesAMissedLockByte()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  rig.uart.missReplyIndex = 1;
+  rig.uart.plantLateOnMiss = true;
+  rig.uart.lateOnMiss = 0x01;
+  const uint8_t replies[] = {0x08, 0x00};
+  rig.uart.reply(replies, sizeof(replies));
+  const uint8_t erase[] = {0x34, 0x00};
+  rig.send(4, erase, sizeof(erase));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  const uint8_t status[] = {0x55, 0x8B};
+  const uint8_t hold[] = {0x55, 0xC8, 0x59};
+  const uint8_t release[] = {0x55, 0xC8, 0x00};
+  TEST_ASSERT_EQUAL(2, countOf(rig.uart.tx, status, sizeof(status)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, hold, sizeof(hold)));
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, release, sizeof(release)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+}
+
+void testUpdiChipEraseAfterEnterDoesNotDisableThePin()
+{
+  UpdiFixture rig;
+  connect(rig);
+  rig.port.output.clear();
+  scriptEnterFromRun(rig.uart);
+  const uint8_t enter[] = {0x14};
+  rig.send(2, enter, sizeof(enter));
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  const uint8_t guard[] = {0x55, 0xC2, 0x03};
+  TEST_ASSERT_EQUAL(1, countOf(rig.uart.tx, guard, sizeof(guard)));
+
+  rig.uart.tx.clear();
+  const uint8_t eraseReplies[] = {0x08, 0x00};
+  rig.uart.reply(eraseReplies, sizeof(eraseReplies));
+  const uint8_t erase[] = {0x34, 0x00};
+  rig.port.output.clear();
+  rig.send(4, erase, sizeof(erase));
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_TRUE(contains(rig.uart.tx, kEraseKey, sizeof(kEraseKey)));
+  TEST_ASSERT_FALSE(contains(rig.uart.tx, kNvmKey, sizeof(kNvmKey)));
+
+  rig.port.output.clear();
+  rig.uart.tx.clear();
+  const uint8_t go[] = {0x08};
+  rig.send(8, go, sizeof(go));
+  TEST_ASSERT_TRUE(parse(rig.port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0x80, answer[0]);
+  TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
+}
+
+void testUpdiNvmWaitGivesUpAfterTwentyMilliseconds()
+{
+  StepClock clock;
+  clock.stepMs = 5;
+  FakeBytePort port;
+  FakeHalfDuplexUart uart;
+  FakeDigitalPin line;
+  UpdiProgrammer programmer(port, uart, clock);
+  programmer.start(line, 6);
+  connectStep(programmer, port, clock);
+  clock.autoStep = true;
+  const uint8_t replies[] = {0x08, 0x40, 0x00, 0x00, 0x01, 0x01, 0x01};
+  uart.reply(replies, sizeof(replies));
+  uint8_t body[10 + 64] = {};
+  body[0] = 0x04;
+  body[1] = 0xC0;
+  body[2] = 64;
+  body[6] = 0x00;
+  body[7] = 0x80;
+  for (uint8_t index = 0; index < 64; ++index)
+  {
+    body[10 + index] = static_cast<uint8_t>(0xA0 + index);
+  }
+  port.output.clear();
+  uart.tx.clear();
+  const std::vector<uint8_t> command = frame(5, body, sizeof(body));
+  port.feed(command.data(), command.size());
+  programmer.update();
+  uint16_t sequence = 0;
+  std::vector<uint8_t> answer;
+  TEST_ASSERT_TRUE(parse(port.output, sequence, answer));
+  TEST_ASSERT_EQUAL_HEX8(0xAB, answer[0]);
+  const uint8_t status[] = {0x55, 0x04, 0x02, 0x10};
+  const uint8_t commit[] = {0x55, 0x44, 0x00, 0x10, 0x01};
+  TEST_ASSERT_EQUAL(3, countOf(uart.tx, status, sizeof(status)));
+  TEST_ASSERT_FALSE(contains(uart.tx, body + 10, 1));
+  TEST_ASSERT_FALSE(contains(uart.tx, commit, sizeof(commit)));
+}
+
 void testUpdiSessionDoesNotUseSpi()
 {
   UpdiFixture rig;
@@ -968,6 +1266,13 @@ void runUpdiTests()
   RUN_TEST(testUpdiGoAfterEnterDisablesThePin);
   RUN_TEST(testUpdiSignOffBeforeProgrammingLeavesThePinEnabled);
   RUN_TEST(testUpdiChipEraseAndPageWrite);
+  RUN_TEST(testUpdiChipEraseLockStaysSet);
+  RUN_TEST(testUpdiChipEraseStatusZeroIsOk);
+  RUN_TEST(testUpdiChipEraseKeyStatusRejected);
+  RUN_TEST(testUpdiChipEraseKeyEchoMismatch);
+  RUN_TEST(testUpdiChipEraseRetriesAMissedLockByte);
+  RUN_TEST(testUpdiChipEraseAfterEnterDoesNotDisableThePin);
+  RUN_TEST(testUpdiNvmWaitGivesUpAfterTwentyMilliseconds);
   RUN_TEST(testUpdiBadCrcAndUnknownCommandStayInSession);
   RUN_TEST(testUpdiLeaveReleasesTheLineAndShutdownRestoresInput);
   RUN_TEST(testUpdiLinkCheckSamplesLevelsThenLoadsStatus);

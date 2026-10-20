@@ -55,6 +55,7 @@ const uint8_t kEraseUsersig = 7;
 const uint8_t kRegStatusA = 0;
 const uint8_t kRegControlA = 2;
 const uint8_t kRegControlB = 3;
+const uint8_t kRegKeyStatus = 7;
 const uint8_t kRegReset = 8;
 const uint8_t kRegSysStatus = 11;
 
@@ -68,6 +69,16 @@ const uint8_t kNvmPbc = 4;
 const uint8_t kNvmWfu = 7;
 
 const uint8_t kResetOn = 0x59;
+
+// Sixteen bit times. Stored only after enter. The post-break store
+// stays 0x00. Two bit times (0x06) lets the target pulse before the
+// pull-up is off, so that value is not used.
+const uint8_t kGuardAfterEnter = 0x03;
+
+// Five times the 4 ms typical page erase-write. A stuck busy bit
+// must still answer inside avrdude's 200 ms write window.
+const uint32_t kNvmWaitMs = 20;
+
 const uint8_t kNvmKey[8] = {0x20, 0x67, 0x6F, 0x72, 0x50, 0x4D, 0x56, 0x4E};
 const uint8_t kEraseKey[8] = {0x65, 0x73, 0x61, 0x72, 0x45, 0x4D, 0x56, 0x4E};
 
@@ -834,6 +845,7 @@ void UpdiProgrammer::_beginEnter()
 /**
  * Follows the jtagice enter sequence for NVM version 1. Status 0x82
  * applies the NVM key. Status 0x08 only clears the page buffer.
+ * The body then stores the short guard.
  *
  * @return Nothing.
  */
@@ -847,8 +859,10 @@ void UpdiProgrammer::_enterProgmode()
 }
 
 /**
- * Shared enter body used by enter-progmode and by chip erase. On
- * failure it has already queued the USB error reply.
+ * Enter body. Status 0x82 applies the NVM key. Status 0x08 only
+ * clears the page buffer. A successful enter stores Control A 0x03.
+ * Chip erase does not call this. On failure the USB error reply
+ * is already queued.
  *
  * @return True when the part accepted programming mode.
  */
@@ -899,6 +913,11 @@ bool UpdiProgrammer::_enterTarget()
       _replyNoPower();
       return false;
     }
+  }
+  if (!_stcs(kRegControlA, kGuardAfterEnter))
+  {
+    _replyNoPower();
+    return false;
   }
   _inProg = true;
   return true;
@@ -989,8 +1008,9 @@ void UpdiProgrammer::_beginErase()
 }
 
 /**
- * Chip erase applies the erase key, resets, and re-enters. A flash
- * page erase stores 0xFF and commits ER. EEPROM page erase is a no-op
+ * Chip erase writes the erase key, checks ASI_KEY_STATUS bit 3,
+ * pulses reset, and waits until LOCKSTATUS clears. A flash page
+ * erase stores 0xFF and commits ER. EEPROM page erase is a no-op
  * because the write erases.
  *
  * @return Nothing.
@@ -1005,15 +1025,30 @@ void UpdiProgrammer::_erase()
   const uint8_t kind = _body()[1];
   if (kind == kEraseChip)
   {
-    if (!_writeKey(kEraseKey) || !_cpuReset())
+    if (!_writeKey(kEraseKey))
     {
       _replyNoPower();
       return;
     }
-    if (_enterTarget())
+    const int keyStatus = _ldcs(kRegKeyStatus);
+    if (keyStatus < 0 || (static_cast<uint8_t>(keyStatus) & 0x08) == 0)
     {
-      _replyOk();
+      _replyNoPower();
+      return;
     }
+    const LockWait waited = _waitLockClear();
+    if (waited == LockWait::PulseNotSent)
+    {
+      _replyNoPower();
+      return;
+    }
+    _inProg = false;
+    if (waited != LockWait::Unlocked)
+    {
+      _replyNoPower();
+      return;
+    }
+    _replyOk();
     return;
   }
   if (kind == kEraseEepromPage || kind == kEraseUsersig)
@@ -1278,8 +1313,8 @@ bool UpdiProgrammer::_sendBlock(const uint8_t* data, uint8_t count)
 // ========== NVM ==========
 
 /**
- * Polls status at 0x1002 at most eight times. Bit 0 and bit 1 clear
- * means the controller is idle.
+ * Polls status at 0x1002 until bit 0 and bit 1 are clear or
+ * kNvmWaitMs elapses. An idle first status returns immediately.
  *
  * @param preserve True to save and restore the pointer.
  * @return False on a link failure or a stuck busy bit.
@@ -1291,8 +1326,8 @@ bool UpdiProgrammer::_nvmWait(bool preserve)
   {
     return false;
   }
-  bool idle = false;
-  for (uint8_t attempt = 0; attempt < 8; ++attempt)
+  const uint32_t start = _clock.millis();
+  while (static_cast<uint32_t>(_clock.millis() - start) < kNvmWaitMs)
   {
     const int status = _lds(kNvmStatus);
     if (status < 0)
@@ -1301,19 +1336,14 @@ bool UpdiProgrammer::_nvmWait(bool preserve)
     }
     if ((status & 0x03) == 0)
     {
-      idle = true;
-      break;
+      if (preserve)
+      {
+        return _stptr(pointer);
+      }
+      return true;
     }
   }
-  if (!idle)
-  {
-    return false;
-  }
-  if (preserve)
-  {
-    return _stptr(pointer);
-  }
-  return true;
+  return false;
 }
 
 /**
@@ -1339,6 +1369,54 @@ bool UpdiProgrammer::_nvmCommand(bool preserve, uint8_t command)
     return _stptr(pointer);
   }
   return true;
+}
+
+/**
+ * Pulses reset and polls system status until LOCKSTATUS (bit 0)
+ * clears. A missing byte is tried again until kResetWaitMs elapses.
+ * An echo mismatch on a reset store returns before the poll. An
+ * echo mismatch on a status load ends the poll. A late byte already
+ * buffered is dropped before the next load. The progmode flag is
+ * left alone.
+ *
+ * @return Unlocked when bit 0 was clear. NotUnlocked when both
+ *         stores were sent and bit 0 stayed set. PulseNotSent when
+ *         a reset store failed.
+ */
+UpdiProgrammer::LockWait UpdiProgrammer::_waitLockClear()
+{
+  if (!_stcs(kRegReset, kResetOn) || !_stcs(kRegReset, 0x00))
+  {
+    return LockWait::PulseNotSent;
+  }
+  const uint32_t start = _clock.millis();
+  while (static_cast<uint32_t>(_clock.millis() - start) < kResetWaitMs)
+  {
+    const uint8_t frame[] = {
+      kSynch, static_cast<uint8_t>(0x80 + kRegSysStatus)};
+    if (!_send(frame, sizeof(frame)))
+    {
+      return LockWait::NotUnlocked;
+    }
+    const int status = _get();
+    if (status >= 0 && (status & 0x01) == 0)
+    {
+      return LockWait::Unlocked;
+    }
+    if (status < 0)
+    {
+      if (!_uartAttached)
+      {
+        return LockWait::NotUnlocked;
+      }
+      _linkOk = true;
+      while (_uart.available() > 0)
+      {
+        _uart.read();
+      }
+    }
+  }
+  return LockWait::NotUnlocked;
 }
 
 /**

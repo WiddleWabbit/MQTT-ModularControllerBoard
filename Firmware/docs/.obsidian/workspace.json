@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "module-bus.md",
+                "file": "reference/pump-module.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "module-bus"
+              "title": "pump-module"
             }
           }
         ]
@@ -190,11 +190,11 @@
   },
   "active": "f51934d8476ef699",
   "lastOpenFiles": [
+    "reference/programming.md",
     "programming.md",
     "module-bus.md",
     "networking.md",
     "configuration.md",
-    "reference/programming.md",
     "reference/sensor-module.md",
     "reference/mqtt.md",
     "reference/module-bus.md",

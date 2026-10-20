@@ -4,7 +4,13 @@
 
 ## Summary
 
-`Programming` is an ISP or UPDI session on one firmware slot, 1 through 4. `program 1 isp` uses the shared SPI pins and that slot's CS pin as RESET. `program 3 updi` uses only that slot's MOD pin as the UPDI wire. A line without both a slot and a method replies `ERR program` and does not start a session. `check N` measures that MOD pin and does not start a session.
+`Programming` is one session on firmware slot 1 through 4. `program N isp` is SPI, for an ATmega328PB. `program N updi` is UPDI, for an ATtiny1614. A line without both a slot and a method replies `ERR program` and does not start a session. `check N` only measures that slot's MOD pin.
+
+SPI uses the shared MOSI, MISO, and SCK pins, plus that slot's CS pin as RESET. The clock is mode 0, MSB first, 125 kHz, and avrdude's baud does not change it. Reset is held low, programming enable waits 20 ms, and that try is repeated up to three times. A flash page then waits 5 ms, each EEPROM byte waits 10 ms, and chip erase waits 10 ms. The board check is signature `0x1E9516`.
+
+UPDI uses only that slot's MOD pin, at 115200 8E2 on UART1. The double break is 25 ms low, 3 ms with the input pull-up, then 25 ms low. The update that ends the break stores Control A `0x00`, a guard of 128 bit times (about 1.1 ms). A successful enter then stores Control A `0x03`, 16 bit times (about 139 µs), so a page finishes inside avrdude's receive window. Enter and leave wait up to 200 ms for status bits 1–3. Chip erase waits up to that same 200 ms for the lock bit to clear, answers OK when it does, and does not enter programming mode. A page program waits up to 20 ms. The board check is signature `0x1E9422`.
+
+Pins, wire bytes, and the full timing tables are in the [programming reference](reference/programming.md).
 
 ## Where it sits
 
@@ -44,7 +50,7 @@ The latch is one record in RTC slow memory (`.rtc_noinit`): magic, slot, and met
 
 ## See also
 
-- [Programming reference](reference/programming.md) — jumper pins, STK500, jtag2updi, the unplug rule, tests.
+- [Programming reference](reference/programming.md) — jumper pins, SPI and UPDI timings, wire bytes, the unplug rule, tests.
 - [Configuration reference](reference/configuration.md) — the accepted `program` and `check` lines, `ERR program`, and `ERR check`.
 - [MQTT reference](reference/mqtt.md) — commands that can still arrive while a session is active.
 - [Serial console](serial-console.md)

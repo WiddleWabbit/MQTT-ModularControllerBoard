@@ -2,7 +2,7 @@
 
 [Home](../home.md) · Guide: [Programming](../programming.md)
 
-Source: `lib/Logic/Programming/Programming.h`, `ProgrammingSession.h`, `IspProgrammer.h`, `UpdiProgrammer.h`. The latch adapter is `lib/Drivers/Esp32ProgrammingLatch.h`. The UPDI UART adapter is `lib/Drivers/Esp32HalfDuplexUart.h`.
+Source: `lib/Logic/Programming/Programming.h`, `ProgrammingSession.h`, `IspProgrammer.h`, `UpdiProgrammer.h`, `UpdiProgrammer.cpp` (`kNvmWaitMs`). The latch adapter is `lib/Drivers/Esp32ProgrammingLatch.h`. The UPDI UART adapter is `lib/Drivers/Esp32HalfDuplexUart.cpp` (`kReadTimeoutMs`).
 
 ## Purpose
 
@@ -136,6 +136,14 @@ The host frame is jtagice mkII: start `0x1B`, a little-endian sequence, a 4-byte
 
 `ENTER_PROGMODE` starts the same break when the link is not up yet. Host bytes wait until the break finishes. The status that follows the break selects the NVM key path. A locked part replies `RSP_ILLEGAL_MCU_STATE`. On the running-chip path, reset is held (`55 C8 59`) and released (`55 C8 00`). ASI_SYS_STATUS is then polled until bit 1, 2, or 3 is set. Those bits are BOOTDONE, user-row programming, and NVM programming. `UpdiProgrammer::kResetWaitMs` is 200. A clear status byte is read again. A missing status byte is read again, and a byte already sitting in the UART is dropped before the next load. The window is one wait inside that command. When it ends with those bits still clear, the reply is `RSP_NO_TARGET_POWER` (`0xAB`). An echo mismatch fails the command on that instruction. NVM version is 1 when the flash page in the descriptor is under 256 bytes. The ATtiny1614 page is 64. A page of 256 or more is recorded as version 2, and memory commands then fail. Flash addresses are used as avrdude sends them.
 
+A successful enter stores Control A `0x03` (`55 C2 03`) once, after the page-buffer clear and before the progmode flag. That is 16 bit times, about 139 µs at 115200. A failed enter does not store it. `55 C2 06` is not sent. Leave does not write Control A back. The reset that leave applies restores the register. The bits 1–3 poll is enter and leave (`_cpuReset`). Chip erase does not call it.
+
+Chip erase is command `0x34`, kind `0`. It writes `55 E0` plus `65 73 61 72 45 4D 56 4E`, then loads ASI_KEY_STATUS (`55 87`). Reset (`55 C8 59`, then `55 C8 00`) is pulsed only when bit 3 of that byte is set. It then polls `55 8B` until LOCKSTATUS (bit 0) is clear, for up to `UpdiProgrammer::kResetWaitMs` (200). Bit 0 clear, including status `0x00`, is `RSP_OK`. A missing status byte is read again, and a late byte is dropped. An echo mismatch fails that load immediately. The NVM key is not sent, and programming mode is not entered. A key echo mismatch, a key-status byte without bit 3, or a failed reset store is `RSP_NO_TARGET_POWER`, and the progmode flag is left as it was. LOCKSTATUS still set at the end of the window is the same reply, and the flag is cleared. Erase does not set the progmode flag. After both reset stores have been sent, clearing the flag keeps the closing GO from writing `55 C3 04`.
+
+After that `RSP_OK`, avrdude 8.1 reads the signature without sending enter again. The read is `RSP_ILLEGAL_MCU_STATE`. avrdude prints `could not end programming, aborting` and a leave error, then `avrdude done. Thank you.`, and exits 0. `chip erase failed` is printed only when the erase command itself was not `RSP_OK`.
+
+Before a repeated store, NVM status at `0x1002` is polled until bits 0 and 1 are clear or 20 ms has elapsed. That budget is not `kResetWaitMs`. An idle status returns on the first read.
+
 GO (`0x08`) and sign-off store Control B `0x04` (`UPDIDIS`, wire bytes `55 C3 04`) only after enter has reached NVM programming. That store disables the UPDI pin until the next chip reset, so a later `check` is silent until the pump is reset. A close that never entered programming mode leaves the pin enabled and still answers `RSP_OK`.
 
 Each UPDI instruction is one UART write. The ESP32 adapter drives that write push-pull and releases the pad when the shifter is empty. The echoes are already in the FIFO, and the programmer reads them before any target byte. A repeated store sends the later data bytes as their own writes, because an ack sits between them. A missing echo fails the command. During the reset wait, a missing status byte is read again until `kResetWaitMs`. Any other missing target byte fails that command. The UART read wait is 20 ms, which covers the 16.4 ms maximum reply at the default 4 MHz UPDI clock. The wait for a byte that is not buffered releases UART1 TX, removes the pull-up, and leaves RX connected. The target drives a short pulse at the start of each reply bit, and the pull-up would lift that pulse before the UART samples the middle of the bit. When the wait ends, TX and the pull-up are connected again. Leave programming stops driving the line and leaves the UART claimed. `shutdown()`, when the session ends, detaches UART1, including a break that has not claimed the pad yet, and restores that MOD pin to an input with no pull-up.
@@ -154,20 +162,59 @@ The completing poll releases the pin, claims it for UART1, and loads `STATUSA` (
 
 ## Configuration
 
-| Constant in `src/main.cpp` | Value | Role |
-| --- | --- | --- |
-| `kProgrammingIdleTimeoutMs` | 60 seconds | No protocol byte ends the session |
-| `kProgrammingUnplugTimeoutMs` | 1 second | Absent frames after the link has been seen |
-| `kProgrammingPins` | GPIO11, GPIO13, GPIO12, CS GPIO6 / GPIO7 / GPIO15 / GPIO16, MOD GPIO40 / GPIO42 / GPIO43 / GPIO1 | Pin line, ISP RESET, and the UPDI GPIO |
-| `kUsbByteBufferBytes` | 1024 | USB CDC RX and TX queue, set before `Serial.begin()` |
+Session limits live in `src/main.cpp`. SPI timings live on `IspProgrammer`. UPDI timings live on `UpdiProgrammer`, except `kNvmWaitMs`, which is in `UpdiProgrammer.cpp`, and the UART read wait, which is in `Esp32HalfDuplexUart.cpp`. avrdude's baud parameter does not change the SPI clock or the UPDI baud.
 
-ISP SPI is fixed at 125 kHz. UPDI is fixed at 115200 8E2. avrdude's baud parameter does not change either.
+| Constant in `src/main.cpp` | Value | What it sets |
+| --- | --- | --- |
+| `kProgrammingIdleTimeoutMs` | 60 seconds | Silence with no STK500 or jtagice byte ends the session |
+| `kProgrammingUnplugTimeoutMs` | 1 second | After the USB link has been seen, this long absent ends the session |
+| `kProgrammingPins` | MOSI GPIO11, MISO GPIO13, SCK GPIO12; CS GPIO6 / GPIO7 / GPIO15 / GPIO16; MOD GPIO40 / GPIO42 / GPIO43 / GPIO1 | Shared SPI, the ISP RESET pin, and the UPDI pin, by slot |
+| `kUsbByteBufferBytes` | 1024 | USB CDC RX and TX queues, set before `Serial.begin()` |
+
+### SPI
+
+`Esp32SpiMaster` opens mode 0, MSB first, SCK idle low, at `IspProgrammer::kSpiClockHz`.
+
+| Constant | Value | What it sets |
+| --- | --- | --- |
+| `kSpiClockHz` | 125 kHz | SPI clock for the whole session. A host speed request is ignored |
+| `kResetSettleMs` | 20 ms | Reset is driven low, then this wait, then programming enable `AC 53 00 00`. The same wait follows each reset pulse between tries |
+| Programming enable | Third response byte `0x53`, three tries | A miss pulses reset high then low. The third miss replies `STK_FAILED` and leaves reset high |
+| `kFlashPageWriteMs` | 5 ms | Wait after a flash page is committed, before the next host byte is read |
+| `kEepromWriteMs` | 10 ms | Wait after each EEPROM byte |
+| `kChipEraseMs` | 10 ms | Wait after chip erase, including universal `AC 80 00 00` |
+| `kMaxPageBytes` | 256 | Largest STK500 page body accepted |
+| Signature | `0x1E9516` | ATmega328PB, read from the chip. The programmer does not substitute it |
+
+### UPDI
+
+UART1 is 8 data bits, even parity, 2 stop bits. The pad stays a GPIO through the break and is claimed on the update that releases it.
+
+| Constant or store | Value | What it sets |
+| --- | --- | --- |
+| `kBaud` | 115200 | UART1 rate. The USB baud is ignored |
+| `kBreakLowMs` | 25 ms | Each open-drain low of the double break. One phase advances per `update()`, so this is a minimum |
+| `kBreakHighMs` | 3 ms | Input pull-up between the two lows. The MOD net has no board pull-up |
+| `kMaxBody` | 512 | Largest jtagice body accepted. A longer body is dropped |
+| Control A after the break | `0x00`, wire `55 C2 00` | Guard of 128 bit times, about 1.1 ms at 115200. This is the register reset value |
+| Control A after a successful enter | `0x03`, wire `55 C2 03` | Guard of 16 bit times, about 139 µs. Stored once, after the page-buffer clear. A failed enter does not store it. `0x06` (2 bit times) is not sent |
+| `kResetWaitMs` | 200 ms | Enter and leave poll ASI_SYS_STATUS until bit 1, 2, or 3 is set. Chip erase polls the same register until LOCKSTATUS (bit 0) is clear. A missing byte is retried inside this window |
+| `kNvmWaitMs` | 20 ms | Poll of NVM status `0x1002` until bits 0 and 1 are clear, before a repeated store or an NVM command. An idle byte returns on the first read |
+| `kReadTimeoutMs` | 20 ms | One UART read of a target byte. A missing echo or any other missing byte fails that command |
+| Erase key | `55 E0 65 73 61 72 45 4D 56 4E` | Chip erase, command `0x34` kind `0`. Reset is pulsed only after ASI_KEY_STATUS (`55 87`) has bit 3 set |
+| Reset pulse | `55 C8 59`, then `55 C8 00` | Hold, then release. Used by enter, leave, and chip erase |
+| NVM key | `55 E0 20 67 6F 72 50 4D 56 4E` | Enter on the running-chip path. Chip erase does not send it |
+| Control B on GO or sign-off | `0x04`, wire `55 C3 04` | Disables the UPDI pin until the chip resets. Sent only while the progmode flag is set. Chip erase clears that flag after both reset stores |
+| Flash page | From the descriptor. Under 256 bytes is NVM version 1. The ATtiny1614 page is 64. A recorded page of 0 is treated as 64 on a buffered write | A page of 256 or more is version 2, and memory commands fail |
+| Signature | `0x1E9422` | ATtiny1614, read from the chip |
+
+avrdude 8.1 waits 200 ms for one flash-page write and 100 ms for a 256-byte read. Those are host windows, not controller constants. The post-enter guard and the 20 ms NVM wait are what keep one page inside the write window.
 
 ## Tests
 
 `test/test_desktop/test_isp.cpp` covers the STK500 subset, the reset-before-SPI order, the fixed 125 kHz clock, the session idle path, an unplug before the port has been seen, a sub-second unplug that leaves the session running, and a full one-second unplug. A second `begin()` after that confirmed unplug starts a new seen-port count.
 
-`test/test_desktop/test_updi.cpp` covers the AVR067 CRC check value, the jtagice sign-on body, the 25/3/25 ms break with the UART installed before the first low, an input pull-up for the 3 ms gap, and `Control_A` `0x00` (`55 C2 00`) written only on the completing update, a `Control_A` store as one 3-byte write and the following system-status load as one 2-byte write, a signature read of `1E 94 22` after a slow BOOTDONE, enter that waits out four clear status bytes, enter that retries one missing status byte and drops a late `0x00`, enter that answers `RSP_NO_TARGET_POWER` when the status stays clear for `kResetWaitMs`, an echo mismatch that stops on the reset store, GO and sign-off that leave the pin enabled before programming mode and GO that writes `55 C3 04` after it, chip erase and a 64-byte flash page, a bad CRC, an unknown command, leave versus shutdown, the link check's same 25/3/25 break and one `55 80` write on the completing poll, a gap that reads low and still sends that write, a scripted low 140 µs into the wait and 9 µs wide with four 2 µs widths and a frame fault, a dropped echo, one transmitter release and one pull-up removal for that status read and none for a store that has only echoes, and that the UPDI programmer object does not own an SPI master.
+`test/test_desktop/test_updi.cpp` covers the AVR067 CRC check value, the jtagice sign-on body, the 25/3/25 ms break with the UART installed before the first low, an input pull-up for the 3 ms gap, and `Control_A` `0x00` (`55 C2 00`) written only on the completing update, a `Control_A` store as one 3-byte write and the following system-status load as one 2-byte write, a signature read of `1E 94 22` after a slow BOOTDONE, enter that waits out four clear status bytes, enter that retries one missing status byte and drops a late `0x00`, enter that answers `RSP_NO_TARGET_POWER` when the status stays clear for `kResetWaitMs`, an echo mismatch that stops on the reset store, GO and sign-off that leave the pin enabled before programming mode and GO that writes `55 C3 04` after it, chip erase that answers OK when LOCKSTATUS clears (including status `0x00`) without sending the NVM key and then a 64-byte flash page, a lock bit held for `kResetWaitMs`, a key-status byte without bit 3, a key echo mismatch, a missed lock byte that is dropped, enter then erase then GO leaving the pin enabled, an NVM status that stays busy for 20 ms, a successful enter that writes `55 C2 03` once and a failed enter that does not, a bad CRC, an unknown command, leave versus shutdown, the link check's same 25/3/25 break and one `55 80` write on the completing poll, a gap that reads low and still sends that write, a scripted low 140 µs into the wait and 9 µs wide with four 2 µs widths and a frame fault, a dropped echo, one transmitter release and one pull-up removal for that status read and none for a store that has only echoes, and that the UPDI programmer object does not own an SPI master.
 
 `test/test_desktop/test_deep_modules.cpp` covers slot 3 ISP leaving the other CS pins alone, slot 2 UPDI installing UART1 and then claiming MOD GPIO42 at 115200 without starting SPI or driving CS, a second `begin` that does not pulse or reinstall, the 3 ms gap as an input pull-up, 60 s silence and a seen-then-absent 1 s unplug for both methods, `begin(0)` / `begin(5)` leaving the bus polling, a slot 3 link check that stays inactive, holds the 25/3/25 break on MOD GPIO43, leaves the seated slot's MOD pin alone, and then lets the bus poll, a slot 1 check that still sends `55 80` when the gap reads low, and `begin` releasing a check already in the first low without leaving a pull-up on MOD. `test/test_desktop/test_configuration.cpp` covers the accepted lines, `ERR program`, and `ERR check`.
 
@@ -187,8 +234,11 @@ The `.rtc_noinit` record is ESP32-only. The first check on the board, after a `c
 | UPDI unknown command | `RSP_ILLEGAL_COMMAND` (`0xAA`), session stays active |
 | UPDI not in programming mode, or NVM version 2 | Memory command fails, session stays active |
 | Missing UPDI echo | That command fails |
-| Reset status still clear after `kResetWaitMs` | `RSP_NO_TARGET_POWER` (`0xAB`) |
+| Enter or leave reset status bits 1–3 still clear after `kResetWaitMs` | `RSP_NO_TARGET_POWER` (`0xAB`) |
+| Chip-erase key echo mismatch, or KEY_STATUS bit 3 clear | `RSP_NO_TARGET_POWER` (`0xAB`), reset not pulsed |
+| Chip-erase LOCKSTATUS still set after `kResetWaitMs` | `RSP_NO_TARGET_POWER` (`0xAB`), progmode flag cleared |
+| NVM status bit 0 or 1 still set after 20 ms | `RSP_NO_TARGET_POWER` (`0xAB`) |
 | GO or sign-off before NVM programming | `RSP_OK`, UPDI pin left enabled |
-| GO or sign-off after NVM programming | Control B `0x04`, pin ignores UPDI until the chip resets |
+| GO or sign-off while the progmode flag is set | Control B `0x04`, pin ignores UPDI until the chip resets. Chip erase clears the flag after both reset stores, so that close does not store it |
 | 60 s with no protocol byte | Session ends. ISP restores the claimed CS pin to an input with a pull-up. UPDI restores the claimed MOD pin to an input |
 | Link seen, then absent for 1 s | Session ends. ISP restores the claimed CS pin to an input with a pull-up. UPDI restores the claimed MOD pin to an input |
