@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "reference/pump-module.md",
+                "file": "architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "pump-module"
+              "title": "architecture"
             }
           }
         ]
@@ -190,6 +190,7 @@
   },
   "active": "f51934d8476ef699",
   "lastOpenFiles": [
+    "reference/pump-module.md",
     "reference/programming.md",
     "programming.md",
     "module-bus.md",
@@ -201,7 +202,6 @@
     "reference/index.md",
     "reference/configuration.md",
     "reference/networking.md",
-    "reference/pump-module.md",
     "reference/solenoid-module.md",
     "sensor-module.md",
     "home.md",

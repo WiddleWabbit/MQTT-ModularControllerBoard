@@ -132,10 +132,10 @@ UpdiProgrammer::UpdiProgrammer(IBytePort& port, IHalfDuplexUart& uart,
 // ========== Public API ==========
 
 /**
- * Stores the UPDI pin and leaves it as an input with no pull-up.
+ * Stores the UPDI pin and leaves it as an input with a pull-up.
  * The UART stays detached until a connect break finishes.
  *
- * @param line Slot MOD pin.
+ * @param line Slot CS pin.
  * @param gpio GPIO number of that pin.
  * @return Nothing.
  */
@@ -143,7 +143,7 @@ void UpdiProgrammer::start(IDigitalPin& line, uint8_t gpio)
 {
   _line = &line;
   _gpio = gpio;
-  _line->setMode(PinMode::DigitalInput);
+  _line->setMode(PinMode::DigitalInputPullup);
 }
 
 /**
@@ -180,8 +180,8 @@ void UpdiProgrammer::update()
 }
 
 /**
- * Detaches the UART and returns the line to an input with no pull-up.
- * That matches the bus idle state of a MOD pin.
+ * Detaches the UART and returns the line to an input with a pull-up.
+ * That matches the bus idle state of a CS pin.
  *
  * @return Nothing.
  */
@@ -195,7 +195,7 @@ void UpdiProgrammer::shutdown()
   }
   if (_line != nullptr)
   {
-    _line->setMode(PinMode::DigitalInput);
+    _line->setMode(PinMode::DigitalInputPullup);
   }
   _breakPhase = BreakPhase::Idle;
   _pending = Pending::None;
@@ -213,7 +213,7 @@ void UpdiProgrammer::shutdown()
  * stored for the report. Host bytes stay unread. Later polls advance
  * the phases, so this call does not release the pin.
  *
- * @param line Slot MOD pin.
+ * @param line Slot CS pin.
  * @param gpio GPIO number of that pin.
  * @return Nothing.
  */
@@ -654,9 +654,9 @@ void UpdiProgrammer::_startBreak(Pending pending)
 
 /**
  * Moves 25 ms open-drain low, 3 ms input pull-up, then 25 ms
- * open-drain low. The pull-up is the high between the breaks. A MOD
- * pin has no board pull-up, and open-drain high only releases the
- * driver. A link check samples the pin at the end of that pull-up.
+ * open-drain low. The pull-up is the high between the breaks. A CS
+ * pin also has a board pull-up, and open-drain high only releases
+ * the driver. A link check samples the pin at the end of that pull-up.
  * The completing call releases the line, claims the pad, and returns
  * so the waiting instruction is written in that same call.
  *
@@ -740,7 +740,7 @@ void UpdiProgrammer::_runPending()
 
 /**
  * Reads UPDI STATUSA, then detaches the UART and restores the pin to
- * an input with no pull-up. The drive and release samples stay in
+ * an input with a pull-up. The drive and release samples stay in
  * _checkResult.
  *
  * @return Nothing.

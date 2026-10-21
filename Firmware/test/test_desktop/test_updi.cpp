@@ -663,7 +663,7 @@ void testUpdiLeaveReleasesTheLineAndShutdownRestoresInput()
 
   rig.programmer.shutdown();
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
 }
 
 /**
@@ -761,7 +761,7 @@ void testUpdiLinkCheckSamplesLevelsThenLoadsStatus()
   TEST_ASSERT_EQUAL(1, rig.uart.rearmCount);
   TEST_ASSERT_TRUE(rig.uart.pullUpEnabled);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
   TEST_ASSERT_EQUAL(0, rig.port.output.size());
   TEST_ASSERT_EQUAL(1, rig.port.input.size());
 }
@@ -792,7 +792,7 @@ void testUpdiLinkCheckWithNoStatusByteStillReleasesThePin()
   TEST_ASSERT_EQUAL(1, rig.uart.rearmCount);
   TEST_ASSERT_TRUE(rig.uart.pullUpEnabled);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
 }
 
 void testUpdiLinkCheckReportsADipAndAMissingEcho()
@@ -859,7 +859,7 @@ void testUpdiLinkCheckSendsWhenTheGapStaysLow()
   TEST_ASSERT_TRUE(result.replied);
   TEST_ASSERT_EQUAL_HEX8(0x30, result.status);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.line.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.line.mode);
 }
 
 void testUpdiEnterWaitsForBootDone()

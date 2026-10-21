@@ -87,9 +87,9 @@ Firmware slot numbers follow schematic nets and `src/main.cpp` (`SNS1_PIN` is sl
 
 Shared I2C is SDA GPIO4 and SCL GPIO5, with 4.7 kΩ pull-ups on the motherboard. Sense uses the ESP32 internal pull-up. The module ties SENSE to GND when seated. LOW means present.
 
-MOD is the enumeration select. The host drives it low to talk to unconfigured address `0x0A`, then releases it to an input. After address assignment a type handler may reuse MOD. Daughter firmware must not require MOD low after `SET_ADDRESS`.
+MOD is the enumeration select. The host drives it low to talk to unconfigured address `0x0A`, then releases it to an input. Daughter firmware must not require MOD low after `SET_ADDRESS`.
 
-CS is an input with a pull-up, idle HIGH, during normal operation. The module protocol does not use SPI. A programming session can take the selected slot's CS pin as AVR RESET. UPDI uses that slot's MOD pin. See [programming.md](../programming.md).
+CS is an input with a pull-up, idle HIGH, during normal operation. The module protocol does not use SPI. A programming session can take the selected slot's CS pin as AVR RESET or as the UPDI wire. See [programming.md](../programming.md).
 
 `begin()` sets SENSE to input pull-up, MOD to input, and CS to input pull-up, then starts I2C. GPIO43 and GPIO44 are UART0 pins. The ESP32 driver must call Arduino `pinMode` so that peripheral detaches.
 

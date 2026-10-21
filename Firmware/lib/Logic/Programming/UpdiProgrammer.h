@@ -36,10 +36,10 @@ public:
   UpdiProgrammer(IBytePort& port, IHalfDuplexUart& uart, IClock& clock);
 
   /**
-   * Stores the UPDI pin and leaves it as an input with no pull-up.
+   * Stores the UPDI pin and leaves it as an input with a pull-up.
    * Does not attach the UART.
    *
-   * @param line Slot MOD pin used as the UPDI wire.
+   * @param line Slot CS pin used as the UPDI wire.
    * @param gpio GPIO number passed to install().
    * @return Nothing.
    */
@@ -55,7 +55,7 @@ public:
   void update() override;
 
   /**
-   * Detaches the UART and returns the line to an input with no pull-up.
+   * Detaches the UART and returns the line to an input with a pull-up.
    *
    * @return Nothing.
    */
@@ -73,7 +73,7 @@ public:
    * open-drain low that starts the double break. The driven level is
    * stored for the report. Does not read the USB byte stream.
    *
-   * @param line Slot MOD pin used as the UPDI wire.
+   * @param line Slot CS pin used as the UPDI wire.
    * @param gpio GPIO number passed to install().
    * @return Nothing.
    */
