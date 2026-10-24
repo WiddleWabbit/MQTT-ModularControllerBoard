@@ -4,17 +4,17 @@
 
 ## Summary
 
-`Programming` is one session on firmware slot 1 through 4. `program N isp` is SPI, for an ATmega328PB. `program N updi` is UPDI, for an ATtiny1614. A line without both a slot and a method replies `ERR program` and does not start a session. `check N` only measures that slot's CS pin.
+`Programming` is one session on firmware slot 1 through 4. `program N isp` is SPI, for an ATmega328PB. `program N updi` is UPDI, for an ATtiny1614. A line without both a slot and a method replies `ERR program` and does not start a session. `check N` only measures that slot's MOD pin.
 
 SPI uses the shared MOSI, MISO, and SCK pins, plus that slot's CS pin as RESET. The clock is mode 0, MSB first, 125 kHz, and avrdude's baud does not change it. Reset is held low, programming enable waits 20 ms, and that try is repeated up to three times. A flash page then waits 5 ms, each EEPROM byte waits 10 ms, and chip erase waits 10 ms. The board check is signature `0x1E9516`.
 
-UPDI uses only that slot's CS pin, at 115200 8E2 on UART1. The double break is 25 ms low, 3 ms with the input pull-up, then 25 ms low. The update that ends the break stores Control A `0x00`, a guard of 128 bit times (about 1.1 ms). A successful enter then stores Control A `0x03`, 16 bit times (about 139 µs), so a page finishes inside avrdude's receive window. Enter and leave wait up to 200 ms for status bits 1–3. Chip erase waits up to that same 200 ms for the lock bit to clear, answers OK when it does, and does not enter programming mode. A page program waits up to 20 ms. The board check is signature `0x1E9422`.
+UPDI uses only that slot's MOD pin, at 115200 8E2 on UART1. The double break is 25 ms low, 3 ms with the input pull-up, then 25 ms low. The update that ends the break stores Control A `0x00`, a guard of 128 bit times (about 1.1 ms). A successful enter then stores Control A `0x03`, 16 bit times (about 139 µs), so a page finishes inside avrdude's receive window. Enter and leave wait up to 200 ms for status bits 1–3. Chip erase waits up to that same 200 ms for the lock bit to clear, answers OK when it does, and does not enter programming mode. A page program waits up to 20 ms. The board check is signature `0x1E9422`.
 
 Pins, wire bytes, and the full timing tables are in the [programming reference](reference/programming.md).
 
 ## Where it sits
 
-`main.cpp` constructs it with the USB byte port, the SPI master, the half-duplex UART, the four CS pins, `kProgrammingPins`, `ModuleBus`, the clock, `kProgrammingIdleTimeoutMs` (60 seconds), and `kProgrammingUnplugTimeoutMs` (1 second). `loop()` calls `network.update()` first. While `active()` is true it calls `programming.update()` and returns, unless the session ended on that pass.
+`main.cpp` constructs it with the USB byte port, the SPI master, the half-duplex UART, the four CS pins, the four MOD pins, `kProgrammingPins`, `ModuleBus`, the clock, `kProgrammingIdleTimeoutMs` (60 seconds), and `kProgrammingUnplugTimeoutMs` (1 second). `loop()` calls `network.update()` first. While `active()` is true it calls `programming.update()` and returns, unless the session ended on that pass.
 
 `serialConsole.update()` recognizes the program line and returns before the bus. `loop()` then stores the RTC latch and calls `begin(slot, method)`. A `check` line does not store the latch. Each pass while the check is running polls one phase of the 25 ms / 3 ms / 25 ms break and returns before the bus and before `delay(10)`. The pass that finishes the second low claims the pin and reads STATUSA.
 

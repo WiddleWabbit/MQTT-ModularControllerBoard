@@ -111,7 +111,7 @@ apply
 
 `program N isp` and `program N updi` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the session in [Programming](../programming.md). N is one digit, 1 through 4. The method word is exactly `isp` or `updi`. The console does not read further lines until that session ends. `program`, `program isp`, `program updi`, `program 1`, `program 1 udpi`, a slot outside 1..4, and any extra token reply `ERR program` and do not start a session. `programmable` is `ERR command`.
 
-`check N` measures the UPDI wire on that slot's CS pin and does not start a session. N is one digit, 1 through 4. Accepting it prints nothing. When the reply wait stayed high the console prints four lines:
+`check N` measures the UPDI wire on that slot's MOD pin and does not start a session. N is one digit, 1 through 4. Accepting it prints nothing. When the reply wait stayed high the console prints four lines:
 
 ```text
 drive low: 0

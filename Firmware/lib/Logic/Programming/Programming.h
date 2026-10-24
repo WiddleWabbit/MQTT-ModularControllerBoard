@@ -18,7 +18,7 @@ class ModuleBus;
  * Programming session for one firmware slot. begin() selects ISP or
  * UPDI, quiesces the module bus, and hands the USB byte stream to that
  * programmer. update() runs until the session's idle or unplug rule
- * ends it. startUpdiCheck() measures one CS pin and does not start
+ * ends it. startUpdiCheck() measures one MOD pin and does not start
  * a session.
  */
 class Programming
@@ -31,12 +31,16 @@ public:
    * @param port USB byte stream shared with the console.
    * @param spi SPI master for ISP. Unused by UPDI.
    * @param uart Single-wire UART for UPDI. Unused by ISP.
-   * @param cs1 Slot 1 chip-select. ISP RESET and the UPDI wire.
+   * @param cs1 Slot 1 chip-select. ISP RESET.
    * @param cs2 Slot 2 chip-select.
    * @param cs3 Slot 3 chip-select.
    * @param cs4 Slot 4 chip-select.
-   * @param pins GPIO numbers printed by the console. ISP and UPDI both
-   *        use the CS pin objects and `csGpio`.
+   * @param mod1 Slot 1 MOD pin. The UPDI wire.
+   * @param mod2 Slot 2 MOD pin.
+   * @param mod3 Slot 3 MOD pin.
+   * @param mod4 Slot 4 MOD pin.
+   * @param pins GPIO numbers printed by the console. ISP uses `csGpio`.
+   *        UPDI uses `modGpio` and the MOD pin objects.
    * @param modules Module bus quiesced for the session.
    * @param clock Monotonic clock.
    * @param idleTimeoutMs Silence that ends the session.
@@ -45,15 +49,16 @@ public:
    */
   Programming(IBytePort& port, ISpiMaster& spi, IHalfDuplexUart& uart,
               IDigitalPin& cs1, IDigitalPin& cs2, IDigitalPin& cs3,
-              IDigitalPin& cs4, const ProgrammingPins& pins,
-              ModuleBus& modules, IClock& clock, uint32_t idleTimeoutMs,
-              uint32_t unplugTimeoutMs);
+              IDigitalPin& cs4, IDigitalPin& mod1, IDigitalPin& mod2,
+              IDigitalPin& mod3, IDigitalPin& mod4,
+              const ProgrammingPins& pins, ModuleBus& modules, IClock& clock,
+              uint32_t idleTimeoutMs, uint32_t unplugTimeoutMs);
 
   /**
    * Starts a session on slot 1..4. An in-progress link check is
    * released first. No-op when a session is active or the slot is
    * outside that range. ISP drives the slot CS pin high. UPDI leaves
-   * the slot CS pin idle, with its pull-up, and does not start SPI.
+   * the slot MOD pin idle, with its pull-up, and does not start SPI.
    *
    * @param slot Firmware slot, 1 through 4.
    * @param method ISP or UPDI.
@@ -107,6 +112,7 @@ private:
   UpdiProgrammer _updi;
   ProgrammingSession _session;
   IDigitalPin* _cs[4];
+  IDigitalPin* _mod[4];
   const ProgrammingPins& _pins;
   bool _checkActive = false;
 };

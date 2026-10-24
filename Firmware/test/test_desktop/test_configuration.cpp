@@ -20,7 +20,7 @@
 namespace
 {
 const ProgrammingPins kProgrammingPins = {
-  11, 13, 12, {6, 7, 15, 16}};
+  11, 13, 12, {6, 7, 15, 16}, {40, 42, 43, 1}};
 
 NetworkConfig config()
 {
@@ -845,7 +845,7 @@ void testProgramCommandSelectsSlotAndMethod()
   TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Updi),
                     static_cast<int>(request.method));
   TEST_ASSERT_EQUAL_STRING(
-    "UPDI slot 1: UPDI GPIO6, 3V3, GND", updi1.serial.output[1].c_str());
+    "UPDI slot 1: UPDI GPIO40, 3V3, GND", updi1.serial.output[1].c_str());
 
   CommandStack updi4;
   updi4.serial.feed("program 4 updi\n");
@@ -853,7 +853,7 @@ void testProgramCommandSelectsSlotAndMethod()
   TEST_ASSERT_TRUE(updi4.controller.takeProgrammingRequest(request));
   TEST_ASSERT_EQUAL(4, request.slot);
   TEST_ASSERT_EQUAL_STRING(
-    "UPDI slot 4: UPDI GPIO16, 3V3, GND", updi4.serial.output[1].c_str());
+    "UPDI slot 4: UPDI GPIO1, 3V3, GND", updi4.serial.output[1].c_str());
 }
 
 /**

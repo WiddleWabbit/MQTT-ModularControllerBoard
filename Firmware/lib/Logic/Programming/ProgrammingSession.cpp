@@ -17,8 +17,8 @@ ProgrammingSession::ProgrammingSession(ModuleHost& host, IBytePort& port,
 // ========== Public API ==========
 
 /**
- * Quiesces the host. No-op when already active. The pin is left as
- * start() set it.
+ * Quiesces the host, which releases every MOD line. No-op when
+ * already active.
  *
  * @param programmer ISP or UPDI programmer for this session.
  * @return Nothing.
