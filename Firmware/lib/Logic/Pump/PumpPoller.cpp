@@ -45,13 +45,18 @@ void PumpPoller::update()
   {
     return;
   }
+  if (_serviceRefresh())
+  {
+    return;
+  }
   _servicePeriodic();
 }
 
 /**
  * Records the desired on/off state for one module. Does not touch
- * I2C. Restarts the command-absence timer. A later command for the
- * same slot replaces this one.
+ * I2C. Restarts the command-absence timer. An on command also
+ * requests SET_PUMP on at the next pass, including when the pump
+ * is already on. A later command for the same slot replaces this one.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param on True commands on.
@@ -71,6 +76,18 @@ bool PumpPoller::commandState(uint8_t moduleSlot, bool on)
   intent.desiredOn = on;
   intent.applyPending = true;
   intent.applyAttempts = 0;
+  if (on)
+  {
+    intent.refreshNow = true;
+    intent.refreshAttempts = 0;
+  }
+  else
+  {
+    intent.refreshNow = false;
+    intent.refreshArmed = false;
+    intent.refreshAttempts = 0;
+    intent.nextRefreshAt = 0;
+  }
   return true;
 }
 
@@ -196,9 +213,14 @@ void PumpPoller::_syncSessions()
       _intent[slot] = saved;
       _intent[slot].applyAttempts = 0;
       _intent[slot].resetAttempts = 0;
+      _intent[slot].refreshAttempts = 0;
       if (saved.desiredValid)
       {
         _intent[slot].applyPending = true;
+      }
+      if (saved.desiredOn)
+      {
+        _intent[slot].refreshNow = true;
       }
     }
   }
@@ -237,6 +259,10 @@ void PumpPoller::_clearIntent(uint8_t moduleSlot)
   intent.applyAttempts = 0;
   intent.resetPending = false;
   intent.resetAttempts = 0;
+  intent.refreshNow = false;
+  intent.refreshArmed = false;
+  intent.refreshAttempts = 0;
+  intent.nextRefreshAt = 0;
 }
 
 /**
@@ -278,6 +304,10 @@ void PumpPoller::_armSilence()
 void PumpPoller::_armOff(uint8_t moduleSlot)
 {
   Intent& intent = _intent[moduleSlot];
+  intent.refreshNow = false;
+  intent.refreshArmed = false;
+  intent.refreshAttempts = 0;
+  intent.nextRefreshAt = 0;
   if (intent.desiredValid && !intent.desiredOn)
   {
     return;
@@ -424,6 +454,10 @@ bool PumpPoller::_serviceApply()
       {
         intent.applyPending = false;
         intent.applyAttempts = 0;
+        if (intent.desiredOn && written.state == PumpState::On)
+        {
+          _armOnRefresh(slot);
+        }
       }
       else
       {
@@ -447,6 +481,89 @@ bool PumpPoller::_serviceApply()
     return true;
   }
   return false;
+}
+
+/**
+ * Sends SET_PUMP on again while the desired state is on and the
+ * known state is on. An accepted on command is due immediately.
+ * After a successful on, the next one is due at the poll interval.
+ *
+ * @return True when a refresh was issued.
+ */
+bool PumpPoller::_serviceRefresh()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    Intent& intent = _intent[slot];
+    SlotRuntime& runtime = _runtime[slot];
+    if (intent.resetPending || !intent.desiredValid || !intent.desiredOn ||
+        !_isActivePump(slot) || !runtime.stateKnown ||
+        runtime.state != PumpState::On)
+    {
+      continue;
+    }
+    const bool due = intent.refreshNow ||
+                     (intent.refreshArmed && _isDue(intent.nextRefreshAt));
+    if (!due)
+    {
+      continue;
+    }
+
+    const PumpStateResult written = setPump(_moduleHost, slot, true);
+    if (written.status == PumpQueryStatus::Ok)
+    {
+      _rememberState(slot, written.state, true);
+      if (written.state == PumpState::On)
+      {
+        _armOnRefresh(slot);
+      }
+      else if (written.state == PumpState::Fault)
+      {
+        intent.refreshNow = false;
+        intent.refreshArmed = false;
+        intent.refreshAttempts = 0;
+        intent.nextRefreshAt = 0;
+        runtime.nextPollAt = _clock.millis() + _intervalMs;
+      }
+      else
+      {
+        intent.refreshNow = false;
+        intent.refreshAttempts = 0;
+      }
+    }
+    else
+    {
+      intent.refreshAttempts =
+          static_cast<uint8_t>(intent.refreshAttempts + 1);
+      if (intent.refreshAttempts >= kPumpQueryAttempts)
+      {
+        _armOnRefresh(slot);
+      }
+      else
+      {
+        intent.refreshNow = true;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Schedules the next on refresh and the next state poll together.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Nothing.
+ */
+void PumpPoller::_armOnRefresh(uint8_t moduleSlot)
+{
+  Intent& intent = _intent[moduleSlot];
+  const uint32_t due = _clock.millis() + _intervalMs;
+  intent.refreshNow = false;
+  intent.refreshAttempts = 0;
+  intent.refreshArmed = true;
+  intent.nextRefreshAt = due;
+  _runtime[moduleSlot].nextPollAt = due;
 }
 
 /**

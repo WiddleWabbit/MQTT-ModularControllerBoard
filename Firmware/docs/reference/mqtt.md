@@ -143,7 +143,7 @@ mosquitto_pub -h <broker> -t watering/pump -q 1 -m "1 reset"
 
 The result is retained on `{id}/slot/N/pump` as `on`, `off`, or `fault`.
 
-`on` and `off` restart the absence window. `reset` does not. `SET_PUMP` is sent when the known state differs and the pump is not faulted. `RESET_PUMP` is sent only for `reset`. A command that already matches waits for the next state read, about `kPumpPollIntervalMs` (60 seconds), which publishes the same word again.
+`on` and `off` restart the absence window. `reset` does not. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on. While the absence window stays open, that on command is sent again every `kPumpPollIntervalMs` (60 seconds), and the reply publishes the same word again. Off is sent when the known state differs. `RESET_PUMP` is sent only for `reset`. A faulted pump is left alone until `reset`.
 
 If no accepted on/off command arrives for `kPumpCommandTimeoutMs` (3 minutes), a pump that is on is turned off. A faulted pump stays faulted until `reset`.
 

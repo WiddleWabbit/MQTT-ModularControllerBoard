@@ -90,7 +90,7 @@ While a session is active, Wi-Fi, NTP, and MQTT keep running. The console, the b
 | `PumpModule` | `update` | At most one pump exchange, then publish what it stored | [Pump](pump-module.md) |
 | `Programming` | `begin`, `update`, `active`, `startUpdiCheck`, `pollUpdiCheck` | ISP or UPDI until idle timeout or a confirmed unplug. A link check is polled from `loop()` and is not a session | [Programming](programming.md) |
 
-Poll intervals and command-absence cutoffs are named constants in `src/main.cpp` and are passed into the type modules. Sensor, solenoid, and pump polls are 60 seconds. A solenoid command absent for 15 minutes turns every output off. A pump on/off command absent for 3 minutes turns the pump off. A pump reset does not refresh that window.
+Poll intervals and command-absence cutoffs are named constants in `src/main.cpp` and are passed into the type modules. Sensor, solenoid, and pump polls are 60 seconds. A solenoid command absent for 15 minutes turns every output off. A pump on/off command absent for 3 minutes turns the pump off. While that window is still open, each accepted pump `on` is sent to the board, and it is sent again at the pump poll interval. A pump reset does not refresh that window.
 
 `Network` accepts at most four inbound handlers. Sensor, solenoid, and pump register one each, in their constructors. `begin` loads the stored record over the defaults from `main.cpp`, then starts Wi-Fi, MQTT, and NTP. `apply` persists the selected fields and pushes Wi-Fi or MQTT only after that save. An empty broker host stays unconfigured and does not call `connect`.
 

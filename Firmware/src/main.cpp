@@ -35,7 +35,9 @@ const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
 // After 15 minutes with none, every solenoid output is turned off.
 const uint32_t kSolenoidCommandTimeoutMs = 15UL * 60UL * 1000UL;
 
-// State of the pump is read and published on this period.
+// State of the pump is read on this period. While an accepted on
+// command is still inside the absence window, SET_PUMP on is sent
+// on this same period, and that reply is the state sample.
 const uint32_t kPumpPollIntervalMs = 60UL * 1000UL;
 
 // Accepted pump on/off commands must arrive within this window.

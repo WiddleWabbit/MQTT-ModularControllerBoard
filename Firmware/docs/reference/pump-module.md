@@ -6,7 +6,7 @@ Source: `lib/Logic/Pump/PumpModule.h`, `PumpPoller.h`, `PumpMqttBridge.h`. Share
 
 ## Purpose
 
-Type `0x0300` drives one pump. The host reads it when the module is identified, reads it again on the poll interval, and publishes `on`, `off`, or `fault`. `{id}/pump` names the desired state or asks for a reset. `SET_PUMP` is sent only when the known state differs, and it is not sent while the pump is faulted. `RESET_PUMP` is sent only after an MQTT reset.
+Type `0x0300` drives one pump. The host reads it when the module is identified, and publishes `on`, `off`, or `fault`. `{id}/pump` names the desired state or asks for a reset. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on, and that on is repeated at the poll interval while the absence window is open. The repeat's reply is the state sample, so a held pump is not also read on that pass. Off is sent when the known state differs. `SET_PUMP` is not sent while the pump is faulted. `RESET_PUMP` is sent only after an MQTT reset.
 
 The host sends these commands only while the slot is `Online`, the type is `0x0300`, and the protocol version is 1. There is no index. `ECHO` is not part of this type.
 
@@ -43,7 +43,8 @@ Leaving `Online` drops the cached state. A sense gap that leaves the slot `Onlin
 1. `GET_PUMP_STATE` for an online pump whose state is not known. A command for that slot is the next state read, ahead of another slot's periodic read.
 2. `RESET_PUMP` when a reset is pending and the state is known.
 3. `SET_PUMP` when the desired on/off state differs from the known state, and the state is not fault.
-4. The periodic `GET_PUMP_STATE`.
+4. `SET_PUMP` on when the desired state is on, the known state is on, and a refresh is due. A refresh is due on the pass after each accepted `on`, and again `kPumpPollIntervalMs` after the previous successful on. That reply postpones the state read to the same time.
+5. The periodic `GET_PUMP_STATE`.
 
 ```text
 topic:   {id}/pump
@@ -55,10 +56,12 @@ payload: 1 on
 The callback records the request and does not touch I2C. `on` and `off` restart the absence window. `reset` does not. A malformed payload does not. A command for a slot that is still enumerating waits. A command for an empty, faulted slot, an unsupported type, or a different module is dropped.
 
 ```text
-pump off, desired on   -> SET on
-pump on,  desired on   -> no command
-pump on,  desired off  -> SET off
-pump fault, desired on -> no SET; wait for reset
+pump off, desired on            -> SET on
+pump on,  on command just in    -> SET on
+pump on,  poll interval elapsed -> SET on
+pump on,  neither of those due  -> no command
+pump on,  desired off           -> SET off
+pump fault, desired on          -> no SET; wait for reset
 ```
 
 A newer on/off command for the same slot replaces the previous desired state. The last accepted on/off command is applied again after the module is identified again.
@@ -71,7 +74,7 @@ When the reset returns off or on, a later pass sends `SET_PUMP` if the desired s
 
 ### Command absence
 
-`{id}/pump` on/off commands are expected about once a minute. If no accepted on/off command arrives for 3 minutes, the controller turns off every pump that is on.
+`{id}/pump` on/off commands are expected about once a minute. While the window is open and the desired state is on, the controller also sends `SET_PUMP` on at that same pace, so a pump board can turn itself off when those commands stop. If no accepted on/off command arrives for 3 minutes, the controller turns off every pump that is on.
 
 The window is `kPumpCommandTimeoutMs` in `src/main.cpp` (`3UL * 60UL * 1000UL`). It starts when the poller first runs. Each accepted `on` or `off` restarts it. A reset does not. When the window elapses, every online pump is given desired state off. A pump that is already off is not commanded. A pump that is on receives `SET_PUMP` off. A pump that is faulted is left faulted. A module that comes online after the window has elapsed is turned off once its state is known and that state is on.
 
@@ -119,7 +122,7 @@ MQTT {id}/pump  payload "1 on"
 I2C  SET_PUMP on
 MQTT {id}/slot/1/pump  retained  "on"
 
-I2C  GET_PUMP_STATE
+I2C  SET_PUMP on
 MQTT {id}/slot/1/pump  retained  "fault"
 
 MQTT {id}/pump  payload "1 reset"
@@ -129,23 +132,23 @@ I2C  SET_PUMP on
 MQTT {id}/slot/1/pump  retained  "on"
 ```
 
-About one poll interval after the last state read, the read runs again and publishes again, even when the text is unchanged. If no accepted on/off command arrives for `kPumpCommandTimeoutMs`, a pump that is on is commanded off.
+About one poll interval after the last successful on, `SET_PUMP` on runs again and publishes again, even when the text is unchanged. A pump that is off or faulted is read on that interval instead. If no accepted on/off command arrives for `kPumpCommandTimeoutMs`, a pump that is on is commanded off, and the on refresh stops.
 
 ## Errors
 
 `Busy` repeats the same command. A busy pump query does not, by itself, move the slot to `Fault`. A state byte other than 0, 1, or 2 is a failed query.
 
-`Busy` or a failed query is tried up to three times. Three failed state reads wait `kPumpPollIntervalMs`. A failed on, off, or reset is tried up to three times. A later state poll that still shows the pump on, while the absence cutoff is in effect, tries off again.
+`Busy` or a failed query is tried up to three times. Three failed state reads wait `kPumpPollIntervalMs`. A failed on, off, or reset is tried up to three times. Three failed on refreshes wait `kPumpPollIntervalMs` and then try again while the desired state stays on. A later state poll that still shows the pump on, while the absence cutoff is in effect, tries off again.
 
 ## Configuration
 
 | Constant in `src/main.cpp` | Value | Role |
 | --- | --- | --- |
-| `kPumpPollIntervalMs` | 60 seconds | Gap after a successful state read, and the wait after three failed reads |
+| `kPumpPollIntervalMs` | 60 seconds | Gap after a successful state read, between on refreshes, and the wait after three failed reads or three failed on refreshes |
 | `kPumpCommandTimeoutMs` | 3 minutes | Absence window that turns a pump that is on off |
 
 A zero argument selects the poller's own default for that argument. It does not disable the poll or the cutoff. A reset does not refresh the absence window.
 
 ## Tests
 
-`test/test_desktop/test_pump.cpp` covers the three command frames, host rejection unless the slot is an online pump, the state read and its 60 second repeat, a module reset that reads the state again, busy retries, a desired state that sets the pump only when it differs, fault published and left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, and retained `unavailable` after unplug. The tests use one pump module, plus one command addressed to slot 2. `test_deep_modules.cpp` drives `PumpModule::update()`.
+`test/test_desktop/test_pump.cpp` covers the three command frames, host rejection unless the slot is an online pump, the state read and its 60 second repeat, a module reset that reads the state again, busy retries, off sent only when the state differs, on sent again when it is already on and again at the poll interval, a busy on refresh that waits and tries again, a fault left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, and retained `unavailable` after unplug. The tests use one pump module, plus one command addressed to slot 2. `test_deep_modules.cpp` drives `PumpModule::update()`.

@@ -411,7 +411,13 @@ void testPumpCommandSetsOnlyWhenStateDiffers()
   const size_t afterOn = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterOn, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(afterOn + 1, harness.modules.bus.protocolOpCount());
+
+  const size_t afterRepeat = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterRepeat, harness.modules.bus.protocolOpCount());
 
   harness.client.deliver(kPumpCommandTopic, "1 off");
   harness.poller.update();
@@ -635,9 +641,14 @@ void testPumpCommandRefreshesAbsenceTimeout()
 
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+  const size_t afterRepeat = harness.modules.bus.protocolOpCount();
+
   harness.clock.advance(4999);
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterMatch, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(afterRepeat, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, harness.device.pumpState);
 
   harness.clock.advance(1);
   harness.poller.update();
@@ -782,6 +793,106 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   TEST_ASSERT_EQUAL(once, harness.client.publishedMessages.size());
 }
 
+void testPumpOnRefreshFollowsCommandAndInterval()
+{
+  PumpHarness harness(1000, 60000);
+  harness.device.pumpState = module_protocol::kPumpStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.bridge.update();
+  harness.client.publishedMessages.clear();
+
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
+                             true));
+
+  const size_t afterCommand = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(400);
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(afterCommand + 1, harness.modules.bus.protocolOpCount());
+
+  const size_t afterSecond = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterSecond, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+
+  harness.client.deliver(kPumpCommandTopic, "1 off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, lastTx(harness.modules, 2));
+  const size_t afterOff = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterOff, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, harness.device.pumpState);
+}
+
+void testPumpOnRefreshRetriesAfterBusy()
+{
+  PumpHarness harness(1000, 60000);
+  harness.device.pumpState = module_protocol::kPumpStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+
+  harness.device.forceBusy = true;
+  harness.clock.advance(1000);
+  for (int attempt = 0; attempt < 3; ++attempt)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump,
+                      lastCommand(harness.modules));
+  }
+  const size_t afterGiveUp = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterGiveUp, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterGiveUp, harness.modules.bus.protocolOpCount());
+
+  harness.device.forceBusy = false;
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, harness.device.pumpState);
+}
+
+void testPumpOnRefreshLeavesFaultAlone()
+{
+  PumpHarness harness(1000, 60000);
+  harness.device.pumpState = module_protocol::kPumpStateFault;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  const size_t afterCommand = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterCommand, harness.modules.bus.protocolOpCount());
+
+  harness.clock.advance(1000);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
+}
+
 void testPumpBridgeFollowsDeviceId()
 {
   PumpHarness harness;
@@ -848,5 +959,8 @@ void runPumpTests()
   RUN_TEST(testPumpTimeoutDoesNotResetFault);
   RUN_TEST(testPumpCommandWaitsThroughEnumeration);
   RUN_TEST(testPeriodicPumpPublishEachStateAndClearOnUnplug);
+  RUN_TEST(testPumpOnRefreshFollowsCommandAndInterval);
+  RUN_TEST(testPumpOnRefreshRetriesAfterBusy);
+  RUN_TEST(testPumpOnRefreshLeavesFaultAlone);
   RUN_TEST(testPumpBridgeFollowsDeviceId);
 }

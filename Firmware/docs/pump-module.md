@@ -4,7 +4,7 @@
 
 ## Summary
 
-`PumpModule` talks to daughter boards of type `0x0300`. A board drives one pump. The module reads it when the board is identified, reads it again on the poll interval, and publishes `on`, `off`, or `fault`. `{id}/pump` names the desired on or off state, or asks for a reset. `SET_PUMP` is sent only when the known state differs, and it is not sent while the pump is faulted.
+`PumpModule` talks to daughter boards of type `0x0300`. A board drives one pump. The module reads it when the board is identified, reads it again on the poll interval, and publishes `on`, `off`, or `fault`. `{id}/pump` names the desired on or off state, or asks for a reset. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on. While that command is still inside the absence window, the same on command is sent again every `kPumpPollIntervalMs`, and that reply is the state sample. Off is sent when the known state differs. Nothing is sent while the pump is faulted.
 
 If no accepted on/off command arrives for `kPumpCommandTimeoutMs` (3 minutes), a pump that is on is turned off. A reset does not refresh that window, and it does not clear a fault by itself. `RESET_PUMP` is sent only after `{id}/pump` says `reset`.
 
@@ -28,7 +28,7 @@ The callback only records the request. `ModuleHost` is the only I2C caller. This
 ```mermaid
 flowchart TD
   upd["PumpModule.update()"] --> poll["PumpPoller: at most one exchange"]
-  poll --> order["A missing state, else RESET, else SET, else the periodic read"]
+  poll --> order["Missing state, else RESET, else a differing SET, else held on, else the periodic read"]
   order --> mem["Store the state"]
   mem --> bridge["PumpMqttBridge"]
   bridge --> pub{"A state was stored this pass?"}

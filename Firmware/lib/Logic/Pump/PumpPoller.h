@@ -10,12 +10,14 @@
 /**
  * Schedules Pump-module commands. Reads the pump state when a module
  * comes online or is identified again, then again at pollIntervalMs.
- * An MQTT desired-state command turns the pump on or off only when
- * the known state differs. A fault is left alone until an MQTT reset.
- * After that reset, the desired state is applied when the pump is no
- * longer faulted. When no on/off command is accepted for
- * commandTimeoutMs, a pump that is on is turned off. At most one I2C
- * query per update(). Does not publish MQTT.
+ * An accepted on command sends SET_PUMP on even when the pump is
+ * already on, and that on is repeated at pollIntervalMs while the
+ * absence window is open. Off is sent only when the known state
+ * differs. A fault is left alone until an MQTT reset. After that
+ * reset, the desired state is applied when the pump is no longer
+ * faulted. When no on/off command is accepted for commandTimeoutMs,
+ * a pump that is on is turned off. At most one I2C query per
+ * update(). Does not publish MQTT.
  */
 class PumpPoller
 {
@@ -30,8 +32,9 @@ public:
    * @param moduleHost Host that issues pump queries.
    * @param clock Monotonic clock for the poll interval and the
    *        command-absence timeout.
-   * @param pollIntervalMs Period between state polls. Zero selects
-   *        kDefaultPollIntervalMs.
+   * @param pollIntervalMs Period between state polls, and between
+   *        repeated on commands while an on command is still inside
+   *        the absence window. Zero selects kDefaultPollIntervalMs.
    * @param commandTimeoutMs Silence after which a pump that is on is
    *        commanded off. Zero selects kDefaultCommandTimeoutMs.
    *        The window starts when update() first runs, and restarts
@@ -52,8 +55,9 @@ public:
 
   /**
    * Records the desired on/off state for one module. Does not touch
-   * I2C. Restarts the command-absence timer. A later command for the
-   * same slot replaces this one.
+   * I2C. Restarts the command-absence timer. An on command also
+   * requests SET_PUMP on at the next pass, including when the pump
+   * is already on. A later command for the same slot replaces this one.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param on True commands on.
@@ -132,6 +136,10 @@ private:
     uint8_t applyAttempts;
     bool resetPending;
     uint8_t resetAttempts;
+    bool refreshNow;
+    bool refreshArmed;
+    uint8_t refreshAttempts;
+    uint32_t nextRefreshAt;
   };
 
   ModuleHost& _moduleHost;
@@ -223,6 +231,23 @@ private:
    * @return True when a set was issued.
    */
   bool _serviceApply();
+
+  /**
+   * Sends SET_PUMP on again while the desired state is on and the
+   * known state is on. An accepted on command is due immediately.
+   * After a successful on, the next one is due at the poll interval.
+   *
+   * @return True when a refresh was issued.
+   */
+  bool _serviceRefresh();
+
+  /**
+   * Schedules the next on refresh and the next state poll together.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return Nothing.
+   */
+  void _armOnRefresh(uint8_t moduleSlot);
 
   /**
    * Reads one due pump state.
