@@ -122,17 +122,19 @@ void testStatusReporterPrintsIdleStates()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
-  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:01",
                            fixture.serial.output[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
                            fixture.serial.output[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
                            fixture.serial.output[2].c_str());
-  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[3].c_str());
-  TEST_ASSERT_EQUAL_STRING("Slot 2: Empty", fixture.serial.output[4].c_str());
-  TEST_ASSERT_EQUAL_STRING("Slot 3: Empty", fixture.serial.output[5].c_str());
-  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
+                           fixture.serial.output[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 2: Empty", fixture.serial.output[5].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 3: Empty", fixture.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[7].c_str());
 }
 
 void testStatusReporterPrintsConnectingWithoutRssi()
@@ -144,9 +146,9 @@ void testStatusReporterPrintsConnectingWithoutRssi()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
-                           fixture.serial.output[0].c_str());
+                           fixture.serial.output[1].c_str());
 }
 
 void testStatusReporterPrintsBackoffWithoutRssi()
@@ -160,9 +162,9 @@ void testStatusReporterPrintsBackoffWithoutRssi()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL(WifiManagerState::Backoff, fixture.wifiManager.state());
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Backoff",
-                           fixture.serial.output[0].c_str());
+                           fixture.serial.output[1].c_str());
 }
 
 void testStatusReporterPrintsConnectedRssi()
@@ -177,9 +179,9 @@ void testStatusReporterPrintsConnectedRssi()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connected (-67 dBm)",
-                           fixture.serial.output[0].c_str());
+                           fixture.serial.output[1].c_str());
 }
 
 void testStatusReporterPrintsWaitingForSyncWithoutTime()
@@ -191,9 +193,9 @@ void testStatusReporterPrintsWaitingForSyncWithoutTime()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: WaitingForSync",
-                           fixture.serial.output[1].c_str());
+                           fixture.serial.output[2].c_str());
 }
 
 void testStatusReporterPrintsSynchronizedLocalTime()
@@ -208,9 +210,9 @@ void testStatusReporterPrintsSynchronizedLocalTime()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:20)",
-                           fixture.serial.output[1].c_str());
+                           fixture.serial.output[2].c_str());
 }
 
 void testStatusReporterAppliesDaylightOffset()
@@ -226,7 +228,7 @@ void testStatusReporterAppliesDaylightOffset()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-14 23:13:20)",
-                           fixture.serial.output[1].c_str());
+                           fixture.serial.output[2].c_str());
 }
 
 void testStatusReporterPrintsMqttWaitingForNetwork()
@@ -241,7 +243,7 @@ void testStatusReporterPrintsMqttWaitingForNetwork()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
-                           fixture.serial.output[2].c_str());
+                           fixture.serial.output[3].c_str());
 }
 
 void testStatusReporterPrintsMqttConnected()
@@ -256,7 +258,7 @@ void testStatusReporterPrintsMqttConnected()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL_STRING("MQTT Status: Connected",
-                           fixture.serial.output[2].c_str());
+                           fixture.serial.output[3].c_str());
 }
 
 void testStatusReporterPrintsMqttBackoff()
@@ -273,7 +275,7 @@ void testStatusReporterPrintsMqttBackoff()
 
   TEST_ASSERT_EQUAL(MqttServiceState::Backoff, fixture.mqttService.state());
   TEST_ASSERT_EQUAL_STRING("MQTT Status: Backoff",
-                           fixture.serial.output[2].c_str());
+                           fixture.serial.output[3].c_str());
 }
 
 void testStatusReporterPrintsMqttUnconfigured()
@@ -290,7 +292,7 @@ void testStatusReporterPrintsMqttUnconfigured()
   TEST_ASSERT_EQUAL(MqttServiceState::Unconfigured, fixture.mqttService.state());
   TEST_ASSERT_EQUAL(0, fixture.mqttClient.connectCallCount);
   TEST_ASSERT_EQUAL_STRING("MQTT Status: Unconfigured",
-                           fixture.serial.output[2].c_str());
+                           fixture.serial.output[3].c_str());
 }
 
 void testStatusReporterUsesConfiguredInterval()
@@ -304,7 +306,7 @@ void testStatusReporterUsesConfiguredInterval()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 }
 
 void testStatusReporterExposesConfig()
@@ -333,7 +335,7 @@ void testStatusReporterReconfigureChangesInterval()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(afterFirst + 7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(afterFirst + 8, fixture.serial.output.size());
 }
 
 void testStatusReporterWaitsForIntervalBeforeReprint()
@@ -351,7 +353,7 @@ void testStatusReporterWaitsForIntervalBeforeReprint()
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(afterFirst + 7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(afterFirst + 8, fixture.serial.output.size());
 }
 
 void testStatusReporterAdvancesClockAfterSync()
@@ -370,11 +372,11 @@ void testStatusReporterAdvancesClockAfterSync()
   fixture.clock.advance(1000);
   fixture.reporter.update();
 
-  TEST_ASSERT_EQUAL(14, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(16, fixture.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:20)",
-                           fixture.serial.output[1].c_str());
+                           fixture.serial.output[2].c_str());
   TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:21)",
-                           fixture.serial.output[8].c_str());
+                           fixture.serial.output[10].c_str());
 }
 
 void testStatusReporterStopsWhenUnpluggedAfterPrint()
@@ -384,12 +386,12 @@ void testStatusReporterStopsWhenUnpluggedAfterPrint()
 
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 
   fixture.serial.plugged = false;
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 }
 
 void testStatusReporterPrintsEmptySlots()
@@ -398,8 +400,8 @@ void testStatusReporterPrintsEmptySlots()
   fixture.start();
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[3].c_str());
-  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[6].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 1: Empty", fixture.serial.output[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("Slot 4: Empty", fixture.serial.output[7].c_str());
 }
 
 void testStatusReporterSlotOneIsIndexZeroAddr10()
@@ -418,7 +420,7 @@ void testStatusReporterSlotOneIsIndexZeroAddr10()
   fixture.clock.advance(1000);
   fixture.reporter.update();
   TEST_ASSERT_EQUAL_STRING("Slot 1: Online IdentityEcho addr=0x10",
-                           fixture.serial.output[3].c_str());
+                           fixture.serial.output[4].c_str());
 }
 
 void testStatusReporterPrintsOnlineSlot()
@@ -440,7 +442,7 @@ void testStatusReporterPrintsFault()
   fixture.clock.advance(1000);
   fixture.reporter.update();
   TEST_ASSERT_EQUAL_STRING("Slot 1: Fault Nack",
-                           fixture.serial.output[3].c_str());
+                           fixture.serial.output[4].c_str());
 }
 
 void testSlotNackPrintsOnceUntilTheSlotRecovers()
@@ -558,7 +560,7 @@ void testStatusReporterPrintsConnectedAddressAndRssi()
   fixture.reporter.update();
 
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connected (192.168.4.20, -67 dBm)",
-                           fixture.serial.output[0].c_str());
+                           fixture.serial.output[1].c_str());
 }
 
 void testStatusReporterOmitsAddressUntilConnected()
@@ -571,20 +573,20 @@ void testStatusReporterOmitsAddressUntilConnected()
   fixture.clock.advance(1000);
   fixture.reporter.update();
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
-                           fixture.serial.output[0].c_str());
+                           fixture.serial.output[1].c_str());
 
   fixture.wifiManager.begin();
   fixture.clock.advance(1000);
   fixture.reporter.update();
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
-                           fixture.serial.output[7].c_str());
+                           fixture.serial.output[9].c_str());
 
   fixture.wifiManager.update();
   fixture.clock.advance(1000);
   fixture.reporter.update();
   TEST_ASSERT_EQUAL(WifiManagerState::Backoff, fixture.wifiManager.state());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Backoff",
-                           fixture.serial.output[14].c_str());
+                           fixture.serial.output[17].c_str());
 }
 
 void testStatusReporterSkipsPrintsWhenDisabled()
@@ -606,21 +608,21 @@ void testStatusReporterResumeWaitsForFullInterval()
   fixture.start();
   fixture.clock.advance(1000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 
   fixture.reporter.setReportingEnabled(false);
   fixture.clock.advance(5000);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 
   fixture.reporter.setReportingEnabled(true);
   fixture.clock.advance(999);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(14, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(16, fixture.serial.output.size());
 }
 
 void testStatusReporterPrintsOnDemandWhileDisabled()
@@ -630,13 +632,15 @@ void testStatusReporterPrintsOnDemandWhileDisabled()
   fixture.reporter.setReportingEnabled(false);
   fixture.reporter.printStatus();
 
-  TEST_ASSERT_EQUAL(7, fixture.serial.output.size());
-  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
                            fixture.serial.output[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Idle",
                            fixture.serial.output[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle",
                            fixture.serial.output[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: Idle",
+                           fixture.serial.output[3].c_str());
 }
 
 void testStatusReporterPrintOnDemandWritesNothingWhenUnplugged()
@@ -655,15 +659,111 @@ void testStatusReporterPrintOnDemandRestartsInterval()
   fixture.reporter.update();
   fixture.clock.advance(400);
   fixture.reporter.printStatus();
-  TEST_ASSERT_EQUAL(14, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(16, fixture.serial.output.size());
 
   fixture.clock.advance(999);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(14, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(16, fixture.serial.output.size());
 
   fixture.clock.advance(1);
   fixture.reporter.update();
-  TEST_ASSERT_EQUAL(21, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL(24, fixture.serial.output.size());
+}
+
+void testStatusReporterPrintsUptimeFromTheMonotonicClock()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
+                           fixture.serial.output[0].c_str());
+
+  fixture.serial.output.clear();
+  fixture.clock.advance(1000);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:01",
+                           fixture.serial.output[0].c_str());
+
+  fixture.serial.output.clear();
+  fixture.clock.set(1999);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:01",
+                           fixture.serial.output[0].c_str());
+
+  fixture.serial.output.clear();
+  fixture.clock.set(60000);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:01:00",
+                           fixture.serial.output[0].c_str());
+
+  fixture.serial.output.clear();
+  fixture.clock.set(3600000);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 01:00:00",
+                           fixture.serial.output[0].c_str());
+
+  fixture.serial.output.clear();
+  fixture.clock.set(90061000);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 1d 01:01:01",
+                           fixture.serial.output[0].c_str());
+}
+
+void testStatusReporterPrintsZeroUptimeOnThePeriodicSnapshot()
+{
+  StatusFixture fixture;
+  fixture.start(0);
+  fixture.reporter.update();
+
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
+                           fixture.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
+}
+
+void testStatusReporterUptimeWrapsWithTheClock()
+{
+  StatusFixture fixture;
+  fixture.clock.set(4294967295u);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 49d 17:02:47",
+                           fixture.serial.output[0].c_str());
+
+  fixture.clock.advance(1);
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
+                           fixture.serial.output[8].c_str());
+}
+
+void testStatusReporterUptimeIgnoresNtp()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.ntpService.begin();
+  fixture.ntpAdapter.synchronized = true;
+  fixture.ntpAdapter.epoch = 1700000000;
+  fixture.ntpService.update();
+  fixture.clock.set(3661000);
+  fixture.reporter.update();
+
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 01:01:01",
+                           fixture.serial.output[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Synchronized (2023-11-15 06:13:20)",
+                           fixture.serial.output[2].c_str());
+}
+
+void testStatusReporterUptimePrintsWhileReportingIsOff()
+{
+  StatusFixture fixture;
+  fixture.start();
+  fixture.reporter.setReportingEnabled(false);
+  fixture.clock.advance(5000);
+  fixture.reporter.update();
+  TEST_ASSERT_EQUAL(0, fixture.serial.output.size());
+
+  fixture.reporter.printStatus();
+  TEST_ASSERT_EQUAL(8, fixture.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:05",
+                           fixture.serial.output[0].c_str());
 }
 
 void testWifiManagerForwardsLocalAddress()
@@ -766,6 +866,11 @@ void runStatusTests()
   RUN_TEST(testStatusReporterPrintsOnDemandWhileDisabled);
   RUN_TEST(testStatusReporterPrintOnDemandWritesNothingWhenUnplugged);
   RUN_TEST(testStatusReporterPrintOnDemandRestartsInterval);
+  RUN_TEST(testStatusReporterPrintsUptimeFromTheMonotonicClock);
+  RUN_TEST(testStatusReporterPrintsZeroUptimeOnThePeriodicSnapshot);
+  RUN_TEST(testStatusReporterUptimeWrapsWithTheClock);
+  RUN_TEST(testStatusReporterUptimeIgnoresNtp);
+  RUN_TEST(testStatusReporterUptimePrintsWhileReportingIsOff);
   RUN_TEST(testWifiManagerForwardsLocalAddress);
   RUN_TEST(testWifiManagerCommitsChangedHostnameBeforeBegin);
 }

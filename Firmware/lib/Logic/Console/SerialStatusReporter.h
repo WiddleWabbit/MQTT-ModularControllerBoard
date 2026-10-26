@@ -18,8 +18,8 @@ struct SerialStatusReporterConfig
 };
 
 /**
- * Writes USB-gated WiFi, NTP, MQTT, and slot status snapshots on a
- * configured interval for the current power-on session.
+ * Writes USB-gated uptime, WiFi, NTP, MQTT, and slot status snapshots
+ * on a configured interval for the current power-on session.
  */
 class SerialStatusReporter
 {
@@ -55,9 +55,9 @@ public:
   void reconfigure(const SerialStatusReporterConfig& config);
 
   /**
-   * Writes WiFi, NTP, MQTT, and slot status lines when started, periodic
-   * reporting is enabled, the USB link is plugged in, and the snapshot
-   * interval has elapsed.
+   * Writes uptime, WiFi, NTP, MQTT, and slot status lines when started,
+   * periodic reporting is enabled, the USB link is plugged in, and the
+   * snapshot interval has elapsed.
    *
    * @return Nothing.
    */
@@ -81,7 +81,7 @@ public:
   bool reportingEnabled() const;
 
   /**
-   * Writes one WiFi, NTP, MQTT, and slot snapshot immediately.
+   * Writes one uptime, WiFi, NTP, MQTT, and slot snapshot immediately.
    *
    * The USB link must be plugged in. Periodic reporting may be disabled.
    * A successful print restarts the snapshot interval.
@@ -120,11 +120,20 @@ private:
   void _reportSlotNack(bool snapshotDue);
 
   /**
-   * Writes the WiFi, NTP, MQTT, and slot lines.
+   * Writes the uptime, WiFi, NTP, MQTT, and slot lines.
    *
    * @return Nothing.
    */
   void _writeSnapshot();
+
+  /**
+   * Writes the time since boot from the monotonic clock.
+   *
+   * Whole seconds only. The text wraps when the millisecond counter does.
+   *
+   * @return Nothing.
+   */
+  void _writeUptime();
 
   /**
    * Writes the current WiFi manager state.

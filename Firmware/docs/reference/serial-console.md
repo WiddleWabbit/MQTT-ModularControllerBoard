@@ -20,13 +20,14 @@ The console subscribes to nothing and publishes nothing. `MQTT Status:` on the s
 
 `setReportingEnabled(true)` also restarts the interval from now. `reconfigure` replaces the interval for the rest of the boot. No USB command calls it. The product interval is the value passed to `begin`.
 
-The reporter reads `WifiManager`, `NtpService`, `MqttService`, and `ModuleHost` snapshots. It must not call `ping()` or `echo()`.
+The reporter reads `IClock` for uptime, and `WifiManager`, `NtpService`, `MqttService`, and `ModuleHost` snapshots. It must not call `ping()` or `echo()`.
 
 ## Snapshot
 
-Seven lines. Connected Wi-Fi with an address other than `0.0.0.0` includes the address and RSSI. Address `0.0.0.0` keeps the RSSI-only line. Other Wi-Fi states omit both. MQTT labels are the `MqttServiceState` names. Unsynchronized NTP omits the time.
+Eight lines. The first is uptime. Connected Wi-Fi with an address other than `0.0.0.0` includes the address and RSSI. Address `0.0.0.0` keeps the RSSI-only line. Other Wi-Fi states omit both. MQTT labels are the `MqttServiceState` names. Unsynchronized NTP omits the time.
 
 ```text
+Uptime: 0d 01:02:03
 WiFi Status: Connected (192.168.1.42, -62 dBm)
 NTP Status: Synchronized (2026-09-21 16:04:00)
 MQTT Status: Connected
@@ -35,6 +36,8 @@ Slot 2: Online IdentityEcho addr=0x11
 Slot 3: Unsupported type=0x02AA addr=0x12
 Slot 4: Fault Nack
 ```
+
+Uptime is whole seconds from `IClock::millis()`. Days are not padded. Hours, minutes, and seconds are two digits. Milliseconds are dropped. `4294967295` ms prints `Uptime: 49d 17:02:47`. The next millisecond prints `Uptime: 0d 00:00:00`. The line does not use NTP.
 
 Wi-Fi forms:
 
@@ -84,6 +87,6 @@ A slot in `Fault Nack` prints `Slot N: Nack` once from `updateStatus()`, includi
 
 ## Tests
 
-`test/test_desktop/test_status.cpp` pins the epoch and offsets and covers plug gating, interval spacing, `begin`, `reconfigure`, MQTT state labels, slot lines, and time advancing after sync. `test_configuration.cpp` covers `set`, `apply`, `status`, and `program`. `test_deep_modules.cpp` drives the console through `SerialConsole`.
+`test/test_desktop/test_status.cpp` pins the epoch and offsets and covers plug gating, interval spacing, `begin`, `reconfigure`, MQTT state labels, slot lines, and time advancing after sync. `testStatusReporterPrintsUptimeFromTheMonotonicClock` covers zero, one second, a truncated millisecond, one minute, one hour, and one day. `testStatusReporterUptimeWrapsWithTheClock` covers the last `uint32` millisecond and the wrap to zero. `testStatusReporterUptimeIgnoresNtp` keeps uptime on the monotonic clock while NTP shows a wall time. `testStatusReporterUptimePrintsWhileReportingIsOff` prints uptime from `status` while periodic reporting is off. `test_configuration.cpp` covers `set`, `apply`, `status`, and `program`. `test_deep_modules.cpp` drives the console through `SerialConsole`.
 
-Snapshots in tests are seven lines. The reporter is constructed with an empty module host when the test has no bus of its own.
+Snapshots in tests are eight lines. The reporter is constructed with an empty module host when the test has no bus of its own.

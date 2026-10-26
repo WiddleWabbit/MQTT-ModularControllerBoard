@@ -435,9 +435,11 @@ void testSetStatusOffRemainsEnabledUntilApply()
   const size_t before = stack.serial.output.size();
   stack.clock.advance(1000);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(before + 7, stack.serial.output.size());
-  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+  TEST_ASSERT_EQUAL(before + 8, stack.serial.output.size());
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:01",
                            stack.serial.output[before].c_str());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[before + 1].c_str());
 }
 
 void testApplyStatusOffStoresZeroAndStopsPrints()
@@ -477,7 +479,7 @@ void testApplyStatusOnResumesAfterInterval()
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterApply + 7, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterApply + 8, stack.serial.output.size());
 }
 
 void testStatusCommandPrintsWhileReportingIsOff()
@@ -486,18 +488,22 @@ void testStatusCommandPrintsWhileReportingIsOff()
   stack.serial.feed("set status off\nstatus\n");
   stack.controller.update();
   TEST_ASSERT_TRUE(stack.reporter.reportingEnabled());
-  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
                            stack.serial.output[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[2].c_str());
 
   stack.serial.feed("apply\nstatus\n");
   stack.controller.update();
   TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
-  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[8].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[9].c_str());
+  TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
+                           stack.serial.output[10].c_str());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
-                           stack.serial.output[9].c_str());
-  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[10].c_str());
-  TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
                            stack.serial.output[11].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[12].c_str());
+  TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
+                           stack.serial.output[13].c_str());
 }
 
 void testStatusCommandPrintsNothingWhenUnplugged()
@@ -516,20 +522,20 @@ void testStatusCommandRestartsSnapshotInterval()
   stack.clock.advance(1000);
   stack.reporter.update();
   const size_t afterPeriodic = stack.serial.output.size();
-  TEST_ASSERT_EQUAL(7, afterPeriodic);
+  TEST_ASSERT_EQUAL(8, afterPeriodic);
 
   stack.clock.advance(400);
   stack.serial.feed("status\n");
   stack.controller.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 7, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 8, stack.serial.output.size());
 
   stack.clock.advance(999);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 7, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 8, stack.serial.output.size());
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 14, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 16, stack.serial.output.size());
 }
 
 void testSetStatusRejectsUnknownValue()

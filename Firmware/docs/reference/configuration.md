@@ -107,7 +107,7 @@ apply
 
 `set status on` and `set status off` stage periodic USB snapshots. `set status maybe` replies `ERR status`. `apply` stores `status_report` as `1` or `0` and then enables or disables periodic printing.
 
-`status` is not a `set` command. It prints one snapshot immediately, including while periodic reporting is off and while a status change is still staged. The snapshot is the seven lines in the [serial console reference](serial-console.md). It does not change the on/off flag. A successful print restarts the wait until the next periodic snapshot.
+`status` is not a `set` command. It prints one snapshot immediately, including while periodic reporting is off and while a status change is still staged. The snapshot is the eight lines in the [serial console reference](serial-console.md). It does not change the on/off flag. A successful print restarts the wait until the next periodic snapshot.
 
 `program N isp` and `program N updi` reply `OK programming` and a one-line jumper reminder, then hand the USB byte stream to the session in [Programming](../programming.md). N is one digit, 1 through 4. The method word is exactly `isp` or `updi`. The console does not read further lines until that session ends. `program`, `program isp`, `program updi`, `program 1`, `program 1 udpi`, a slot outside 1..4, and any extra token reply `ERR program` and do not start a session. `programmable` is `ERR command`.
 

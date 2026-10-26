@@ -317,8 +317,8 @@ void loop()
   // At most one pump exchange, then publish what it stored.
   pumpModule.update();
 
-  // Print Wi-Fi, NTP, MQTT, and the four slot lines when the snapshot
-  // interval has elapsed and USB is plugged in.
+  // Print uptime, Wi-Fi, NTP, MQTT, and the four slot lines when the
+  // snapshot interval has elapsed and USB is plugged in.
   serialConsole.updateStatus();
 
   // Print free heap and PSRAM when USB is plugged in.

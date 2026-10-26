@@ -79,9 +79,9 @@ void SerialStatusReporter::reconfigure(const SerialStatusReporterConfig& config)
 }
 
 /**
- * Writes WiFi, NTP, MQTT, and slot status lines when started, periodic
- * reporting is enabled, the USB link is plugged in, and the snapshot
- * interval has elapsed.
+ * Writes uptime, WiFi, NTP, MQTT, and slot status lines when started,
+ * periodic reporting is enabled, the USB link is plugged in, and the
+ * snapshot interval has elapsed.
  *
  * @return Nothing.
  */
@@ -133,7 +133,7 @@ bool SerialStatusReporter::reportingEnabled() const
 }
 
 /**
- * Writes one WiFi, NTP, MQTT, and slot snapshot immediately.
+ * Writes one uptime, WiFi, NTP, MQTT, and slot snapshot immediately.
  *
  * The USB link must be plugged in. Periodic reporting may be disabled.
  * A successful print restarts the snapshot interval.
@@ -202,12 +202,13 @@ void SerialStatusReporter::_reportSlotNack(bool snapshotDue)
 }
 
 /**
- * Writes the WiFi, NTP, MQTT, and slot lines.
+ * Writes the uptime, WiFi, NTP, MQTT, and slot lines.
  *
  * @return Nothing.
  */
 void SerialStatusReporter::_writeSnapshot()
 {
+  _writeUptime();
   _writeWifiStatus();
   _writeNtpStatus();
   _writeMqttStatus();
@@ -215,6 +216,27 @@ void SerialStatusReporter::_writeSnapshot()
   {
     _writeSlotStatus(i);
   }
+}
+
+/**
+ * Writes the time since boot from the monotonic clock.
+ *
+ * Whole seconds only. The text wraps when the millisecond counter does.
+ *
+ * @return Nothing.
+ */
+void SerialStatusReporter::_writeUptime()
+{
+  const uint32_t totalSeconds = _clock.millis() / 1000u;
+  const uint32_t days = totalSeconds / 86400u;
+  const uint32_t secondsOfDay = totalSeconds % 86400u;
+  const unsigned hours = static_cast<unsigned>(secondsOfDay / 3600u);
+  const unsigned minutes = static_cast<unsigned>((secondsOfDay % 3600u) / 60u);
+  const unsigned seconds = static_cast<unsigned>(secondsOfDay % 60u);
+  char line[32];
+  std::snprintf(line, sizeof(line), "Uptime: %ud %02u:%02u:%02u",
+                static_cast<unsigned>(days), hours, minutes, seconds);
+  _serial.writeLine(line);
 }
 
 /**
