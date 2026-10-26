@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "ModuleCodec.h"
@@ -124,6 +125,77 @@ struct PumpHarness
     mqtt.setMessageHandler(PumpMqttBridge::onMqttMessage, &bridge);
   }
 };
+
+/**
+ * Counts publishes of one topic.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @return Number of matching messages.
+ */
+int countTopic(const FakeMqttClient& client, const char* topic)
+{
+  int count = 0;
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    if (client.publishedMessages[i].topic == topic)
+    {
+      ++count;
+    }
+  }
+  return count;
+}
+
+/**
+ * Counts publishes of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Number of matching messages.
+ */
+int countMatching(const FakeMqttClient& client, const char* topic,
+                  const char* payload, bool retained)
+{
+  int count = 0;
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      ++count;
+    }
+  }
+  return count;
+}
+
+/**
+ * Finds the first publish of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Message index, or -1 when no message matches.
+ */
+int messageIndex(const FakeMqttClient& client, const char* topic,
+                 const char* payload, bool retained)
+{
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
 
 /**
  * Reports whether a payload was published on a topic.
@@ -470,7 +542,7 @@ void testPumpCommandAddressesSlotTwo()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(modules));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(modules, 2));
   bridge.update();
-  TEST_ASSERT_TRUE(published(client, "watering/slot/2/pump", "on", true));
+  TEST_ASSERT_TRUE(published(client, "watering/slot/2/pump", "on", false));
 }
 
 void testPumpFaultIsPublishedAndNotResetUntilCommand()
@@ -481,7 +553,7 @@ void testPumpFaultIsPublishedAndNotResetUntilCommand()
   learnState(harness);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "fault",
-                             true));
+                             false));
 
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kPumpCommandTopic, "1 on");
@@ -760,26 +832,28 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   learnState(harness);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "off",
-                             true));
+                             false));
 
   harness.client.publishedMessages.clear();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump"));
 
   harness.device.pumpState = module_protocol::kPumpStateOn;
   harness.clock.advance(60000);
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
-                             true));
+                             false));
 
   harness.client.publishedMessages.clear();
   harness.clock.advance(60000);
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/pump"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
-                             true));
+                             false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump", "",
+                              true));
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
@@ -787,10 +861,10 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump",
-                             "unavailable", true));
-  const size_t once = harness.client.publishedMessages.size();
+                             "unavailable", false));
+  const int once = countTopic(harness.client, "watering/slot/1/pump");
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(once, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client, "watering/slot/1/pump"));
 }
 
 void testPumpOnRefreshFollowsCommandAndInterval()
@@ -808,7 +882,7 @@ void testPumpOnRefreshFollowsCommandAndInterval()
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
-                             true));
+                             false));
 
   const size_t afterCommand = harness.modules.bus.protocolOpCount();
   harness.clock.advance(400);
@@ -901,24 +975,51 @@ void testPumpBridgeFollowsDeviceId()
   learnState(harness);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "off",
-                             true));
+                             false));
   harness.client.publishedMessages.clear();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump"));
 
+  harness.client.publishedMessages.clear();
   harness.topics.setDeviceId("shed");
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
   harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "off", true));
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "off", false));
+  const int cleared = messageIndex(harness.client, "shed/slot/1/pump", "",
+                                   true);
+  const int value = messageIndex(harness.client, "shed/slot/1/pump", "off",
+                                 false);
+  TEST_ASSERT_TRUE(cleared >= 0);
+  TEST_ASSERT_TRUE(value > cleared);
 
   harness.client.deliver(harness.topics.pumpCommand(), "1 on");
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
   harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "on", true));
+  TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "on", false));
+}
+
+void testPumpClearsEveryUnusedTopicOnce()
+{
+  PumpHarness harness;
+  for (int step = 0; step < module_protocol::kSlotCount; ++step)
+  {
+    harness.bridge.update();
+  }
+  TEST_ASSERT_EQUAL(module_protocol::kSlotCount,
+                    harness.client.publishedMessages.size());
+  for (int slot = 1; slot <= module_protocol::kSlotCount; ++slot)
+  {
+    char topic[96];
+    std::snprintf(topic, sizeof(topic), "watering/slot/%d/pump", slot);
+    TEST_ASSERT_EQUAL(1, countMatching(harness.client, topic, "", true));
+  }
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(module_protocol::kSlotCount,
+                    harness.client.publishedMessages.size());
 }
 
 
@@ -963,4 +1064,5 @@ void runPumpTests()
   RUN_TEST(testPumpOnRefreshRetriesAfterBusy);
   RUN_TEST(testPumpOnRefreshLeavesFaultAlone);
   RUN_TEST(testPumpBridgeFollowsDeviceId);
+  RUN_TEST(testPumpClearsEveryUnusedTopicOnce);
 }

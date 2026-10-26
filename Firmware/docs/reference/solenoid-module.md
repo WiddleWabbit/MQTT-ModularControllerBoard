@@ -72,7 +72,7 @@ solenoid 4 off, desired off -> no command
 
 `{id}/solenoids/connected` with payload `N` asks for the connected-output list of slot `N`. The handler records that request. It does not record desired state, and it does not restart the absence window. Extra tokens are ignored.
 
-The reply is retained on `{id}/slot/N/solenoids`. The text is the count, then each connected index, 1-based. An index is listed when that output is `on` or `off`. A `disconnected` output is omitted. Four outputs with 1, 2, and 4 connected is `4 1 2 4`. A count of 0 is `0`. All disconnected is the count alone, such as `4`.
+The reply is published on `{id}/slot/N/solenoids` with retain off. The text is the count, then each connected index, 1-based. An index is listed when that output is `on` or `off`. A `disconnected` output is omitted. Four outputs with 1, 2, and 4 connected is `4 1 2 4`. A count of 0 is `0`. All disconnected is the count alone, such as `4`.
 
 ### Command absence
 
@@ -93,10 +93,10 @@ Each solenoid slot has its own count, states, and poll timer. The poller still r
 | Topic | Direction | Payload |
 | --- | --- | --- |
 | `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10` |
-| `{id}/slot/N/solenoid/M` | publish, retained, QoS 0 | `on`, `off`, `disconnected`, or `unavailable` |
+| `{id}/slot/N/solenoid/M` | publish, QoS 0, retain off | `on`, `off`, `disconnected`, or `unavailable` |
 | `{id}/solenoids` | subscribe, QoS 1 | `N on off ...` |
 | `{id}/solenoids/connected` | subscribe, QoS 1 | `N` |
-| `{id}/slot/N/solenoids` | publish, retained, QoS 0 | count, then connected indexes, such as `4 1 2 4` |
+| `{id}/slot/N/solenoids` | publish, QoS 0, retain off | count, then connected indexes, such as `4 1 2 4` |
 
 `{id}/slot/N` is the slot snapshot. It is not a solenoid state. Outbound publishes are QoS 0. A rejected publish stays pending.
 
@@ -104,17 +104,19 @@ Each stored state is published, including a repeat of the same text, on the brid
 
 | Event | Topic | Payload | Retained |
 | --- | --- | --- | --- |
-| Periodic `GET_SOLENOID_STATE` succeeds | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
-| `SET_SOLENOID` returns a state | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | yes |
-| Slot is no longer an online solenoid, or the new count drops an output that had a state | `{id}/slot/N/solenoid/M` | `unavailable` | yes, once |
-| Count and every output state are known, the connected set changes, or `{id}/solenoids/connected` asks again | `{id}/slot/N/solenoids` | `4 1 2 4` | yes |
-| Slot is no longer an online solenoid after an inventory was published | `{id}/slot/N/solenoids` | `unavailable` | yes, once |
+| Periodic `GET_SOLENOID_STATE` succeeds | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | no |
+| `SET_SOLENOID` returns a state | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | no |
+| Slot is no longer an online solenoid, or the new count drops an output that had a state | `{id}/slot/N/solenoid/M` | `unavailable` | no, once |
+| Count and every output state are known, the connected set changes, or `{id}/solenoids/connected` asks again | `{id}/slot/N/solenoids` | `4 1 2 4` | no |
+| Slot is no longer an online solenoid after an inventory was published | `{id}/slot/N/solenoids` | `unavailable` | no, once |
 | Count query, malformed command, or a command still waiting for the count | — | nothing | — |
-| Bridge pass with no new state | — | nothing | — |
+| Bridge pass with no new state | — | the state and the list are not repeated | — |
+
+Output states and the connected list are not retained. A retained state survived after the board was unplugged, and a new subscriber received it as if the output were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. Before the first value on a result topic for this device id, the bridge publishes a retained empty payload so the broker deletes any copy it already stored. A publish with retain off does not do that delete. Each bridge pass also clears one result topic that has not been cleared yet, including outputs this boot never publishes. The same rule is in the [MQTT reference](mqtt.md).
 
 The inventory text is the count, then each connected index. It is compared as text. An unchanged inventory is not sent again unless `{id}/solenoids/connected` asked.
 
-A failed periodic step publishes nothing for that output. The last retained payload stays until a later read or set succeeds, or until the output is gone.
+A failed periodic step publishes nothing for that output. The broker is not holding the last state, because that topic's retained copy was deleted when the state was published. The next successful read or set is what a later subscriber sees.
 
 ### Example
 
@@ -123,19 +125,19 @@ Slot 1, four outputs, all off. Then `1 on on off off`:
 ```text
 I2C  GET_SOLENOID_COUNT
 I2C  GET_SOLENOID_STATE index 0
-MQTT {id}/slot/1/solenoid/1  retained  "off"
+MQTT {id}/slot/1/solenoid/1  "off"
 I2C  GET_SOLENOID_STATE index 1
-MQTT {id}/slot/1/solenoid/2  retained  "off"
+MQTT {id}/slot/1/solenoid/2  "off"
 I2C  GET_SOLENOID_STATE index 2
-MQTT {id}/slot/1/solenoid/3  retained  "off"
+MQTT {id}/slot/1/solenoid/3  "off"
 I2C  GET_SOLENOID_STATE index 3
-MQTT {id}/slot/1/solenoid/4  retained  "off"
+MQTT {id}/slot/1/solenoid/4  "off"
 
 MQTT {id}/solenoids  payload "1 on on off off"
 I2C  SET_SOLENOID index 0 on
-MQTT {id}/slot/1/solenoid/1  retained  "on"
+MQTT {id}/slot/1/solenoid/1  "on"
 I2C  SET_SOLENOID index 1 on
-MQTT {id}/slot/1/solenoid/2  retained  "on"
+MQTT {id}/slot/1/solenoid/2  "on"
 ```
 
 About one poll interval after the last state read, the four reads run again and publish again, even when the text is unchanged. If no accepted command arrives for `kSolenoidCommandTimeoutMs`, outputs that are on are commanded off.
@@ -157,4 +159,4 @@ A zero argument selects the poller's own default for that argument. It does not 
 
 ## Tests
 
-`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and retained `unavailable` after unplug. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.
+`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and `unavailable` with retain off after unplug. It also covers one sweep of every unused solenoid topic, and the retained empty delete before the first state under a new device id. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.

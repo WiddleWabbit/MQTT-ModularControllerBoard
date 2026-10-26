@@ -49,10 +49,14 @@ public:
                             size_t length, void* context);
 
   /**
-   * Publishes each new state, including a repeated value, and one
-   * retained unavailable when the pump disappears. A rejected publish
-   * stays pending. An update with no new state does not publish.
-   * A new device id sends the current state once on the new topics.
+   * Publishes each new state, including a repeated value, with
+   * retain off. Before the first payload on a topic for this device
+   * id, publishes a retained empty payload so the broker drops any
+   * previous copy. A pump that disappears publishes unavailable
+   * with retain off. Each update also clears one pump topic that
+   * has not been cleared yet. A rejected publish stays pending.
+   * A new device id clears and sends the current state once on
+   * the new topics.
    *
    * @return Nothing.
    */
@@ -66,6 +70,8 @@ private:
   bool _publishedOk[module_protocol::kSlotCount];
   uint32_t _publishedRevision[module_protocol::kSlotCount];
   char _published[module_protocol::kSlotCount][16];
+  bool _cleared[module_protocol::kSlotCount];
+  uint8_t _clearCursor;
 
   /**
    * Parses a pump command and records it.
@@ -93,17 +99,25 @@ private:
   void _publishSnapshots();
 
   /**
-   * Publishes one pump topic.
+   * Deletes one retained pump topic this device id has not cleared.
+   * A topic already cleared by a value publish is skipped.
+   *
+   * @return Nothing.
+   */
+  void _clearOneStaleTopic();
+
+  /**
+   * Publishes one pump topic with retain off, after deleting any
+   * broker copy once.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param payload Text payload.
-   * @param retained Retained-message flag.
    * @return True when publication was accepted.
    */
-  bool _publish(uint8_t moduleSlot, const char* payload, bool retained);
+  bool _publish(uint8_t moduleSlot, const char* payload);
 
   /**
-   * Formats the retained text for a cached state.
+   * Formats the text for a cached state.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param out Destination buffer.

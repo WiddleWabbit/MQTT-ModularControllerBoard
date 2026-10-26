@@ -11,7 +11,8 @@ class Network;
 
 /**
  * Sensor daughter behaviour: count, presence, readings, the immediate
- * read command, the connected-input list, and retained publication.
+ * read command, the connected-input list, and publication with
+ * retain off.
  * update() issues at most one bus exchange and then publishes what
  * that exchange stored.
  */

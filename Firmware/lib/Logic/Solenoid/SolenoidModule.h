@@ -11,8 +11,9 @@ class Network;
 
 /**
  * Solenoid daughter behaviour: output count, desired-state commands,
- * the absence cutoff, and retained publication. update() issues at
- * most one bus exchange and then publishes what that exchange stored.
+ * the absence cutoff, and publication with retain off. update()
+ * issues at most one bus exchange and then publishes what that
+ * exchange stored.
  */
 class SolenoidModule
 {

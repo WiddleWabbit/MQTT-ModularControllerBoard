@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "ModuleCodec.h"
@@ -166,6 +167,57 @@ int countTopic(const FakeMqttClient& client, const char* topic)
     }
   }
   return count;
+}
+
+/**
+ * Counts publishes of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Number of matching messages.
+ */
+int countMatching(const FakeMqttClient& client, const char* topic,
+                  const char* payload, bool retained)
+{
+  int count = 0;
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      ++count;
+    }
+  }
+  return count;
+}
+
+/**
+ * Finds the first publish of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Message index, or -1 when no message matches.
+ */
+int messageIndex(const FakeMqttClient& client, const char* topic,
+                 const char* payload, bool retained)
+{
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 /**
@@ -431,7 +483,7 @@ void testSensorReadCommandPublishesWithoutBusUntilUpdate()
                     lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 2500", true));
+                             "connected 2500", false));
 }
 
 void testSensorReadCommandRepeatsUnchangedReading()
@@ -450,9 +502,9 @@ void testSensorReadCommandRepeatsUnchangedReading()
   harness.client.deliver(kSensorReadTopic, "1 1");
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensor/1"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 2500", true));
+                             "connected 2500", false));
 }
 
 void testSensorReadCommandRejectsMalformedPayload()
@@ -477,9 +529,10 @@ void testSensorReadCommandRejectsMalformedPayload()
   TEST_ASSERT_EQUAL(afterCount + 1, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
                     lastCommand(harness.modules));
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "1 1", true));
+                             "1 1", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 3", false));
   SensorDemandResult demand;
   TEST_ASSERT_FALSE(harness.poller.takeDemandResult(&demand));
 }
@@ -495,6 +548,12 @@ void testSensorReadCommandUnavailableWhenSensorMissing()
   harness.poller.update();
   TEST_ASSERT_EQUAL(afterCount, harness.modules.bus.protocolOpCount());
   harness.bridge.update();
+  const int cleared = messageIndex(harness.client, "watering/slot/1/sensor/2",
+                                   "", true);
+  const int value = messageIndex(harness.client, "watering/slot/1/sensor/2",
+                                 "unavailable", false);
+  TEST_ASSERT_TRUE(cleared >= 0);
+  TEST_ASSERT_TRUE(value > cleared);
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/2",
                              "unavailable", false));
 }
@@ -511,7 +570,7 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "disconnected", true));
+                             "disconnected", false));
 
   harness.client.publishedMessages.clear();
   harness.device.sensorConnected[0] = true;
@@ -521,21 +580,23 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 2600", true));
-  const size_t once = harness.client.publishedMessages.size();
+                             "connected 2600", false));
+  const int once = countTopic(harness.client, "watering/slot/1/sensor/1");
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(once, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client, "watering/slot/1/sensor/1"));
 
   harness.client.publishedMessages.clear();
   harness.clock.advance(60000);
   harness.poller.update();
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensor/1"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 2600", true));
+                             "connected 2600", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "", true));
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensor/1"));
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
@@ -543,7 +604,7 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "unavailable", true));
+                             "unavailable", false));
 }
 
 void testSensorBridgeFollowsDeviceId()
@@ -558,13 +619,15 @@ void testSensorBridgeFollowsDeviceId()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 2500", true));
+                             "connected 2500", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "1 1", true));
+                             "1 1", false));
   harness.client.publishedMessages.clear();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensor/1"));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensors"));
 
+  harness.client.publishedMessages.clear();
   harness.topics.setDeviceId("shed");
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kSensorReadTopic, "1 1");
@@ -572,9 +635,17 @@ void testSensorBridgeFollowsDeviceId()
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/sensor/1",
-                             "connected 2500", true));
+                             "connected 2500", false));
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/sensors",
-                             "1 1", true));
+                             "1 1", false));
+  const int cleared = messageIndex(harness.client, "shed/slot/1/sensor/1",
+                                   "", true);
+  const int value = messageIndex(harness.client, "shed/slot/1/sensor/1",
+                                 "connected 2500", false);
+  TEST_ASSERT_TRUE(cleared >= 0);
+  TEST_ASSERT_TRUE(value > cleared);
+  TEST_ASSERT_EQUAL(1, countMatching(harness.client, "shed/slot/1/sensor/1",
+                                     "", true));
 
   harness.client.publishedMessages.clear();
   harness.client.deliver(harness.topics.sensorRead(), "1 1");
@@ -583,7 +654,7 @@ void testSensorBridgeFollowsDeviceId()
                     lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/sensor/1",
-                             "connected 2500", true));
+                             "connected 2500", false));
 }
 
 void testSensorConnectedListPublishesIndexes()
@@ -602,18 +673,18 @@ void testSensorConnectedListPublishesIndexes()
   learnInputs(harness, 4);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "4 1 2 4", true));
+                             "4 1 2 4", false));
 
   harness.client.publishedMessages.clear();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensors"));
 
   harness.clock.advance(60000);
   readInputs(harness, 4);
   harness.bridge.update();
   TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensors"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "connected 1", true));
+                             "connected 1", false));
 
   harness.client.publishedMessages.clear();
   const size_t learned = harness.modules.bus.protocolOpCount();
@@ -621,7 +692,7 @@ void testSensorConnectedListPublishesIndexes()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "4 1 2 4", true));
+                             "4 1 2 4", false));
   harness.poller.update();
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
 }
@@ -640,28 +711,28 @@ void testSensorConnectedQueryWaitsUntilPresenceIsKnown()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(seated, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
-                              "2 1", true));
+                              "2 1", false));
 
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount,
                     lastCommand(harness.modules));
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
-                              "2 1", true));
+                              "2 1", false));
 
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
                     lastCommand(harness.modules));
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
-                              "2 1", true));
+                              "2 1", false));
 
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
                     lastCommand(harness.modules));
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
-                              "2 1", true));
+                              "2 1", false));
 
   harness.poller.update();
   harness.bridge.update();
@@ -669,7 +740,7 @@ void testSensorConnectedQueryWaitsUntilPresenceIsKnown()
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(1, lastSensorIndex(harness.modules));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "2 1", true));
+                             "2 1", false));
 }
 
 void testSensorConnectedQueryRejectsMalformedPayload()
@@ -689,7 +760,7 @@ void testSensorConnectedQueryRejectsMalformedPayload()
   harness.client.deliver(kSensorConnectedTopic, "on");
   harness.client.deliver(kSensorConnectedTopic, "");
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensors"));
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
 }
 
@@ -701,10 +772,10 @@ void testSensorConnectedListForEmptyAndAllAbsent()
   empty.poller.update();
   empty.bridge.update();
   TEST_ASSERT_TRUE(published(empty.client, "watering/slot/1/sensors",
-                             "0", true));
+                             "0", false));
   empty.client.publishedMessages.clear();
   empty.bridge.update();
-  TEST_ASSERT_EQUAL(0, empty.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(empty.client, "watering/slot/1/sensors"));
 
   SensorHarness absent;
   absent.device.sensorCount = 4;
@@ -716,7 +787,7 @@ void testSensorConnectedListForEmptyAndAllAbsent()
   learnInputs(absent, 4);
   absent.bridge.update();
   TEST_ASSERT_TRUE(published(absent.client, "watering/slot/1/sensors",
-                             "4", true));
+                             "4", false));
 }
 
 void testSensorConnectedListFollowsPresenceChange()
@@ -731,7 +802,7 @@ void testSensorConnectedListFollowsPresenceChange()
   learnInputs(harness, 2);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "2 1", true));
+                             "2 1", false));
 
   harness.device.sensorConnected[1] = true;
   harness.device.sensorValue[1] = 7;
@@ -741,7 +812,7 @@ void testSensorConnectedListFollowsPresenceChange()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensors"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "2 1 2", true));
+                             "2 1 2", false));
   harness.bridge.update();
   TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensors"));
 }
@@ -756,7 +827,7 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
   learnInputs(harness, 1);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "1 1", true));
+                             "1 1", false));
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
@@ -764,9 +835,83 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "unavailable", true));
+                             "unavailable", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "unavailable", true));
+                             "unavailable", false));
+}
+
+void testSensorReadingClearsBrokerCopyBeforeTheValue()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = true;
+  harness.device.sensorValue[0] = 2500;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  const int cleared = messageIndex(harness.client, "watering/slot/1/sensor/1",
+                                   "", true);
+  const int value = messageIndex(harness.client, "watering/slot/1/sensor/1",
+                                 "connected 2500", false);
+  TEST_ASSERT_TRUE(cleared >= 0);
+  TEST_ASSERT_TRUE(value > cleared);
+  TEST_ASSERT_EQUAL(1, countMatching(harness.client, "watering/slot/1/sensor/1",
+                                     "", true));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 2500", true));
+}
+
+void testSensorSkipsValueWhenRetainClearIsRejected()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = true;
+  harness.device.sensorValue[0] = 2500;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.poller.update();
+  harness.client.publishResults.push_back(false);
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 2500", false));
+
+  harness.client.publishedMessages.clear();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "connected 2500", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 2500", true));
+}
+
+void testSensorClearsEveryUnusedTopicOnce()
+{
+  SensorHarness harness;
+  const int topics = module_protocol::kSlotCount *
+                     (module_protocol::kMaxSensorsPerModule + 1);
+  for (int step = 0; step < topics; ++step)
+  {
+    harness.bridge.update();
+  }
+  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
+  for (int slot = 1; slot <= module_protocol::kSlotCount; ++slot)
+  {
+    for (int sensor = 1; sensor <= module_protocol::kMaxSensorsPerModule;
+         ++sensor)
+    {
+      char topic[96];
+      std::snprintf(topic, sizeof(topic), "watering/slot/%d/sensor/%d",
+                    slot, sensor);
+      TEST_ASSERT_EQUAL(1, countMatching(harness.client, topic, "", true));
+    }
+    char list[96];
+    std::snprintf(list, sizeof(list), "watering/slot/%d/sensors", slot);
+    TEST_ASSERT_EQUAL(1, countMatching(harness.client, list, "", true));
+  }
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
 }
 
 
@@ -801,4 +946,7 @@ void runSensorTests()
   RUN_TEST(testSensorConnectedListForEmptyAndAllAbsent);
   RUN_TEST(testSensorConnectedListFollowsPresenceChange);
   RUN_TEST(testSensorConnectedInventoryClearsWhenModuleUnplugged);
+  RUN_TEST(testSensorReadingClearsBrokerCopyBeforeTheValue);
+  RUN_TEST(testSensorSkipsValueWhenRetainClearIsRejected);
+  RUN_TEST(testSensorClearsEveryUnusedTopicOnce);
 }

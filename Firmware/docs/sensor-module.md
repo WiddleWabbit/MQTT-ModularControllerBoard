@@ -32,15 +32,16 @@ flowchart TD
   order --> mem["Store the count or the sample"]
   mem --> bridge["SensorMqttBridge"]
   bridge --> pub{"A reading was stored, or the connected list changed?"}
-  pub -->|yes| mqtt["Publish the retained reading, and the list when it changed"]
-  pub -->|no| quiet["Leave the broker as it is"]
+  pub -->|yes| mqtt["Publish the reading and the list with retain off"]
+  pub -->|no| quiet["Do not repeat them"]
+  bridge --> clear["Clear one result topic the broker may still be holding"]
 ```
 
 The callback for `{id}/sensor/read` only enqueues a slot and a sensor index. The poller sends `GET_SENSOR_READING` on a later pass. While the count is still unknown, that request waits and the count query runs instead. `{id}/sensor/connected` only asks for the connected-input list. It does not enqueue a reading.
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, samples, revision, and poll timer. The bridge reads those and publishes `{id}/slot/N/sensor/M` when a reading was stored, and `{id}/slot/N/sensors` as the count plus the connected indexes. Unplug publishes retained `unavailable` once for that slot's inputs and for its list. Another slot keeps its own cache.
+Each slot keeps its own count, samples, revision, and poll timer. The bridge reads those and publishes `{id}/slot/N/sensor/M` when a reading was stored, and `{id}/slot/N/sensors` as the count plus the connected indexes. Those publishes are not retained. A retained reading stayed on the broker after the board was removed, and a new subscriber received it as if the input were still there. `{id}/slot/N` stays retained. Unplug publishes `unavailable` once, with retain off, for that slot's inputs and for its list. Another slot keeps its own cache. The delete of an old broker copy is in the [sensor reference](reference/sensor-module.md).
 
 Serial status prints the slot line (`Online Sensor addr=0x10`). It does not print individual inputs.
 

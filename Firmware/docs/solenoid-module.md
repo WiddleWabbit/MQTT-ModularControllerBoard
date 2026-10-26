@@ -32,15 +32,16 @@ flowchart TD
   order --> mem["Store the count or the state"]
   mem --> bridge["SolenoidMqttBridge"]
   bridge --> pub{"A state was stored, or the inventory changed?"}
-  pub -->|yes| mqtt["Publish the retained output, and the connected list when it changed"]
-  pub -->|no| quiet["Leave the broker as it is"]
+  pub -->|yes| mqtt["Publish the output and the list with retain off"]
+  pub -->|no| quiet["Do not repeat them"]
+  bridge --> clear["Clear one result topic the broker may still be holding"]
 ```
 
 A command step reads an output whose state is still unknown, or sends `SET_SOLENOID` where the known state differs. A disconnected output is left alone. A command whose word count does not match the module count is not applied.
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, output states, desired state, and poll timer. The absence window is one timer for the whole controller: any accepted `{id}/solenoids` command restarts it. The bridge publishes `{id}/slot/N/solenoid/M` from the stored state, and `{id}/slot/N/solenoids` as the count plus the connected indexes.
+Each slot keeps its own count, output states, desired state, and poll timer. The absence window is one timer for the whole controller: any accepted `{id}/solenoids` command restarts it. The bridge publishes `{id}/slot/N/solenoid/M` from the stored state, and `{id}/slot/N/solenoids` as the count plus the connected indexes. Those publishes are not retained, so a removed board cannot leave `on` or `off` for a subscriber who connects later. `{id}/slot/N` stays retained. The delete of an old broker copy is in the [solenoid reference](reference/solenoid-module.md).
 
 Serial status prints the slot line only.
 

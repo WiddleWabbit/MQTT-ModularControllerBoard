@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "ModuleCodec.h"
@@ -123,6 +124,77 @@ struct SolenoidHarness
     mqtt.setMessageHandler(SolenoidMqttBridge::onMqttMessage, &bridge);
   }
 };
+
+/**
+ * Counts publishes of one topic.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @return Number of matching messages.
+ */
+int countTopic(const FakeMqttClient& client, const char* topic)
+{
+  int count = 0;
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    if (client.publishedMessages[i].topic == topic)
+    {
+      ++count;
+    }
+  }
+  return count;
+}
+
+/**
+ * Counts publishes of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Number of matching messages.
+ */
+int countMatching(const FakeMqttClient& client, const char* topic,
+                  const char* payload, bool retained)
+{
+  int count = 0;
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      ++count;
+    }
+  }
+  return count;
+}
+
+/**
+ * Finds the first publish of one topic, payload, and retain flag.
+ *
+ * @param client Fake broker.
+ * @param topic Expected topic.
+ * @param payload Expected payload.
+ * @param retained Expected retained flag.
+ * @return Message index, or -1 when no message matches.
+ */
+int messageIndex(const FakeMqttClient& client, const char* topic,
+                 const char* payload, bool retained)
+{
+  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
+  {
+    const FakeMqttClient::PublishedMessage& message =
+        client.publishedMessages[i];
+    if (message.topic == topic && message.payload == payload &&
+        message.retained == retained)
+    {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
 
 /**
  * Reports whether a payload was published on a topic.
@@ -438,13 +510,13 @@ void testSolenoidCommandSetsOnlyMismatchedOutputs()
 
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "on", true));
+                             "on", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/2",
-                             "on", true));
+                             "on", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/3",
-                             "off", true));
+                             "off", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/4",
-                             "off", true));
+                             "off", false));
 }
 
 void testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized()
@@ -622,7 +694,7 @@ void testPeriodicSolenoidPublishEachStateAndClearOnUnplug()
   learnOutputs(harness, 1);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "disconnected", true));
+                             "disconnected", false));
 
   harness.client.publishedMessages.clear();
   harness.device.solenoidState[0] = module_protocol::kSolenoidStateOff;
@@ -630,18 +702,21 @@ void testPeriodicSolenoidPublishEachStateAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "off", true));
-  const size_t once = harness.client.publishedMessages.size();
+                             "off", false));
+  const int once = countTopic(harness.client, "watering/slot/1/solenoid/1");
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(once, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(once,
+                    countTopic(harness.client, "watering/slot/1/solenoid/1"));
 
   harness.client.publishedMessages.clear();
   harness.clock.advance(60000);
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/solenoid/1"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/solenoid/1",
+                              "", true));
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
@@ -649,7 +724,7 @@ void testPeriodicSolenoidPublishEachStateAndClearOnUnplug()
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "unavailable", true));
+                             "unavailable", false));
 }
 
 void testConnectedQueryPublishesIndexesWithoutRefreshingSilence()
@@ -664,7 +739,7 @@ void testConnectedQueryPublishesIndexesWithoutRefreshingSilence()
   learnOutputs(harness, 4);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "4 1 2 4", true));
+                             "4 1 2 4", false));
 
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.clock.advance(4999);
@@ -692,12 +767,12 @@ void testConnectedQueryWaitsUntilEveryStateIsKnown()
   harness.client.deliver(kSolenoidConnectedTopic, "1");
   harness.bridge.update();
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/solenoids",
-                              "4 1 2 4", true));
+                              "4 1 2 4", false));
 
   learnOutputs(harness, 4);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "4 1 2 4", true));
+                             "4 1 2 4", false));
 }
 
 void testConnectedQueryRejectsMalformedPayload()
@@ -715,7 +790,7 @@ void testConnectedQueryRejectsMalformedPayload()
   harness.client.deliver(kSolenoidConnectedTopic, "5");
   harness.client.deliver(kSolenoidConnectedTopic, "on");
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/solenoids"));
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
 }
 
@@ -728,14 +803,14 @@ void testConnectedInventoryClearsWhenModuleUnplugged()
   learnOutputs(harness, 1);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "1 1", true));
+                             "1 1", false));
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "unavailable", true));
+                             "unavailable", false));
 }
 
 void testSolenoidBridgeFollowsDeviceId()
@@ -747,13 +822,16 @@ void testSolenoidBridgeFollowsDeviceId()
   learnOutputs(harness, 1);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "1 1", true));
+                             "1 1", false));
   harness.client.publishedMessages.clear();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client,
+                                  "watering/slot/1/solenoid/1"));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/solenoids"));
 
+  harness.client.publishedMessages.clear();
   harness.topics.setDeviceId("shed");
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kSolenoidCommandTopic, "1 on");
@@ -761,9 +839,15 @@ void testSolenoidBridgeFollowsDeviceId()
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoids",
-                             "1 1", true));
+                             "1 1", false));
+  const int cleared = messageIndex(harness.client, "shed/slot/1/solenoid/1",
+                                   "", true);
+  const int value = messageIndex(harness.client, "shed/slot/1/solenoid/1",
+                                 "off", false);
+  TEST_ASSERT_TRUE(cleared >= 0);
+  TEST_ASSERT_TRUE(value > cleared);
 
   harness.client.deliver(harness.topics.solenoidCommand(), "1 on");
   harness.poller.update();
@@ -771,7 +855,35 @@ void testSolenoidBridgeFollowsDeviceId()
                     lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
-                             "on", true));
+                             "on", false));
+}
+
+void testSolenoidClearsEveryUnusedTopicOnce()
+{
+  SolenoidHarness harness;
+  const int topics = module_protocol::kSlotCount *
+                     (module_protocol::kMaxSolenoidsPerModule + 1);
+  for (int step = 0; step < topics; ++step)
+  {
+    harness.bridge.update();
+  }
+  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
+  for (int slot = 1; slot <= module_protocol::kSlotCount; ++slot)
+  {
+    for (int output = 1; output <= module_protocol::kMaxSolenoidsPerModule;
+         ++output)
+    {
+      char topic[96];
+      std::snprintf(topic, sizeof(topic), "watering/slot/%d/solenoid/%d",
+                    slot, output);
+      TEST_ASSERT_EQUAL(1, countMatching(harness.client, topic, "", true));
+    }
+    char list[96];
+    std::snprintf(list, sizeof(list), "watering/slot/%d/solenoids", slot);
+    TEST_ASSERT_EQUAL(1, countMatching(harness.client, list, "", true));
+  }
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
 }
 
 
@@ -808,4 +920,5 @@ void runSolenoidTests()
   RUN_TEST(testConnectedQueryRejectsMalformedPayload);
   RUN_TEST(testConnectedInventoryClearsWhenModuleUnplugged);
   RUN_TEST(testSolenoidBridgeFollowsDeviceId);
+  RUN_TEST(testSolenoidClearsEveryUnusedTopicOnce);
 }

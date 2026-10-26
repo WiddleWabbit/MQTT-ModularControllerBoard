@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "UnretainedPublish.h"
+
 // ========== Construction ==========
 
 SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
@@ -12,7 +14,8 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
     _mqttService(mqttService),
     _topics(topics),
     _seenGeneration(topics.generation()),
-    _demandHeld(false)
+    _demandHeld(false),
+    _clearCursor(0)
 {
   _heldDemand.moduleSlot = 0;
   _heldDemand.sensorIndex = 0;
@@ -27,10 +30,12 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
       _publishedOk[slot][index] = false;
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
+      _readingCleared[slot][index] = false;
     }
     _inventoryPending[slot] = false;
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
+    _inventoryCleared[slot] = false;
   }
 }
 
@@ -61,11 +66,8 @@ void SensorMqttBridge::onMqttMessage(const char* topic,
 }
 
 /**
- * Publishes each new reading, including a repeated value, and one
- * retained unavailable when an input disappears. Publishes the
- * connected-input list when that text changes or a request asked
- * again. A rejected publish stays pending. An update with no new
- * reading and no list change does not publish.
+ * Publishes each new reading and the connected-input list with
+ * retain off, and deletes one stale retained topic.
  *
  * @return Nothing.
  */
@@ -75,6 +77,7 @@ void SensorMqttBridge::update()
   _publishDemand();
   _publishSnapshots();
   _publishInventories();
+  _clearOneStaleTopic();
 }
 
 
@@ -98,10 +101,13 @@ void SensorMqttBridge::_syncTopicGeneration()
       _publishedOk[slot][index] = false;
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
+      _readingCleared[slot][index] = false;
     }
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
+    _inventoryCleared[slot] = false;
   }
+  _clearCursor = 0;
   _seenGeneration = generation;
 }
 
@@ -271,23 +277,20 @@ void SensorMqttBridge::_publishDemand()
   }
 
   char payload[32];
-  bool retained = false;
   if (_heldDemand.ok)
   {
     _formatReading(_heldDemand.connected, _heldDemand.value, payload,
                    sizeof(payload));
-    retained = true;
   }
   else
   {
     std::snprintf(payload, sizeof(payload), "unavailable");
   }
-  if (!_publish(_heldDemand.moduleSlot, _heldDemand.sensorIndex, payload,
-                retained))
+  if (!_publish(_heldDemand.moduleSlot, _heldDemand.sensorIndex, payload))
   {
     return;
   }
-  if (retained)
+  if (_heldDemand.ok)
   {
     std::snprintf(_published[_heldDemand.moduleSlot][_heldDemand.sensorIndex],
                   sizeof(_published[_heldDemand.moduleSlot]
@@ -322,7 +325,7 @@ void SensorMqttBridge::_publishSnapshots()
         if (_publishedOk[slot][index] &&
             std::strcmp(_published[slot][index], "unavailable") != 0)
         {
-          if (_publish(slot, index, "unavailable", true))
+          if (_publish(slot, index, "unavailable"))
           {
             std::snprintf(_published[slot][index],
                           sizeof(_published[slot][index]), "unavailable");
@@ -340,7 +343,7 @@ void SensorMqttBridge::_publishSnapshots()
       {
         continue;
       }
-      if (!_publish(slot, index, payload, true))
+      if (!_publish(slot, index, payload))
       {
         continue;
       }
@@ -353,8 +356,9 @@ void SensorMqttBridge::_publishSnapshots()
 }
 
 /**
- * Publishes the retained input list for each slot that can answer.
+ * Publishes the input list for each slot that can answer.
  * A slot that could answer and no longer can publishes unavailable.
+ * Neither payload is retained.
  *
  * @return Nothing.
  */
@@ -443,7 +447,53 @@ bool SensorMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
 }
 
 /**
- * Publishes the retained inventory topic for one slot.
+ * Deletes one retained result topic this device id has not cleared.
+ *
+ * @return Nothing.
+ */
+void SensorMqttBridge::_clearOneStaleTopic()
+{
+  const uint8_t perSlot = static_cast<uint8_t>(
+      module_protocol::kMaxSensorsPerModule + 1U);
+  const uint8_t total = static_cast<uint8_t>(
+      module_protocol::kSlotCount * perSlot);
+  while (_clearCursor < total)
+  {
+    const uint8_t slot = static_cast<uint8_t>(_clearCursor / perSlot);
+    const uint8_t item = static_cast<uint8_t>(_clearCursor % perSlot);
+    const bool inventory = item == module_protocol::kMaxSensorsPerModule;
+    bool* cleared = inventory ? &_inventoryCleared[slot]
+                              : &_readingCleared[slot][item];
+    char topic[96];
+    const unsigned moduleNumber = static_cast<unsigned>(slot) + 1U;
+    if (inventory)
+    {
+      std::snprintf(topic, sizeof(topic), "%s/%u/sensors",
+                    _topics.slotPrefix(), moduleNumber);
+    }
+    else
+    {
+      const unsigned sensorNumber = static_cast<unsigned>(item) + 1U;
+      std::snprintf(topic, sizeof(topic), "%s/%u/sensor/%u",
+                    _topics.slotPrefix(), moduleNumber, sensorNumber);
+    }
+    if (*cleared)
+    {
+      ++_clearCursor;
+      continue;
+    }
+    if (!clearRetainedOnce(_mqttService, topic, *cleared))
+    {
+      return;
+    }
+    ++_clearCursor;
+    return;
+  }
+}
+
+/**
+ * Publishes the inventory topic for one slot with retain off,
+ * after deleting any broker copy once.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param payload Text payload.
@@ -456,31 +506,33 @@ bool SensorMqttBridge::_publishInventory(uint8_t moduleSlot,
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/sensors",
                 _topics.slotPrefix(), moduleNumber);
-  return _mqttService.publish(topic, payload, true);
+  return publishUnretained(_mqttService, topic, payload,
+                           _inventoryCleared[moduleSlot]);
 }
 
 /**
- * Publishes one sensor topic.
+ * Publishes one sensor topic with retain off, after deleting any
+ * broker copy once.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param sensorIndex Zero-based input.
  * @param payload Text payload.
- * @param retained Retained-message flag.
  * @return True when publication was accepted.
  */
 bool SensorMqttBridge::_publish(uint8_t moduleSlot, uint8_t sensorIndex,
-                                const char* payload, bool retained)
+                                const char* payload)
 {
   char topic[96];
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   const unsigned sensorNumber = static_cast<unsigned>(sensorIndex) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/sensor/%u",
                 _topics.slotPrefix(), moduleNumber, sensorNumber);
-  return _mqttService.publish(topic, payload, retained);
+  return publishUnretained(_mqttService, topic, payload,
+                           _readingCleared[moduleSlot][sensorIndex]);
 }
 
 /**
- * Formats the retained text for a cached sample.
+ * Formats the text for a cached sample.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param sensorIndex Zero-based input.

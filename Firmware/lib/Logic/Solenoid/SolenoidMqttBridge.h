@@ -56,10 +56,14 @@ public:
                             size_t length, void* context);
 
   /**
-   * Publishes each new state, including a repeated value, and one
-   * retained unavailable when an output disappears. A rejected publish
-   * stays pending. An update with no new state does not publish.
-   * A new device id sends the current states once on the new topics.
+   * Publishes each new state, including a repeated value, with
+   * retain off. Before the first payload on a topic for this device
+   * id, publishes a retained empty payload so the broker drops any
+   * previous copy. An output that disappears publishes unavailable
+   * with retain off. Each update also clears one result topic that
+   * has not been cleared yet. A rejected publish stays pending.
+   * A new device id clears and sends the current states once on
+   * the new topics.
    *
    * @return Nothing.
    */
@@ -79,6 +83,10 @@ private:
   bool _inventoryPending[module_protocol::kSlotCount];
   bool _inventoryOk[module_protocol::kSlotCount];
   char _inventoryPayload[module_protocol::kSlotCount][80];
+  bool _outputCleared[module_protocol::kSlotCount]
+                     [module_protocol::kMaxSolenoidsPerModule];
+  bool _inventoryCleared[module_protocol::kSlotCount];
+  uint8_t _clearCursor;
 
   /**
    * Parses a desired-state command and records it.
@@ -116,12 +124,22 @@ private:
   void _publishSnapshots();
 
   /**
-   * Publishes the retained output list for each slot that can answer.
+   * Publishes the output list for each slot that can answer.
    * A slot that could answer and no longer can publishes unavailable.
+   * Neither payload is retained.
    *
    * @return Nothing.
    */
   void _publishInventories();
+
+  /**
+   * Deletes one retained result topic this device id has not cleared.
+   * Walks output indexes, then the list, for each slot. A topic
+   * already cleared by a value publish is skipped.
+   *
+   * @return Nothing.
+   */
+  void _clearOneStaleTopic();
 
   /**
    * Formats "<count> <connected indexes...>" for one slot.
@@ -134,7 +152,8 @@ private:
   bool _formatInventory(uint8_t moduleSlot, char* out, size_t outCap) const;
 
   /**
-   * Publishes the retained inventory topic for one slot.
+   * Publishes the inventory topic for one slot with retain off,
+   * after deleting any broker copy once.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param payload Text payload.
@@ -143,19 +162,19 @@ private:
   bool _publishInventory(uint8_t moduleSlot, const char* payload);
 
   /**
-   * Publishes one solenoid topic.
+   * Publishes one solenoid topic with retain off, after deleting any
+   * broker copy once.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param solenoidIndex Zero-based output.
    * @param payload Text payload.
-   * @param retained Retained-message flag.
    * @return True when publication was accepted.
    */
-  bool _publish(uint8_t moduleSlot, uint8_t solenoidIndex, const char* payload,
-                bool retained);
+  bool _publish(uint8_t moduleSlot, uint8_t solenoidIndex,
+                const char* payload);
 
   /**
-   * Formats the retained text for a cached state.
+   * Formats the text for a cached state.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param solenoidIndex Zero-based output.

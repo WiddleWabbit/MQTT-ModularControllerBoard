@@ -163,7 +163,7 @@ slot 2       waits in Enumerating while slot 1 holds the lock
 
 Two sensors use that same enumeration. After a slot is online, only that slot starts its type cycle. How those cycles share a poller is described on the type page.
 
-Unplugging slot 2 returns slot 2 to `Empty`. When slot 2 was a sensor, its sensor topics publish retained `unavailable`. Slot 1 keeps its address, its type, and its own cycle.
+Unplugging slot 2 returns slot 2 to `Empty`. That slot line is retained, because it is sent only when the text changes. When slot 2 was a sensor, its sensor topics publish `unavailable` with retain off, so a later subscriber does not keep the old readings. Slot 1 keeps its address, its type, and its own cycle. Why result topics are not retained is in the [MQTT reference](mqtt.md).
 
 ### Slot publication
 

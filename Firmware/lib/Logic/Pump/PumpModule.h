@@ -11,8 +11,8 @@ class Network;
 
 /**
  * Pump daughter behaviour: state polls, on/off and reset commands,
- * the repeated on refresh, the absence cutoff, and retained
- * publication. update() issues at most one bus exchange and then
+ * the repeated on refresh, the absence cutoff, and publication
+ * with retain off. update() issues at most one bus exchange and then
  * publishes what that exchange stored.
  */
 class PumpModule

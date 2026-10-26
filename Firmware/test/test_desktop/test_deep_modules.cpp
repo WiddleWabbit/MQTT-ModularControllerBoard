@@ -778,7 +778,7 @@ void testSensorModulePublishesReadingOnTheSameUpdate()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensor/1",
-                              "connected 10", true));
+                              "connected 10", false));
 
   board.sensor.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
@@ -787,7 +787,7 @@ void testSensorModulePublishesReadingOnTheSameUpdate()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "connected 10", true));
+                             "connected 10", false));
   const int once = countTopic(board.mqtt, "watering/slot/1/sensor/1");
   board.sensor.update();
   TEST_ASSERT_EQUAL(once, countTopic(board.mqtt, "watering/slot/1/sensor/1"));
@@ -823,7 +823,7 @@ void testSensorModuleReadCommandAndMalformedPayload()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "connected 10", true));
+                             "connected 10", false));
 
   board.mqtt.publishedMessages.clear();
   board.mqtt.deliver("watering/sensor/read", "nope");
@@ -835,7 +835,10 @@ void testSensorModuleReadCommandAndMalformedPayload()
   const size_t afterRejects = board.slots.i2c.protocolOpCount();
   board.sensor.update();
   TEST_ASSERT_EQUAL(afterRejects, board.slots.i2c.protocolOpCount());
-  TEST_ASSERT_EQUAL(0, board.mqtt.publishedMessages.size());
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensor/1",
+                              "connected 10", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensor/1",
+                              "unavailable", false));
 
   board.mqtt.deliver("watering/sensor/read", "1 2");
   board.sensor.update();
@@ -858,7 +861,7 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   board.sensor.update();
   board.sensor.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "disconnected", true));
+                             "disconnected", false));
 
   const size_t afterCycle = board.slots.i2c.protocolOpCount();
   board.clock.advance(59999);
@@ -875,7 +878,7 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "connected -5", true));
+                             "connected -5", false));
 
   board.slots.sense(0).setPresent(false);
   for (uint32_t i = 0; i < 80; ++i)
@@ -885,9 +888,9 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   }
   board.sensor.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "unavailable", true));
+                             "unavailable", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensors",
-                             "unavailable", true));
+                             "unavailable", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", true));
 }
 
@@ -913,7 +916,7 @@ void testSensorModulePublishesConnectedList()
     board.sensor.update();
   }
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensors",
-                             "4 1 2 4", true));
+                             "4 1 2 4", false));
   const int once = countTopic(board.mqtt, "watering/slot/1/sensors");
   board.sensor.update();
   TEST_ASSERT_EQUAL(once, countTopic(board.mqtt, "watering/slot/1/sensors"));
@@ -931,7 +934,7 @@ void testSensorModulePublishesConnectedList()
   board.mqtt.deliver("watering/sensor/connected", "");
   board.sensor.update();
   TEST_ASSERT_EQUAL(learned, board.slots.i2c.protocolOpCount());
-  TEST_ASSERT_EQUAL(0, board.mqtt.publishedMessages.size());
+  TEST_ASSERT_EQUAL(0, countTopic(board.mqtt, "watering/slot/1/sensors"));
 }
 
 void testSensorModuleDoesNotExchangeWhileProgramming()
@@ -989,7 +992,7 @@ void testSolenoidModuleCommandPublishesAndTimesOut()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
 
   const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/solenoids", "1 maybe");
@@ -1008,7 +1011,7 @@ void testSolenoidModuleCommandPublishesAndTimesOut()
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn,
                     device.solenoidState[0]);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/1",
-                             "on", true));
+                             "on", false));
 
   board.clock.advance(kSolenoidSilenceMs - 1);
   board.solenoid.update();
@@ -1021,7 +1024,7 @@ void testSolenoidModuleCommandPublishesAndTimesOut()
                     txByte(board.slots.i2c, 3));
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, device.solenoidState[0]);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
 }
 
 void testSolenoidModuleSkipsDisconnectedAndPublishesInventory()
@@ -1039,11 +1042,11 @@ void testSolenoidModuleSkipsDisconnectedAndPublishesInventory()
   board.solenoid.update();
   board.solenoid.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/1",
-                             "on", true));
+                             "on", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/2",
-                             "disconnected", true));
+                             "disconnected", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoids",
-                             "2 1", true));
+                             "2 1", false));
 
   const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/solenoids/connected", "1");
@@ -1063,7 +1066,7 @@ void testSolenoidModuleSkipsDisconnectedAndPublishesInventory()
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateDisconnected,
                     device.solenoidState[1]);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/solenoid/1",
-                             "off", true));
+                             "off", false));
 }
 
 void testSolenoidModuleClearsOnUnplug()
@@ -1090,7 +1093,7 @@ void testSolenoidModuleClearsOnUnplug()
   TEST_ASSERT_TRUE(setOutput);
   TEST_ASSERT_EQUAL(0x11, board.slots.i2c.ops.back().address);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/solenoid/1",
-                             "on", true));
+                             "on", false));
 
   board.slots.sense(1).setPresent(false);
   for (uint32_t i = 0; i < 80; ++i)
@@ -1100,9 +1103,9 @@ void testSolenoidModuleClearsOnUnplug()
   }
   board.solenoid.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/solenoid/1",
-                             "unavailable", true));
+                             "unavailable", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/solenoids",
-                             "unavailable", true));
+                             "unavailable", false));
 }
 
 
@@ -1120,7 +1123,7 @@ void testPumpModuleTurnsOnAndPublishes()
   board.pump.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
                     lastCommand(board.slots.i2c));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", false));
 
   const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/pump", "1");
@@ -1139,7 +1142,7 @@ void testPumpModuleTurnsOnAndPublishes()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, txByte(board.slots.i2c, 2));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, device.pumpState);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", false));
 
   const size_t afterOn = board.slots.i2c.protocolOpCount();
   board.clock.advance(kPumpSilenceMs - 1);
@@ -1152,7 +1155,7 @@ void testPumpModuleTurnsOnAndPublishes()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, txByte(board.slots.i2c, 2));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, device.pumpState);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", false));
 }
 
 void testPumpModuleResetsFaultBeforeTurningOn()
@@ -1165,7 +1168,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10").online);
   board.pump.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "fault",
-                             true));
+                             false));
 
   const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/pump", "1 on");
@@ -1181,7 +1184,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   board.pump.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, device.pumpState);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", false));
 
   device.pumpState = module_protocol::kPumpStateFault;
   device.pumpResetLeavesFault = true;
@@ -1213,7 +1216,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   board.pump.update();
   TEST_ASSERT_EQUAL(afterReset, board.slots.i2c.protocolOpCount());
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "fault",
-                             true));
+                             false));
 }
 
 void testPumpModuleResetDoesNotRefreshAbsenceTimeout()
@@ -1225,7 +1228,7 @@ void testPumpModuleResetDoesNotRefreshAbsenceTimeout()
   device.pumpState = module_protocol::kPumpStateOn;
   TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10").online);
   board.pump.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", false));
   board.mqtt.deliver("watering/pump", "1 on");
   board.pump.update();
 
@@ -1246,7 +1249,7 @@ void testPumpModuleResetDoesNotRefreshAbsenceTimeout()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, txByte(board.slots.i2c, 2));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, device.pumpState);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", false));
 }
 
 void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
@@ -1262,7 +1265,7 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
   board.pump.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(0x11, board.slots.i2c.ops.back().address);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump", "on", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump", "on", false));
 
   board.slots.sense(1).setPresent(false);
   for (uint32_t i = 0; i < 80; ++i)
@@ -1272,7 +1275,7 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
   }
   board.pump.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump",
-                             "unavailable", true));
+                             "unavailable", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
 }
 

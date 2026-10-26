@@ -76,7 +76,7 @@ That asks for sensor 2 on module slot 1. The two numbers are decimal, separated 
 
 The callback enqueues the request. Up to four requests can wait. A fifth, while four are still waiting, is dropped and publishes nothing. On a later poller pass the host sends `GET_SENSOR_READING`. The bridge publishes the result on `{id}/slot/N/sensor/M`.
 
-If the named input is outside the module's reported count, the host does not send I2C. The bridge publishes non-retained `unavailable`. The same non-retained `unavailable` is published when the slot can never answer (empty, fault, unsupported, or a different type) or when three attempts come back busy or failed. That message leaves the previous retained reading on the broker.
+If the named input is outside the module's reported count, the host does not send I2C. The bridge publishes `unavailable` with retain off, and deletes any copy the broker was still holding for that topic. The same non-retained `unavailable` is published when the slot can never answer (empty, fault, unsupported, or a different type) or when three attempts come back busy or failed. A subscriber who connects afterwards does not receive the old reading. The reason result topics are not retained is in the [MQTT reference](mqtt.md).
 
 While the module is still coming online, or its count is not known yet, the request stays queued. It is not failed and it is not published yet.
 
@@ -95,8 +95,8 @@ The list waits until the count is known and every input's presence is known. The
 | Topic | Direction | Payload |
 | --- | --- | --- |
 | `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10` |
-| `{id}/slot/N/sensor/M` | publish, QoS 0 | `connected <int32>`, `disconnected`, or `unavailable` |
-| `{id}/slot/N/sensors` | publish, retained, QoS 0 | count, then connected indexes, such as `2 1` |
+| `{id}/slot/N/sensor/M` | publish, QoS 0, retain off | `connected <int32>`, `disconnected`, or `unavailable` |
+| `{id}/slot/N/sensors` | publish, QoS 0, retain off | count, then connected indexes, such as `2 1` |
 | `{id}/sensor/read` | subscribe, QoS 1 | `N M` |
 | `{id}/sensor/connected` | subscribe, QoS 1 | `N` |
 
@@ -104,7 +104,7 @@ The list waits until the count is known and every input's presence is known. The
 
 Outbound publishes are QoS 0. Publication waits until MQTT is connected. A rejected publish stays pending and is retried on a later bridge pass.
 
-Successful readings use these retained payloads:
+Successful readings use these payloads. None of them are retained:
 
 ```text
 connected 2500
@@ -116,20 +116,22 @@ disconnected
 
 | Event | Topic | Payload | Retained |
 | --- | --- | --- | --- |
-| Periodic `GET_SENSOR_READING` succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
-| Immediate read succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | yes |
+| Periodic `GET_SENSOR_READING` succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | no |
+| Immediate read succeeds | `{id}/slot/N/sensor/M` | `connected <value>` or `disconnected` | no |
 | Immediate read fails, or the sensor number is outside the reported count | `{id}/slot/N/sensor/M` | `unavailable` | no |
-| Slot is no longer an online sensor, or the new count drops an input that had a reading | `{id}/slot/N/sensor/M` | `unavailable` | yes, once |
-| Count and every presence are known, the connected set changes, or `{id}/sensor/connected` asks again | `{id}/slot/N/sensors` | `2 1` | yes |
-| Slot is no longer an online sensor after a list was published | `{id}/slot/N/sensors` | `unavailable` | yes, once |
+| Slot is no longer an online sensor, or the new count drops an input that had a reading | `{id}/slot/N/sensor/M` | `unavailable` | no, once |
+| Count and every presence are known, the connected set changes, or `{id}/sensor/connected` asks again | `{id}/slot/N/sensors` | `2 1` | no |
+| Slot is no longer an online sensor after a list was published | `{id}/slot/N/sensors` | `unavailable` | no, once |
 | Count query, a presence query that leaves an input unknown, malformed command, or a dropped extra command | — | nothing | — |
-| Bridge pass with no new reading and no list change | — | nothing | — |
+| Bridge pass with no new reading and no list change | — | the reading and the list are not repeated | — |
+
+Readings and the connected list are not retained. A retained reading survived after the board was unplugged, and a new subscriber received it as if the input were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. Before the first value on a result topic for this device id, the bridge publishes a retained empty payload so the broker deletes any copy it already stored. A publish with retain off does not do that delete. Each bridge pass also clears one result topic that has not been cleared yet, so an empty slot still drops old `sensor/1` through `sensor/16` and `sensors` topics. After the sweep finishes, a quiet pass publishes nothing. The same rule is in the [MQTT reference](mqtt.md).
 
 The list text is the count, then each connected index. It is compared as text. An unchanged list is not sent again unless `{id}/sensor/connected` asked. The list can be published on the pass that stores the last presence, before that input's reading.
 
 Each stored reading is published, including a repeat of the same text. The next bridge pass, with no new reading, does not publish that input again. An immediate read publishes once for that read. The periodic snapshot does not emit a second copy on that pass.
 
-A failed periodic step publishes nothing for that input. The last retained payload stays until a later reading succeeds, or until the input is gone. When a published input disappears, the bridge publishes retained `unavailable` once. After the module is identified again, the next successful reading replaces it.
+A failed periodic step publishes nothing for that input. The broker is not holding the last reading, because that topic's retained copy was deleted when the reading was published. The next successful reading is what a later subscriber sees. When a published input disappears, the bridge publishes `unavailable` once, with retain off. After the module is identified again, the next successful reading replaces it for subscribers who are already connected.
 
 `GET_SENSOR_COUNT` does not publish. `GET_SENSOR_CONNECTED` does not publish a reading. It can publish the connected list when that query completes the set or changes it.
 
@@ -141,11 +143,11 @@ Sensor in slot 1, two inputs, first connected with raw value 2500, second absent
 I2C  GET_SENSOR_COUNT                         (no MQTT)
 I2C  GET_SENSOR_CONNECTED  index 0            (no MQTT)
 I2C  GET_SENSOR_READING    index 0
-MQTT {id}/slot/1/sensor/1  retained  "connected 2500"
+MQTT {id}/slot/1/sensor/1  "connected 2500"
 I2C  GET_SENSOR_CONNECTED  index 1
-MQTT {id}/slot/1/sensors   retained  "2 1"
+MQTT {id}/slot/1/sensors   "2 1"
 I2C  GET_SENSOR_READING    index 1
-MQTT {id}/slot/1/sensor/2  retained  "disconnected"
+MQTT {id}/slot/1/sensor/2  "disconnected"
 ```
 
 About one poll interval after that second reading, the four queries run again. Both reading topics are published again, even when 2500 and `disconnected` are unchanged. The connected list is not sent again.
@@ -153,7 +155,7 @@ About one poll interval after that second reading, the four queries run again. B
 ```text
 MQTT {id}/sensor/read  payload "1 1"
 I2C  GET_SENSOR_READING    index 0
-MQTT {id}/slot/1/sensor/1  retained  "connected 2500"
+MQTT {id}/slot/1/sensor/1  "connected 2500"
 ```
 
 The periodic cycle resumes on later passes.
@@ -170,4 +172,4 @@ An index outside the reported count is `BadLength` from the module. The host tre
 
 ## Tests
 
-`test/test_desktop/test_sensor.cpp` drives `FakeModuleDevice` and `FakeMqttClient`. It covers the three command frames, host rejection unless the slot is an online sensor, count-then-poll ordering, the poll-interval repeat, a module reset that reads the count again, a count of 0, busy retries, the immediate read, malformed commands, a missing sensor, publication of an unchanged periodic value, and retained `unavailable` after unplug. The connected-list tests cover the first publish, a repeat only when asked, a request that waits for presence, malformed payloads, a count of 0, all inputs absent, a presence change, unplug, and a new device id. The sensor tests use one sensor module. Two slots enumerating together are in `test_modules.cpp`. `test_deep_modules.cpp` drives `SensorModule::update()`, including `{id}/sensor/connected`.
+`test/test_desktop/test_sensor.cpp` drives `FakeModuleDevice` and `FakeMqttClient`. It covers the three command frames, host rejection unless the slot is an online sensor, count-then-poll ordering, the poll-interval repeat, a module reset that reads the count again, a count of 0, busy retries, the immediate read, malformed commands, a missing sensor, publication of an unchanged periodic value, and `unavailable` with retain off after unplug. It also covers the retained empty delete before the first reading, a rejected delete that holds the value back, and one sweep of every unused sensor topic. The connected-list tests cover the first publish, a repeat only when asked, a request that waits for presence, malformed payloads, a count of 0, all inputs absent, a presence change, unplug, and a new device id. The sensor tests use one sensor module. Two slots enumerating together are in `test_modules.cpp`. `test_deep_modules.cpp` drives `SensorModule::update()`, including `{id}/sensor/connected`.
