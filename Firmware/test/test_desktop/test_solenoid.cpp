@@ -1,6 +1,5 @@
 #include <unity.h>
 
-#include <cstdio>
 #include <cstring>
 
 #include "ModuleCodec.h"
@@ -143,57 +142,6 @@ int countTopic(const FakeMqttClient& client, const char* topic)
     }
   }
   return count;
-}
-
-/**
- * Counts publishes of one topic, payload, and retain flag.
- *
- * @param client Fake broker.
- * @param topic Expected topic.
- * @param payload Expected payload.
- * @param retained Expected retained flag.
- * @return Number of matching messages.
- */
-int countMatching(const FakeMqttClient& client, const char* topic,
-                  const char* payload, bool retained)
-{
-  int count = 0;
-  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
-  {
-    const FakeMqttClient::PublishedMessage& message =
-        client.publishedMessages[i];
-    if (message.topic == topic && message.payload == payload &&
-        message.retained == retained)
-    {
-      ++count;
-    }
-  }
-  return count;
-}
-
-/**
- * Finds the first publish of one topic, payload, and retain flag.
- *
- * @param client Fake broker.
- * @param topic Expected topic.
- * @param payload Expected payload.
- * @param retained Expected retained flag.
- * @return Message index, or -1 when no message matches.
- */
-int messageIndex(const FakeMqttClient& client, const char* topic,
-                 const char* payload, bool retained)
-{
-  for (size_t i = 0; i < client.publishedMessages.size(); ++i)
-  {
-    const FakeMqttClient::PublishedMessage& message =
-        client.publishedMessages[i];
-    if (message.topic == topic && message.payload == payload &&
-        message.retained == retained)
-    {
-      return static_cast<int>(i);
-    }
-  }
-  return -1;
 }
 
 /**
@@ -842,12 +790,8 @@ void testSolenoidBridgeFollowsDeviceId()
                              "off", false));
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoids",
                              "1 1", false));
-  const int cleared = messageIndex(harness.client, "shed/slot/1/solenoid/1",
-                                   "", true);
-  const int value = messageIndex(harness.client, "shed/slot/1/solenoid/1",
-                                 "off", false);
-  TEST_ASSERT_TRUE(cleared >= 0);
-  TEST_ASSERT_TRUE(value > cleared);
+  TEST_ASSERT_FALSE(published(harness.client, "shed/slot/1/solenoid/1",
+                              "", true));
 
   harness.client.deliver(harness.topics.solenoidCommand(), "1 on");
   harness.poller.update();
@@ -857,35 +801,6 @@ void testSolenoidBridgeFollowsDeviceId()
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/solenoid/1",
                              "on", false));
 }
-
-void testSolenoidClearsEveryUnusedTopicOnce()
-{
-  SolenoidHarness harness;
-  const int topics = module_protocol::kSlotCount *
-                     (module_protocol::kMaxSolenoidsPerModule + 1);
-  for (int step = 0; step < topics; ++step)
-  {
-    harness.bridge.update();
-  }
-  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
-  for (int slot = 1; slot <= module_protocol::kSlotCount; ++slot)
-  {
-    for (int output = 1; output <= module_protocol::kMaxSolenoidsPerModule;
-         ++output)
-    {
-      char topic[96];
-      std::snprintf(topic, sizeof(topic), "watering/slot/%d/solenoid/%d",
-                    slot, output);
-      TEST_ASSERT_EQUAL(1, countMatching(harness.client, topic, "", true));
-    }
-    char list[96];
-    std::snprintf(list, sizeof(list), "watering/slot/%d/solenoids", slot);
-    TEST_ASSERT_EQUAL(1, countMatching(harness.client, list, "", true));
-  }
-  harness.bridge.update();
-  TEST_ASSERT_EQUAL(topics, harness.client.publishedMessages.size());
-}
-
 
 // ========== Runner ==========
 
@@ -920,5 +835,4 @@ void runSolenoidTests()
   RUN_TEST(testConnectedQueryRejectsMalformedPayload);
   RUN_TEST(testConnectedInventoryClearsWhenModuleUnplugged);
   RUN_TEST(testSolenoidBridgeFollowsDeviceId);
-  RUN_TEST(testSolenoidClearsEveryUnusedTopicOnce);
 }

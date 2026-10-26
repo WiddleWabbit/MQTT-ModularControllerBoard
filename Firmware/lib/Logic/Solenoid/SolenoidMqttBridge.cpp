@@ -3,8 +3,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "UnretainedPublish.h"
-
 // ========== Construction ==========
 
 SolenoidMqttBridge::SolenoidMqttBridge(SolenoidPoller& poller,
@@ -13,8 +11,7 @@ SolenoidMqttBridge::SolenoidMqttBridge(SolenoidPoller& poller,
   : _poller(poller),
     _mqttService(mqttService),
     _topics(topics),
-    _seenGeneration(topics.generation()),
-    _clearCursor(0)
+    _seenGeneration(topics.generation())
 {
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
@@ -24,12 +21,10 @@ SolenoidMqttBridge::SolenoidMqttBridge(SolenoidPoller& poller,
       _publishedOk[slot][index] = false;
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
-      _outputCleared[slot][index] = false;
     }
     _inventoryPending[slot] = false;
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
-    _inventoryCleared[slot] = false;
   }
 }
 
@@ -60,7 +55,7 @@ void SolenoidMqttBridge::onMqttMessage(const char* topic,
 
 /**
  * Publishes each new state and the connected-output list with
- * retain off, and deletes one stale retained topic.
+ * retain off.
  *
  * @return Nothing.
  */
@@ -69,7 +64,6 @@ void SolenoidMqttBridge::update()
   _syncTopicGeneration();
   _publishSnapshots();
   _publishInventories();
-  _clearOneStaleTopic();
 }
 
 
@@ -93,13 +87,10 @@ void SolenoidMqttBridge::_syncTopicGeneration()
       _publishedOk[slot][index] = false;
       _publishedRevision[slot][index] = 0;
       _published[slot][index][0] = '\0';
-      _outputCleared[slot][index] = false;
     }
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
-    _inventoryCleared[slot] = false;
   }
-  _clearCursor = 0;
   _seenGeneration = generation;
 }
 
@@ -421,53 +412,7 @@ bool SolenoidMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
 }
 
 /**
- * Deletes one retained result topic this device id has not cleared.
- *
- * @return Nothing.
- */
-void SolenoidMqttBridge::_clearOneStaleTopic()
-{
-  const uint8_t perSlot = static_cast<uint8_t>(
-      module_protocol::kMaxSolenoidsPerModule + 1U);
-  const uint8_t total = static_cast<uint8_t>(
-      module_protocol::kSlotCount * perSlot);
-  while (_clearCursor < total)
-  {
-    const uint8_t slot = static_cast<uint8_t>(_clearCursor / perSlot);
-    const uint8_t item = static_cast<uint8_t>(_clearCursor % perSlot);
-    const bool inventory = item == module_protocol::kMaxSolenoidsPerModule;
-    bool* cleared = inventory ? &_inventoryCleared[slot]
-                              : &_outputCleared[slot][item];
-    char topic[96];
-    const unsigned moduleNumber = static_cast<unsigned>(slot) + 1U;
-    if (inventory)
-    {
-      std::snprintf(topic, sizeof(topic), "%s/%u/solenoids",
-                    _topics.slotPrefix(), moduleNumber);
-    }
-    else
-    {
-      const unsigned solenoidNumber = static_cast<unsigned>(item) + 1U;
-      std::snprintf(topic, sizeof(topic), "%s/%u/solenoid/%u",
-                    _topics.slotPrefix(), moduleNumber, solenoidNumber);
-    }
-    if (*cleared)
-    {
-      ++_clearCursor;
-      continue;
-    }
-    if (!clearRetainedOnce(_mqttService, topic, *cleared))
-    {
-      return;
-    }
-    ++_clearCursor;
-    return;
-  }
-}
-
-/**
- * Publishes the inventory topic for one slot with retain off,
- * after deleting any broker copy once.
+ * Publishes the inventory topic for one slot with retain off.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param payload Text payload.
@@ -480,13 +425,11 @@ bool SolenoidMqttBridge::_publishInventory(uint8_t moduleSlot,
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/solenoids",
                 _topics.slotPrefix(), moduleNumber);
-  return publishUnretained(_mqttService, topic, payload,
-                           _inventoryCleared[moduleSlot]);
+  return _mqttService.publish(topic, payload, false);
 }
 
 /**
- * Publishes one solenoid topic with retain off, after deleting any
- * broker copy once.
+ * Publishes one solenoid topic with retain off.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param solenoidIndex Zero-based output.
@@ -501,8 +444,7 @@ bool SolenoidMqttBridge::_publish(uint8_t moduleSlot, uint8_t solenoidIndex,
   const unsigned solenoidNumber = static_cast<unsigned>(solenoidIndex) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/solenoid/%u",
                 _topics.slotPrefix(), moduleNumber, solenoidNumber);
-  return publishUnretained(_mqttService, topic, payload,
-                           _outputCleared[moduleSlot][solenoidIndex]);
+  return _mqttService.publish(topic, payload, false);
 }
 
 /**

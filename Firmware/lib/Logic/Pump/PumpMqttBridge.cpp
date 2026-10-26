@@ -3,8 +3,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "UnretainedPublish.h"
-
 // ========== Construction ==========
 
 PumpMqttBridge::PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
@@ -12,15 +10,13 @@ PumpMqttBridge::PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
   : _poller(poller),
     _mqttService(mqttService),
     _topics(topics),
-    _seenGeneration(topics.generation()),
-    _clearCursor(0)
+    _seenGeneration(topics.generation())
 {
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
     _publishedOk[slot] = false;
     _publishedRevision[slot] = 0;
     _published[slot][0] = '\0';
-    _cleared[slot] = false;
   }
 }
 
@@ -50,8 +46,7 @@ void PumpMqttBridge::onMqttMessage(const char* topic, const uint8_t* payload,
 }
 
 /**
- * Publishes each new state with retain off, and deletes one stale
- * retained pump topic.
+ * Publishes each new state with retain off.
  *
  * @return Nothing.
  */
@@ -59,7 +54,6 @@ void PumpMqttBridge::update()
 {
   _syncTopicGeneration();
   _publishSnapshots();
-  _clearOneStaleTopic();
 }
 
 
@@ -80,9 +74,7 @@ void PumpMqttBridge::_syncTopicGeneration()
     _publishedOk[slot] = false;
     _publishedRevision[slot] = 0;
     _published[slot][0] = '\0';
-    _cleared[slot] = false;
   }
-  _clearCursor = 0;
   _seenGeneration = generation;
 }
 
@@ -279,36 +271,7 @@ void PumpMqttBridge::_publishSnapshots()
 }
 
 /**
- * Deletes one retained pump topic this device id has not cleared.
- *
- * @return Nothing.
- */
-void PumpMqttBridge::_clearOneStaleTopic()
-{
-  while (_clearCursor < module_protocol::kSlotCount)
-  {
-    const uint8_t slot = _clearCursor;
-    if (_cleared[slot])
-    {
-      ++_clearCursor;
-      continue;
-    }
-    char topic[96];
-    const unsigned moduleNumber = static_cast<unsigned>(slot) + 1U;
-    std::snprintf(topic, sizeof(topic), "%s/%u/pump", _topics.slotPrefix(),
-                  moduleNumber);
-    if (!clearRetainedOnce(_mqttService, topic, _cleared[slot]))
-    {
-      return;
-    }
-    ++_clearCursor;
-    return;
-  }
-}
-
-/**
- * Publishes one pump topic with retain off, after deleting any
- * broker copy once.
+ * Publishes one pump topic with retain off.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param payload Text payload.
@@ -320,7 +283,7 @@ bool PumpMqttBridge::_publish(uint8_t moduleSlot, const char* payload)
   const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u/pump", _topics.slotPrefix(),
                 moduleNumber);
-  return publishUnretained(_mqttService, topic, payload, _cleared[moduleSlot]);
+  return _mqttService.publish(topic, payload, false);
 }
 
 /**

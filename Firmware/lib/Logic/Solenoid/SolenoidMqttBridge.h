@@ -57,13 +57,9 @@ public:
 
   /**
    * Publishes each new state, including a repeated value, with
-   * retain off. Before the first payload on a topic for this device
-   * id, publishes a retained empty payload so the broker drops any
-   * previous copy. An output that disappears publishes unavailable
-   * with retain off. Each update also clears one result topic that
-   * has not been cleared yet. A rejected publish stays pending.
-   * A new device id clears and sends the current states once on
-   * the new topics.
+   * retain off. An output that disappears publishes unavailable
+   * with retain off. A rejected publish stays pending. A new
+   * device id sends the current states once on the new topics.
    *
    * @return Nothing.
    */
@@ -83,10 +79,6 @@ private:
   bool _inventoryPending[module_protocol::kSlotCount];
   bool _inventoryOk[module_protocol::kSlotCount];
   char _inventoryPayload[module_protocol::kSlotCount][80];
-  bool _outputCleared[module_protocol::kSlotCount]
-                     [module_protocol::kMaxSolenoidsPerModule];
-  bool _inventoryCleared[module_protocol::kSlotCount];
-  uint8_t _clearCursor;
 
   /**
    * Parses a desired-state command and records it.
@@ -133,15 +125,6 @@ private:
   void _publishInventories();
 
   /**
-   * Deletes one retained result topic this device id has not cleared.
-   * Walks output indexes, then the list, for each slot. A topic
-   * already cleared by a value publish is skipped.
-   *
-   * @return Nothing.
-   */
-  void _clearOneStaleTopic();
-
-  /**
    * Formats "<count> <connected indexes...>" for one slot.
    *
    * @param moduleSlot Firmware slot 0..3.
@@ -152,8 +135,7 @@ private:
   bool _formatInventory(uint8_t moduleSlot, char* out, size_t outCap) const;
 
   /**
-   * Publishes the inventory topic for one slot with retain off,
-   * after deleting any broker copy once.
+   * Publishes the inventory topic for one slot with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param payload Text payload.
@@ -162,8 +144,7 @@ private:
   bool _publishInventory(uint8_t moduleSlot, const char* payload);
 
   /**
-   * Publishes one solenoid topic with retain off, after deleting any
-   * broker copy once.
+   * Publishes one solenoid topic with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param solenoidIndex Zero-based output.

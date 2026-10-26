@@ -76,7 +76,7 @@ disconnected
 
 `connected` is followed by one raw int32. `disconnected` has no value.
 
-A read that cannot be done publishes `unavailable` on that same topic with retain off. The bridge also deletes any copy the broker was still holding, so the previous reading does not remain. The request waits while the slot is still coming online or the count is not known yet. Up to four reads can wait. A fifth, while four are waiting, is dropped.
+A read that cannot be done publishes `unavailable` on that same topic with retain off. The request waits while the slot is still coming online or the count is not known yet. Up to four reads can wait. A fifth, while four are waiting, is dropped.
 
 Behaviour: [sensor reference](sensor-module.md).
 
@@ -153,11 +153,9 @@ Behaviour: [pump reference](pump-module.md).
 
 The controller publishes these. Subscribe to read them. QoS is 0.
 
-Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. The same subscriber must not receive a sensor reading, a connected-input list, a solenoid state, or a pump state from a board that is no longer in the slot. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the input were still there.
+Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, solenoid states, the connected-output list, and pump state are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
 
-A later publish with retain off does not delete a message the broker already stored. The first time this boot publishes a result topic, the bridge sends a retained empty payload on that topic, then the value with retain off. MQTT treats a retained empty payload as a delete. If the empty publish is rejected, the value waits and is tried on a later pass. Each bridge update also deletes one result topic that this device id has not cleared yet, including indexes that are never given a value because the slot is empty. That sweep is one topic per update per bridge: slot 1..4, sensor and solenoid indexes 1..16, both inventory topics, and the pump topic. A new device id clears the new topics the same way. Messages already retained under the old prefix are left on the broker.
-
-A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines and does not receive a stale reading, list, or pump state. The next sample arrives on the next poll, or when a command asks again.
+A publish with retain off does not replace a message the broker already stored. This firmware does not publish an empty payload, and it does not delete those copies. Messages already on the broker, including ones under a previous device id, stay until they are removed there. A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines, and any result the broker is still holding. The next sample arrives on the next poll, or when a command asks again.
 
 | Topic | Retained | Payload | Who publishes |
 | --- | --- | --- | --- |
@@ -168,7 +166,7 @@ A subscriber who is already connected receives each new sample, and `unavailable
 | `{id}/slot/N/solenoids` | no | `<count> <connected indexes...>`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/pump` | no | `on`, `off`, `fault`, or `unavailable` | Pump bridge |
 
-`N` is 1..4. `M` is 1..16. Firmware slot 0 is topic 1. The broker copy of each result topic is deleted once per device id before the first value, and unused indexes are deleted by the sweep above.
+`N` is 1..4. `M` is 1..16. Firmware slot 0 is topic 1.
 
 `{id}/slot/N` is the public slot line, without a `Slot N:` prefix. The same words are on the USB snapshot with that prefix. The body is one of:
 
@@ -191,7 +189,7 @@ Fault Busy
 
 A reading or a solenoid or pump state is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point.
 
-`unavailable` is published with retain off when that point disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`, and that publish deletes any broker copy so the previous reading does not remain. A subscriber who connects after either event does not receive `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
+`unavailable` is published with retain off when that point disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
 
 A count query publishes nothing by itself. A sensor presence query publishes nothing on the reading topic. It can publish `{id}/slot/N/sensors` when the list becomes complete or the connected set changes.
 
@@ -209,7 +207,7 @@ Changing the prefix publishes the current values once under the new root. Comman
 
 ## Errors
 
-An ignored command publishes no result. It does not change the retained slot line. There is no retained sensor, solenoid, or pump payload for it to leave in place.
+An ignored command publishes no result. It does not change the retained slot line, and it does not publish a sensor, solenoid, or pump payload.
 
 | Payload | What happens |
 | --- | --- |
@@ -221,7 +219,7 @@ An ignored command publishes no result. It does not change the retained slot lin
 | `{id}/pump` with `fault`, or any word other than `on`, `off`, or `reset` | Ignored |
 | Fifth sensor read while four are still waiting | Dropped |
 | Publish while MQTT is disconnected | Rejected. The publisher retries on a later pass |
-| Immediate sensor read that fails, or a sensor number outside the reported count | `unavailable` with retain off, after the broker copy is deleted |
+| Immediate sensor read that fails, or a sensor number outside the reported count | `unavailable` with retain off |
 | Slot unplugged after a result was published | `unavailable` with retain off, once, on that slot's result topics. `{id}/slot/N` becomes `Empty` and stays retained |
 
 While an ISP session is active, `Network` still delivers commands, and the handlers still record them. Slot status and sensor, solenoid, and pump results are published when those modules run again after the session. [Programming reference](programming.md).
@@ -243,7 +241,7 @@ A new command topic means raising `kSubscriptionCount`. One handler may serve mo
 
 - `test/test_desktop/test_mqtt_topics.cpp` — the five topic strings and the generation counter.
 - `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, a new prefix.
-- `test/test_desktop/test_sensor.cpp`, `test_solenoid.cpp`, and `test_pump.cpp` — result payloads with retain off, one retained empty delete per topic, and a sweep of topics that have no value.
+- `test/test_desktop/test_sensor.cpp`, `test_solenoid.cpp`, and `test_pump.cpp` — result payloads with retain off.
 - `test/test_desktop/test_sensor.cpp` — read, connected list, malformed payloads, `unavailable`.
 - `test/test_desktop/test_solenoid.cpp` — desired state, inventory, the absence window.
 - `test/test_desktop/test_pump.cpp` — on, off, reset, the absence window.
@@ -251,4 +249,4 @@ A new command topic means raising `kSubscriptionCount`. One handler may serve mo
 
 ## Source
 
-`lib/Logic/Network/MqttTopicLayout.cpp` builds the topic strings. `lib/Logic/Network/MqttService.cpp` subscribes and publishes. `lib/Logic/Network/UnretainedPublish.cpp` deletes a retained broker copy once, then publishes the result with retain off. `lib/Drivers/PubSubClientAdapter.cpp` forwards publish with the retain flag and no QoS. The payload formatters are `_formatReading` and `_formatInventory` in `SensorMqttBridge.cpp`, `_formatState` and `_formatInventory` in `SolenoidMqttBridge.cpp`, `_formatState` in `PumpMqttBridge.cpp`, and `writeSlotStatusBody` in `SlotStatusText.cpp`.
+`lib/Logic/Network/MqttTopicLayout.cpp` builds the topic strings. `lib/Logic/Network/MqttService.cpp` subscribes and publishes. `lib/Drivers/PubSubClientAdapter.cpp` forwards publish with the retain flag and no QoS. The payload formatters are `_formatReading` and `_formatInventory` in `SensorMqttBridge.cpp`, `_formatState` and `_formatInventory` in `SolenoidMqttBridge.cpp`, `_formatState` in `PumpMqttBridge.cpp`, and `writeSlotStatusBody` in `SlotStatusText.cpp`.

@@ -50,13 +50,9 @@ public:
 
   /**
    * Publishes each new state, including a repeated value, with
-   * retain off. Before the first payload on a topic for this device
-   * id, publishes a retained empty payload so the broker drops any
-   * previous copy. A pump that disappears publishes unavailable
-   * with retain off. Each update also clears one pump topic that
-   * has not been cleared yet. A rejected publish stays pending.
-   * A new device id clears and sends the current state once on
-   * the new topics.
+   * retain off. A pump that disappears publishes unavailable with
+   * retain off. A rejected publish stays pending. A new device id
+   * sends the current state once on the new topics.
    *
    * @return Nothing.
    */
@@ -70,8 +66,6 @@ private:
   bool _publishedOk[module_protocol::kSlotCount];
   uint32_t _publishedRevision[module_protocol::kSlotCount];
   char _published[module_protocol::kSlotCount][16];
-  bool _cleared[module_protocol::kSlotCount];
-  uint8_t _clearCursor;
 
   /**
    * Parses a pump command and records it.
@@ -99,16 +93,7 @@ private:
   void _publishSnapshots();
 
   /**
-   * Deletes one retained pump topic this device id has not cleared.
-   * A topic already cleared by a value publish is skipped.
-   *
-   * @return Nothing.
-   */
-  void _clearOneStaleTopic();
-
-  /**
-   * Publishes one pump topic with retain off, after deleting any
-   * broker copy once.
+   * Publishes one pump topic with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param payload Text payload.

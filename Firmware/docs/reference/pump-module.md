@@ -108,9 +108,9 @@ Each stored state is published, including a repeat of the same text, on the brid
 | State query, malformed command, or a command still waiting for the state | — | nothing | — |
 | Bridge pass with no new state | — | the state is not repeated | — |
 
-Pump state is not retained. A retained `on` or `fault` survived after the board was unplugged, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. Before the first value on `{id}/slot/N/pump` for this device id, the bridge publishes a retained empty payload so the broker deletes any copy it already stored. A publish with retain off does not do that delete. Each bridge pass also clears one pump topic that has not been cleared yet, so an empty slot still drops an old state. The same rule is in the [MQTT reference](mqtt.md).
+Pump state is not retained. A retained `on` or `fault` survived after the board was unplugged, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
 
-A failed read publishes nothing. The broker is not holding the last state, because that topic's retained copy was deleted when the state was published. The next successful read, set, or reset is what a later subscriber sees.
+A failed read publishes nothing. The next successful read, set, or reset is published with retain off.
 
 ### Example
 
@@ -153,4 +153,4 @@ A zero argument selects the poller's own default for that argument. It does not 
 
 ## Tests
 
-`test/test_desktop/test_pump.cpp` covers the three command frames, host rejection unless the slot is an online pump, the state read and its 60 second repeat, a module reset that reads the state again, busy retries, off sent only when the state differs, on sent again when it is already on and again at the poll interval, a busy on refresh that waits and tries again, a fault left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, and `unavailable` with retain off after unplug. It also covers one sweep of every unused pump topic, and the retained empty delete before the first state under a new device id. The tests use one pump module, plus one command addressed to slot 2. `test_deep_modules.cpp` drives `PumpModule::update()`.
+`test/test_desktop/test_pump.cpp` covers the three command frames, host rejection unless the slot is an online pump, the state read and its 60 second repeat, a module reset that reads the state again, busy retries, off sent only when the state differs, on sent again when it is already on and again at the poll interval, a busy on refresh that waits and tries again, a fault left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, and `unavailable` with retain off after unplug. The tests use one pump module, plus one command addressed to slot 2. `test_deep_modules.cpp` drives `PumpModule::update()`.

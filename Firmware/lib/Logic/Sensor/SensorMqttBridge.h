@@ -57,14 +57,11 @@ public:
 
   /**
    * Publishes each new reading, including a repeated value, with
-   * retain off. Before the first payload on a topic for this device
-   * id, publishes a retained empty payload so the broker drops any
-   * previous copy. An input that disappears publishes unavailable
-   * with retain off. Publishes the connected-input list when that
-   * text changes or a request asked again. Each update also clears
-   * one result topic that has not been cleared yet. A rejected
-   * publish stays pending. A new device id clears and sends the
-   * current readings and the list once on the new topics.
+   * retain off. An input that disappears publishes unavailable with
+   * retain off. Publishes the connected-input list when that text
+   * changes or a request asked again. A rejected publish stays
+   * pending. A new device id sends the current readings and the
+   * list once on the new topics.
    *
    * @return Nothing.
    */
@@ -86,10 +83,6 @@ private:
   bool _inventoryPending[module_protocol::kSlotCount];
   bool _inventoryOk[module_protocol::kSlotCount];
   char _inventoryPayload[module_protocol::kSlotCount][80];
-  bool _readingCleared[module_protocol::kSlotCount]
-                      [module_protocol::kMaxSensorsPerModule];
-  bool _inventoryCleared[module_protocol::kSlotCount];
-  uint8_t _clearCursor;
 
   /**
    * Parses a read command and enqueues it, or records a connected-list
@@ -144,15 +137,6 @@ private:
   void _publishInventories();
 
   /**
-   * Deletes one retained result topic this device id has not cleared.
-   * Walks sensor indexes, then the list, for each slot. A topic
-   * already cleared by a value publish is skipped.
-   *
-   * @return Nothing.
-   */
-  void _clearOneStaleTopic();
-
-  /**
    * Formats "<count> <connected indexes...>" for one slot.
    *
    * @param moduleSlot Firmware slot 0..3.
@@ -163,8 +147,7 @@ private:
   bool _formatInventory(uint8_t moduleSlot, char* out, size_t outCap) const;
 
   /**
-   * Publishes the inventory topic for one slot with retain off,
-   * after deleting any broker copy once.
+   * Publishes the inventory topic for one slot with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param payload Text payload.
@@ -173,8 +156,7 @@ private:
   bool _publishInventory(uint8_t moduleSlot, const char* payload);
 
   /**
-   * Publishes one sensor topic with retain off, after deleting any
-   * broker copy once.
+   * Publishes one sensor topic with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param sensorIndex Zero-based input.

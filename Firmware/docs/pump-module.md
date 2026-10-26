@@ -34,14 +34,13 @@ flowchart TD
   bridge --> pub{"A state was stored this pass?"}
   pub -->|yes| mqtt["Publish on, off, or fault with retain off"]
   pub -->|no| quiet["Do not repeat it"]
-  bridge --> clear["Clear one pump topic the broker may still be holding"]
 ```
 
 A reset waits until the state is known. When it returns off or on and the desired state still differs, a later pass sends `SET_PUMP`. A reset that still returns fault is published and not followed by `SET_PUMP`.
 
 ## What is stored, and who reads it
 
-Each slot keeps its own state, desired on/off, and poll timer. The absence window is one timer for every pump: any accepted on/off command restarts it. Faulted pumps are not reset when the window elapses. The bridge publishes `{id}/slot/N/pump` with retain off. A retained `on` stayed on the broker after the board was removed, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained. Unplug publishes `unavailable` once, with retain off. The delete of an old broker copy is in the [pump reference](reference/pump-module.md).
+Each slot keeps its own state, desired on/off, and poll timer. The absence window is one timer for every pump: any accepted on/off command restarts it. Faulted pumps are not reset when the window elapses. The bridge publishes `{id}/slot/N/pump` with retain off. A retained `on` stayed on the broker after the board was removed, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained. Unplug publishes `unavailable` once, with retain off. The retain rule is in the [pump reference](reference/pump-module.md).
 
 Serial status prints the slot line only. The pump state is the MQTT payload.
 

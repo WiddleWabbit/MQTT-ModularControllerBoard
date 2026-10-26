@@ -112,11 +112,11 @@ Each stored state is published, including a repeat of the same text, on the brid
 | Count query, malformed command, or a command still waiting for the count | — | nothing | — |
 | Bridge pass with no new state | — | the state and the list are not repeated | — |
 
-Output states and the connected list are not retained. A retained state survived after the board was unplugged, and a new subscriber received it as if the output were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. Before the first value on a result topic for this device id, the bridge publishes a retained empty payload so the broker deletes any copy it already stored. A publish with retain off does not do that delete. Each bridge pass also clears one result topic that has not been cleared yet, including outputs this boot never publishes. The same rule is in the [MQTT reference](mqtt.md).
+Output states and the connected list are not retained. A retained state survived after the board was unplugged, and a new subscriber received it as if the output were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
 
 The inventory text is the count, then each connected index. It is compared as text. An unchanged inventory is not sent again unless `{id}/solenoids/connected` asked.
 
-A failed periodic step publishes nothing for that output. The broker is not holding the last state, because that topic's retained copy was deleted when the state was published. The next successful read or set is what a later subscriber sees.
+A failed periodic step publishes nothing for that output. The next successful read or set is published with retain off.
 
 ### Example
 
@@ -159,4 +159,4 @@ A zero argument selects the poller's own default for that argument. It does not 
 
 ## Tests
 
-`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and `unavailable` with retain off after unplug. It also covers one sweep of every unused solenoid topic, and the retained empty delete before the first state under a new device id. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.
+`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and `unavailable` with retain off after unplug. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.
