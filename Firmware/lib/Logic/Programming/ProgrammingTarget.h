@@ -15,8 +15,9 @@ enum class ProgrammingMethod : uint8_t
 
 /**
  * GPIO numbers for the programming header. The composition root owns
- * the board values and passes this struct in. `csGpio` is ISP RESET.
- * `modGpio` is the UPDI wire. Slots are stored in order, 1 through 4.
+ * the board values and passes this struct in. `mosiGpio` is the SPI
+ * data pin and the UPDI wire. `csGpio` is ISP RESET, in slot order
+ * 1 through 4.
  */
 struct ProgrammingPins
 {
@@ -24,7 +25,6 @@ struct ProgrammingPins
   uint8_t misoGpio;
   uint8_t sckGpio;
   uint8_t csGpio[4];
-  uint8_t modGpio[4];
 };
 
 /**

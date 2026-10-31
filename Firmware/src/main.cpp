@@ -121,6 +121,7 @@ Esp32DigitalPin cs1(CS1_PIN);
 Esp32DigitalPin cs2(CS2_PIN);
 Esp32DigitalPin cs3(CS3_PIN);
 Esp32DigitalPin cs4(CS4_PIN);
+Esp32DigitalPin mosi(MOSI_PIN);
 
 
 // ========== Modules ==========
@@ -148,15 +149,14 @@ PumpModule pumpModule(moduleBus, network, systemClock, kPumpPollIntervalMs,
 Esp32SerialPort serialPort(Serial);
 const ProgrammingPins kProgrammingPins = {
   MOSI_PIN, MISO_PIN, SCK_PIN,
-  {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN},
-  {MOD1_PIN, MOD2_PIN, MOD3_PIN, MOD4_PIN}};
+  {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN}};
 SerialConsole serialConsole(serialPort, systemClock, network, moduleBus,
                             kSerialStatusIntervalMs, kProgrammingPins);
 Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
 Esp32HalfDuplexUart updiUart;
 Esp32ProgrammingLatch programmingLatch;
 Programming programming(serialPort, ispSpi, updiUart, cs1, cs2, cs3, cs4,
-                        mod1, mod2, mod3, mod4, kProgrammingPins, moduleBus,
+                        mosi, kProgrammingPins, moduleBus,
                         systemClock, kProgrammingIdleTimeoutMs,
                         kProgrammingUnplugTimeoutMs);
 bool startupAttempted = false;
@@ -299,7 +299,8 @@ void loop()
   if (programming.updiCheckActive())
   {
     // One break phase per pass. The status read is the pass that
-    // finishes the second low. The bus stays off this pin until then.
+    // finishes the second low. Return before the bus so that work
+    // does not stretch the break.
     UpdiLinkCheck check;
     if (programming.pollUpdiCheck(check))
     {

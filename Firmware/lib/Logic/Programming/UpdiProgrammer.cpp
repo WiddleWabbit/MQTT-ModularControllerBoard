@@ -133,8 +133,8 @@ UpdiProgrammer::UpdiProgrammer(IBytePort& port, IHalfDuplexUart& uart,
 
 /**
  * Stores the UPDI pin and leaves it as an input with a pull-up.
- * The UART stays detached until a connect break finishes. The MOD
- * net has no board pull-up, so this pull-up holds the wire high.
+ * The UART stays detached until a connect break finishes. The wire
+ * has no board pull-up, so this pull-up holds it high.
  *
  * @param line Pin used as the UPDI wire.
  * @param gpio GPIO number of that pin.
@@ -181,8 +181,7 @@ void UpdiProgrammer::update()
 }
 
 /**
- * Detaches the UART and returns the line to an input. Enumeration
- * leaves the MOD net in that mode, with no pull-up.
+ * Detaches the UART and returns the line to an input with no pull-up.
  *
  * @return Nothing.
  */

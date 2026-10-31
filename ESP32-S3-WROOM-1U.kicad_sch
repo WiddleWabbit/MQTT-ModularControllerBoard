@@ -3254,7 +3254,7 @@
 	)
 	(text_box "Reduce ringing and current spikes in edges of rise."
 		(exclude_from_sim no)
-		(at 254 139.7 0)
+		(at 255.27 140.97 0)
 		(size 20.32 7.62)
 		(margins 0.9525 0.9525 0.9525 0.9525)
 		(stroke
@@ -3268,7 +3268,7 @@
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left top)
+			(justify right top)
 		)
 		(uuid "a0c2021f-0fda-42f3-a3fd-fdce9413e29e")
 	)

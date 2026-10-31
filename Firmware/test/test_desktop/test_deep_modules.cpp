@@ -41,7 +41,7 @@ const uint8_t kStkEop = 0x20;
 const uint8_t kStkInsync = 0x14;
 const uint8_t kStkOk = 0x10;
 const ProgrammingPins kProgrammingPins = {
-  11, 13, 12, {6, 7, 15, 16}, {40, 42, 43, 1}};
+  11, 13, 12, {6, 7, 15, 16}};
 
 /**
  * Defaults matching startController(), with a broker so MQTT can connect.
@@ -344,10 +344,11 @@ struct ProgrammingRig
   FakeBytePort port;
   FakeSpiMaster spi;
   FakeHalfDuplexUart uart;
+  FakeDigitalPin mosi;
   Programming programming;
 
   /**
-   * Binds the board's CS and MOD pins and the shared pin numbers.
+   * Binds the board's CS pins, the shared MOSI pin, and the pin numbers.
    *
    * @param board Composition under test.
    * @param idleMs Silence that ends the session.
@@ -355,8 +356,7 @@ struct ProgrammingRig
    */
   ProgrammingRig(Board& board, uint32_t idleMs, uint32_t unplugMs)
     : programming(port, spi, uart, board.slots.cs1, board.slots.cs2,
-                  board.slots.cs3, board.slots.cs4, board.slots.mod1,
-                  board.slots.mod2, board.slots.mod3, board.slots.mod4,
+                  board.slots.cs3, board.slots.cs4, mosi,
                   kProgrammingPins, board.bus, board.clock, idleMs, unplugMs)
   {
   }
@@ -1479,14 +1479,19 @@ void testProgrammingUpdiClaimsOnlyTheSelectedPin()
   ProgrammingRig rig(board, 60000, 1000);
   const int mod1Writes = board.slots.mod1.writeCount;
   const int mod2Writes = board.slots.mod2.writeCount;
+  const int mod4Writes = board.slots.mod4.writeCount;
+  const PinMode mod1Mode = board.slots.mod1.mode;
+  const PinMode mod2Mode = board.slots.mod2.mode;
+  const PinMode mod4Mode = board.slots.mod4.mode;
   const int cs1Writes = board.slots.cs1.writeCount;
   const int cs2Writes = board.slots.cs2.writeCount;
   rig.programming.begin(2, ProgrammingMethod::Updi);
   TEST_ASSERT_TRUE(rig.programming.active());
   TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod2Mode, board.slots.mod2.mode);
   TEST_ASSERT_EQUAL(mod2Writes, board.slots.mod2.writeCount);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
   TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs2.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
@@ -1500,11 +1505,13 @@ void testProgrammingUpdiClaimsOnlyTheSelectedPin()
   const std::vector<uint8_t> frame = jtagFrame(1, body, sizeof(body));
   rig.port.feed(frame.data(), frame.size());
   rig.programming.update();
-  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, board.slots.mod2.mode);
-  TEST_ASSERT_FALSE(board.slots.mod2.level);
-  TEST_ASSERT_FALSE(board.slots.mod2.pushPullUsed);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_FALSE(rig.mosi.level);
+  TEST_ASSERT_FALSE(rig.mosi.pushPullUsed);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
   TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
+  TEST_ASSERT_EQUAL(mod2Mode, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(mod2Writes, board.slots.mod2.writeCount);
   TEST_ASSERT_EQUAL(cs2Writes, board.slots.cs2.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs2.mode);
@@ -1514,34 +1521,34 @@ void testProgrammingUpdiClaimsOnlyTheSelectedPin()
   TEST_ASSERT_EQUAL(1, rig.uart.installCount);
   TEST_ASSERT_EQUAL(0, rig.uart.claimCount);
 
-  const int writesAtBreak = board.slots.mod2.writeCount;
+  const int writesAtBreak = rig.mosi.writeCount;
   const int installsAtBreak = rig.uart.installCount;
   rig.programming.begin(2, ProgrammingMethod::Updi);
-  TEST_ASSERT_EQUAL(writesAtBreak, board.slots.mod2.writeCount);
+  TEST_ASSERT_EQUAL(writesAtBreak, rig.mosi.writeCount);
   TEST_ASSERT_EQUAL(installsAtBreak, rig.uart.installCount);
   TEST_ASSERT_EQUAL(cs2Writes, board.slots.cs2.writeCount);
   TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
 
   board.clock.advance(25);
   rig.programming.update();
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.mod2.mode);
-  TEST_ASSERT_TRUE(board.slots.mod2.read());
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.mosi.mode);
+  TEST_ASSERT_TRUE(rig.mosi.read());
   TEST_ASSERT_FALSE(rig.uart.attached);
   TEST_ASSERT_EQUAL(0, rig.uart.tx.size());
   board.clock.advance(2);
   rig.programming.update();
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.mod2.mode);
-  TEST_ASSERT_TRUE(board.slots.mod2.read());
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.mosi.mode);
+  TEST_ASSERT_TRUE(rig.mosi.read());
   TEST_ASSERT_FALSE(rig.uart.attached);
   board.clock.advance(1);
   rig.programming.update();
-  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, board.slots.mod2.mode);
-  TEST_ASSERT_FALSE(board.slots.mod2.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_FALSE(rig.mosi.level);
   board.clock.advance(25);
   rig.programming.update();
-  TEST_ASSERT_TRUE(board.slots.mod2.level);
+  TEST_ASSERT_TRUE(rig.mosi.level);
   TEST_ASSERT_TRUE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(42, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(11, rig.uart.gpio);
   TEST_ASSERT_EQUAL(115200, rig.uart.baud);
   TEST_ASSERT_EQUAL(1, rig.uart.installCount);
   TEST_ASSERT_EQUAL(1, rig.uart.claimCount);
@@ -1558,15 +1565,27 @@ void testProgrammingUpdiClaimsOnlyTheSelectedPin()
   board.clock.advance(60000);
   rig.programming.update();
   TEST_ASSERT_FALSE(rig.programming.active());
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.mosi.mode);
   TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod2Writes, board.slots.mod2.writeCount);
+  TEST_ASSERT_EQUAL(mod2Mode, board.slots.mod2.mode);
   TEST_ASSERT_FALSE(rig.uart.installed);
   TEST_ASSERT_FALSE(rig.uart.attached);
   TEST_ASSERT_EQUAL(cs1Writes, board.slots.cs1.writeCount);
   TEST_ASSERT_EQUAL(cs2Writes, board.slots.cs2.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs2.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
+
+  rig.programming.begin(4, ProgrammingMethod::Updi);
+  rig.port.feed(frame.data(), frame.size());
+  rig.programming.update();
+  TEST_ASSERT_EQUAL(11, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod4Mode, board.slots.mod4.mode);
+  TEST_ASSERT_EQUAL(mod4Writes, board.slots.mod4.writeCount);
+  TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
+  TEST_ASSERT_EQUAL(cs1Writes, board.slots.cs1.writeCount);
 }
 
 void testProgrammingUpdiSilenceAndUnplugEndTheSession()
@@ -1575,18 +1594,25 @@ void testProgrammingUpdiSilenceAndUnplugEndTheSession()
   board.start();
   ProgrammingRig quiet(board, 60000, 1000);
   quiet.port.plugged = false;
+  const int mod4Writes = board.slots.mod4.writeCount;
+  const PinMode mod4Mode = board.slots.mod4.mode;
   quiet.programming.begin(4, ProgrammingMethod::Updi);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, quiet.mosi.mode);
+  TEST_ASSERT_EQUAL(mod4Mode, board.slots.mod4.mode);
+  TEST_ASSERT_EQUAL(mod4Writes, board.slots.mod4.writeCount);
   board.clock.advance(59999);
   quiet.programming.update();
   TEST_ASSERT_TRUE(quiet.programming.active());
   board.clock.advance(1);
   quiet.programming.update();
   TEST_ASSERT_FALSE(quiet.programming.active());
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod4.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, quiet.mosi.mode);
+  TEST_ASSERT_EQUAL(mod4Mode, board.slots.mod4.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs4.mode);
 
   ProgrammingRig unplug(board, 60000, 1000);
   unplug.programming.begin(4, ProgrammingMethod::Updi);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, unplug.mosi.mode);
   unplug.programming.update();
   unplug.port.plugged = false;
   unplug.programming.update();
@@ -1596,7 +1622,9 @@ void testProgrammingUpdiSilenceAndUnplugEndTheSession()
   board.clock.advance(1);
   unplug.programming.update();
   TEST_ASSERT_FALSE(unplug.programming.active());
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod4.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, unplug.mosi.mode);
+  TEST_ASSERT_EQUAL(mod4Mode, board.slots.mod4.mode);
+  TEST_ASSERT_EQUAL(mod4Writes, board.slots.mod4.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs4.mode);
 }
 
@@ -1606,7 +1634,7 @@ void testProgrammingUpdiSilenceAndUnplugEndTheSession()
  *
  * @param programming Check under test.
  * @param clock Clock the programmer uses for the break.
- * @param line MOD pin the check is driving.
+ * @param line UPDI pin the check is driving.
  * @param result Receives the finished measurement.
  * @return Nothing.
  */
@@ -1662,15 +1690,19 @@ void testProgrammingUpdiCheckLeavesTheSessionIdle()
   TEST_ASSERT_FALSE(rig.programming.active());
   const int cs3Writes = board.slots.cs3.writeCount;
   const int mod1Writes = board.slots.mod1.writeCount;
+  const int mod3Writes = board.slots.mod3.writeCount;
   const PinMode mod1Mode = board.slots.mod1.mode;
+  const PinMode mod3Mode = board.slots.mod3.mode;
 
   TEST_ASSERT_TRUE(rig.programming.startUpdiCheck(3));
   TEST_ASSERT_TRUE(rig.programming.updiCheckActive());
   TEST_ASSERT_FALSE(rig.programming.active());
   TEST_ASSERT_FALSE(rig.programming.startUpdiCheck(4));
-  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, board.slots.mod3.mode);
-  TEST_ASSERT_FALSE(board.slots.mod3.level);
-  TEST_ASSERT_FALSE(board.slots.mod3.pushPullUsed);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_FALSE(rig.mosi.level);
+  TEST_ASSERT_FALSE(rig.mosi.pushPullUsed);
+  TEST_ASSERT_EQUAL(mod3Mode, board.slots.mod3.mode);
+  TEST_ASSERT_EQUAL(mod3Writes, board.slots.mod3.writeCount);
   TEST_ASSERT_EQUAL(cs3Writes, board.slots.cs3.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs3.mode);
   TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
@@ -1686,8 +1718,7 @@ void testProgrammingUpdiCheckLeavesTheSessionIdle()
 
   rig.uart.reply(0x30);
   UpdiLinkCheck result = {};
-  finishProgrammingCheck(rig.programming, board.clock, board.slots.mod3,
-                         result);
+  finishProgrammingCheck(rig.programming, board.clock, rig.mosi, result);
   TEST_ASSERT_FALSE(rig.programming.updiCheckActive());
   TEST_ASSERT_FALSE(rig.programming.active());
   TEST_ASSERT_FALSE(result.drivenHigh);
@@ -1707,10 +1738,12 @@ void testProgrammingUpdiCheckLeavesTheSessionIdle()
   const uint8_t ldcs[] = {0x55, 0x80};
   TEST_ASSERT_EQUAL(2, rig.uart.tx.size());
   TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
-  TEST_ASSERT_EQUAL(43, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(11, rig.uart.gpio);
   TEST_ASSERT_EQUAL(115200, rig.uart.baud);
   TEST_ASSERT_FALSE(rig.uart.attached);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod3.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod3Mode, board.slots.mod3.mode);
+  TEST_ASSERT_EQUAL(mod3Writes, board.slots.mod3.writeCount);
   TEST_ASSERT_EQUAL(cs3Writes, board.slots.cs3.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs3.mode);
   TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
@@ -1732,18 +1765,21 @@ void testProgrammingUpdiCheckSendsWhenTheGapStaysLow()
   Board board(kPollMs, kPollMs, kSolenoidSilenceMs, kPollMs, kPumpSilenceMs);
   board.start();
   ProgrammingRig rig(board, 60000, 1000);
-  board.slots.mod1.externalLevel = false;
+  rig.mosi.externalLevel = false;
   const int cs1Writes = board.slots.cs1.writeCount;
+  const int mod1Writes = board.slots.mod1.writeCount;
+  const PinMode mod1Mode = board.slots.mod1.mode;
   TEST_ASSERT_TRUE(rig.programming.startUpdiCheck(1));
-  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, board.slots.mod1.mode);
-  TEST_ASSERT_FALSE(board.slots.mod1.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_FALSE(rig.mosi.level);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
   TEST_ASSERT_EQUAL(cs1Writes, board.slots.cs1.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
 
   rig.uart.reply(0x30);
   UpdiLinkCheck result = {};
-  finishProgrammingCheck(rig.programming, board.clock, board.slots.mod1,
-                         result);
+  finishProgrammingCheck(rig.programming, board.clock, rig.mosi, result);
   TEST_ASSERT_FALSE(rig.programming.updiCheckActive());
   TEST_ASSERT_FALSE(rig.programming.active());
   TEST_ASSERT_FALSE(result.drivenHigh);
@@ -1755,7 +1791,10 @@ void testProgrammingUpdiCheckSendsWhenTheGapStaysLow()
   TEST_ASSERT_EQUAL_MEMORY(ldcs, rig.uart.tx.data(), 2);
   TEST_ASSERT_TRUE(result.echoSeen);
   TEST_ASSERT_TRUE(result.replied);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(11, rig.uart.gpio);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInput, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
   TEST_ASSERT_EQUAL(cs1Writes, board.slots.cs1.writeCount);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
   TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
@@ -1766,9 +1805,14 @@ void testProgrammingBeginReleasesAnUpdiCheck()
   Board board(kPollMs, kPollMs, kSolenoidSilenceMs, kPollMs, kPumpSilenceMs);
   board.start();
   ProgrammingRig rig(board, 60000, 1000);
+  const int mod1Writes = board.slots.mod1.writeCount;
+  const int mod2Writes = board.slots.mod2.writeCount;
+  const PinMode mod1Mode = board.slots.mod1.mode;
+  const PinMode mod2Mode = board.slots.mod2.mode;
   TEST_ASSERT_TRUE(rig.programming.startUpdiCheck(1));
-  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, board.slots.mod1.mode);
-  TEST_ASSERT_FALSE(board.slots.mod1.level);
+  TEST_ASSERT_EQUAL(PinMode::DigitalOutputOpenDrain, rig.mosi.mode);
+  TEST_ASSERT_FALSE(rig.mosi.level);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
 
   rig.programming.begin(2, ProgrammingMethod::Updi);
@@ -1776,8 +1820,11 @@ void testProgrammingBeginReleasesAnUpdiCheck()
   TEST_ASSERT_TRUE(rig.programming.active());
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs2.mode);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod2Mode, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(mod1Writes, board.slots.mod1.writeCount);
+  TEST_ASSERT_EQUAL(mod2Writes, board.slots.mod2.writeCount);
   TEST_ASSERT_FALSE(rig.uart.installed);
   TEST_ASSERT_FALSE(rig.uart.attached);
   TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
@@ -1785,8 +1832,9 @@ void testProgrammingBeginReleasesAnUpdiCheck()
   TEST_ASSERT_FALSE(rig.programming.pollUpdiCheck(leftover));
   TEST_ASSERT_FALSE(rig.programming.startUpdiCheck(1));
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInput, board.slots.mod1.mode);
-  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.mod2.mode);
+  TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mod1Mode, board.slots.mod1.mode);
+  TEST_ASSERT_EQUAL(mod2Mode, board.slots.mod2.mode);
   TEST_ASSERT_TRUE(rig.programming.active());
 }
 
@@ -1801,12 +1849,16 @@ void testProgrammingRejectsSlotOutsideOneToFour()
   const size_t ops = board.slots.i2c.protocolOpCount();
 
   ProgrammingRig rig(board, 60000, 1000);
+  const PinMode mosiMode = rig.mosi.mode;
+  const int mosiWrites = rig.mosi.writeCount;
   rig.programming.begin(0, ProgrammingMethod::Isp);
   TEST_ASSERT_FALSE(rig.programming.active());
   rig.programming.begin(5, ProgrammingMethod::Updi);
   TEST_ASSERT_FALSE(rig.programming.active());
   TEST_ASSERT_EQUAL(ops, board.slots.i2c.protocolOpCount());
   TEST_ASSERT_EQUAL(PinMode::DigitalInputPullup, board.slots.cs1.mode);
+  TEST_ASSERT_EQUAL(mosiMode, rig.mosi.mode);
+  TEST_ASSERT_EQUAL(mosiWrites, rig.mosi.writeCount);
   TEST_ASSERT_EQUAL(0, rig.spi.beginCount);
   TEST_ASSERT_EQUAL(0, rig.uart.installCount);
 
@@ -1939,7 +1991,7 @@ void testSerialConsolePeriodicStatusAndProgramRequest()
   TEST_ASSERT_EQUAL(4, request.slot);
   TEST_ASSERT_EQUAL(static_cast<int>(ProgrammingMethod::Updi),
                     static_cast<int>(request.method));
-  TEST_ASSERT_TRUE(wroteLine(serial, "UPDI slot 4: UPDI GPIO1, 3V3, GND"));
+  TEST_ASSERT_TRUE(wroteLine(serial, "UPDI slot 4: UPDI GPIO11, 3V3, GND"));
 
   serial.output.clear();
   serial.feed("program updi\n");

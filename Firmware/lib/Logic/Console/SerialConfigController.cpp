@@ -416,7 +416,7 @@ bool SerialConfigController::_acceptCheck(const std::string& line,
 
 /**
  * Names the GPIOs for the accepted session. ISP lists the shared SPI
- * pins and the slot CS pin as RESET. UPDI lists that slot's MOD pin.
+ * pins and the slot CS pin as RESET. UPDI lists the shared MOSI pin.
  *
  * @param request Slot and method.
  * @return One pin line.
@@ -434,7 +434,7 @@ std::string SerialConfigController::_pinLine(const ProgrammingRequest& request) 
            ", RESET GPIO" + std::to_string(gpio) +
            ", 3V3, GND";
   }
-  const unsigned gpio = _pins.modGpio[request.slot - 1];
+  const unsigned gpio = _pins.mosiGpio;
   return "UPDI slot " + std::to_string(slot) +
          ": UPDI GPIO" + std::to_string(gpio) +
          ", 3V3, GND";
