@@ -7,6 +7,15 @@
 #include "SensorPoller.h"
 
 /**
+ * Sensor on/off/reset topic when the device id is watering.
+ * Payload is "<moduleSlot> <sensor> on", "off", or "reset".
+ * Module slot 1 is firmware index 0. Sensor 1 is wire index 0.
+ * on and off record the desired state. reset asks for a reset and
+ * does not change the desired state.
+ */
+static const char kSensorCommandTopic[] = "watering/sensor";
+
+/**
  * Sensor read topic when the device id is watering.
  * Payload is "<moduleSlot> <sensor>", both 1-based. Module slot 1 is
  * firmware index 0. Sensor 1 is wire index 0.
@@ -42,9 +51,9 @@ public:
                    MqttTopicLayout& topics);
 
   /**
-   * Enqueues a reading, or records a connected-list request, when the
-   * topic and payload name one sensor slot. Ignores every other
-   * message. Safe to call from the MQTT callback.
+   * Records an on, off, or reset, enqueues a reading, or records a
+   * connected-list request. Ignores every other message. Safe to
+   * call from the MQTT callback.
    *
    * @param topic Received topic.
    * @param payload Payload bytes. Not necessarily NUL-terminated.
@@ -85,8 +94,7 @@ private:
   char _inventoryPayload[module_protocol::kSlotCount][80];
 
   /**
-   * Parses a read command and enqueues it, or records a connected-list
-   * request.
+   * Parses an on/off/reset, a read, or a connected-list request.
    *
    * @param topic Received topic.
    * @param payload Payload bytes.
@@ -112,6 +120,15 @@ private:
    * @return Nothing.
    */
   void _handleConnectedQuery(const uint8_t* payload, size_t length);
+
+  /**
+   * Parses an on, off, or reset for one input and records it.
+   *
+   * @param payload Payload bytes.
+   * @param length Payload length.
+   * @return Nothing.
+   */
+  void _handleCommand(const uint8_t* payload, size_t length);
 
   /**
    * Publishes the held on-demand result when one is waiting.
@@ -179,14 +196,15 @@ private:
                      size_t outCap) const;
 
   /**
-   * Formats a successful reading payload.
+   * Formats the text for one stored state.
    *
-   * @param connected Presence flag.
-   * @param value Raw value, used only when connected is true.
+   * @param state Stored state.
+   * @param hasValue True when value is a stored reading.
+   * @param value Raw value, used only when state is on.
    * @param out Destination buffer.
    * @param outCap Destination capacity.
    * @return Nothing.
    */
-  static void _formatReading(bool connected, int32_t value, char* out,
-                             size_t outCap);
+  static void _formatState(SensorState state, bool hasValue, int32_t value,
+                           char* out, size_t outCap);
 };

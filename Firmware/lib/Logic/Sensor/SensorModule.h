@@ -10,9 +10,9 @@ class ModuleBus;
 class Network;
 
 /**
- * Sensor daughter behaviour: count, presence, readings, the immediate
- * read command, the connected-input list, and publication with
- * retain off.
+ * Sensor daughter behaviour: count, on/off, fault, readings, the
+ * immediate read command, the connected-input list, and publication
+ * with retain off.
  * update() issues at most one bus exchange and then publishes what
  * that exchange stored.
  */
@@ -25,8 +25,8 @@ public:
    * @param bus Module bus. Must outlive this object.
    * @param network MQTT client, topics, and inbound fan-out.
    * @param clock Monotonic clock.
-   * @param pollIntervalMs Period for presence and readings. Zero selects
-   *        the poller's default.
+   * @param pollIntervalMs Gap after a finished state cycle. Zero
+   *        selects the poller's default.
    */
   SensorModule(ModuleBus& bus, Network& network, IClock& clock,
                uint32_t pollIntervalMs);

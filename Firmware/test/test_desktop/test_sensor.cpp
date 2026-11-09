@@ -119,8 +119,23 @@ struct SensorHarness
 };
 
 /**
- * Runs one presence query and one reading query for each input.
- * The count must already be known.
+ * Marks one input on so a state query is followed by a reading.
+ *
+ * @param device Simulated module.
+ * @param index Zero-based input.
+ * @param value Raw value the reading returns.
+ * @return Nothing.
+ */
+void setInputOn(FakeModuleDevice& device, uint8_t index, int32_t value)
+{
+  device.sensorState[index] = module_protocol::kSensorStateOn;
+  device.sensorConnected[index] = true;
+  device.sensorValue[index] = value;
+}
+
+/**
+ * Runs one state query for each input, and a reading when that
+ * input is on. The count must already be known.
  *
  * @param harness Sensor harness.
  * @param count Inputs to walk.
@@ -131,12 +146,15 @@ void readInputs(SensorHarness& harness, uint8_t count)
   for (uint8_t index = 0; index < count; ++index)
   {
     harness.poller.update();
-    harness.poller.update();
+    if (harness.device.sensorState[index] == module_protocol::kSensorStateOn)
+    {
+      harness.poller.update();
+    }
   }
 }
 
 /**
- * Queries the count, then presence and reading for each input.
+ * Queries the count, then state and, when on, a reading for each input.
  *
  * @param harness Sensor harness.
  * @param count Inputs the device reports.
@@ -252,6 +270,52 @@ void testHostReadsSensorCountConnectedAndReading()
   TEST_ASSERT_TRUE(reading.connected);
   TEST_ASSERT_EQUAL(-123456, reading.value);
 
+  const SensorStateResult off = querySensorState(fixture.host, 0, 0);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, off.status);
+  TEST_ASSERT_TRUE(off.state == SensorState::Off);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState, lastCommand(fixture));
+
+  device.sensorConnected[0] = true;
+  const size_t beforeSet = fixture.bus.protocolOpCount();
+  const SensorStateResult turningOn = setSensor(fixture.host, 0, 0, true);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Busy, turningOn.status);
+  TEST_ASSERT_EQUAL(beforeSet + 1, fixture.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(fixture));
+  TEST_ASSERT_EQUAL(0, lastSensorIndex(fixture));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOn,
+                    fixture.bus.ops.back().tx[3]);
+
+  const SensorStateResult settled = querySensorState(fixture.host, 0, 0);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, settled.status);
+  TEST_ASSERT_TRUE(settled.state == SensorState::On);
+
+  const SensorStateResult turnedOff = setSensor(fixture.host, 0, 0, false);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, turnedOff.status);
+  TEST_ASSERT_TRUE(turnedOff.state == SensorState::Off);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(fixture));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOff,
+                    fixture.bus.ops.back().tx[3]);
+
+  device.sensorState[0] = module_protocol::kSensorStateFault;
+  const SensorStateResult ignored = setSensor(fixture.host, 0, 0, true);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, ignored.status);
+  TEST_ASSERT_TRUE(ignored.state == SensorState::Fault);
+
+  const SensorStateResult reset = resetSensor(fixture.host, 0, 0);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Ok, reset.status);
+  TEST_ASSERT_TRUE(reset.state == SensorState::Off);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdResetSensor, lastCommand(fixture));
+
+  device.sensorState[1] = 9;
+  const SensorStateResult badByte = querySensorState(fixture.host, 0, 1);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, badByte.status);
+
+  const size_t beforeReject = fixture.bus.protocolOpCount();
+  const SensorStateResult outOfRange = querySensorState(
+      fixture.host, 0, module_protocol::kMaxSensorsPerModule);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Rejected, outOfRange.status);
+  TEST_ASSERT_EQUAL(beforeReject, fixture.bus.protocolOpCount());
+
   device.forceBusy = true;
   const SensorReadingResult busy = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Busy, busy.status);
@@ -294,15 +358,21 @@ void testHostRejectsShortSensorPayload()
   TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, count.status);
   const SensorReadingResult reading = querySensorReading(fixture.host, 0, 0);
   TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, reading.status);
+  const SensorStateResult state = querySensorState(fixture.host, 0, 0);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, state.status);
+  const SensorStateResult written = setSensor(fixture.host, 0, 0, true);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, written.status);
+  const SensorStateResult reset = resetSensor(fixture.host, 0, 0);
+  TEST_ASSERT_EQUAL(SensorQueryStatus::Failed, reset.status);
 }
 
 void testPollerQueriesCountThenEachSensorAtInterval()
 {
   SensorHarness harness;
   harness.device.sensorCount = 2;
-  harness.device.sensorConnected[0] = true;
+  setInputOn(harness.device, 0, 10);
+  harness.device.sensorState[1] = module_protocol::kSensorStateDisconnected;
   harness.device.sensorConnected[1] = false;
-  harness.device.sensorValue[0] = 10;
   harness.device.sensorValue[1] = -4;
   plugAndPump(harness.modules, 0, harness.device);
 
@@ -315,7 +385,7 @@ void testPollerQueriesCountThenEachSensorAtInterval()
   TEST_ASSERT_EQUAL(2, harness.poller.sensorCount(0));
 
   harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(0, lastSensorIndex(harness.modules));
   harness.poller.update();
@@ -323,11 +393,7 @@ void testPollerQueriesCountThenEachSensorAtInterval()
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(0, lastSensorIndex(harness.modules));
   harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
-                    lastCommand(harness.modules));
-  TEST_ASSERT_EQUAL(1, lastSensorIndex(harness.modules));
-  harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(1, lastSensorIndex(harness.modules));
 
@@ -342,7 +408,7 @@ void testPollerQueriesCountThenEachSensorAtInterval()
   TEST_ASSERT_TRUE(
       harness.poller.sensorSample(0, 1, &connected, &hasValue, &value));
   TEST_ASSERT_FALSE(connected);
-  TEST_ASSERT_EQUAL(-4, value);
+  TEST_ASSERT_FALSE(hasValue);
 
   const size_t afterCycle = harness.modules.bus.protocolOpCount();
   harness.clock.advance(59999);
@@ -351,7 +417,7 @@ void testPollerQueriesCountThenEachSensorAtInterval()
   harness.clock.advance(1);
   harness.poller.update();
   TEST_ASSERT_EQUAL(afterCycle + 1, harness.modules.bus.protocolOpCount());
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(0, lastSensorIndex(harness.modules));
 }
@@ -396,28 +462,32 @@ void testPollerRetriesBusyThenMovesOn()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 1;
+  setInputOn(harness.device, 0, 1);
   plugAndPump(harness.modules, 0, harness.device);
   harness.poller.update();
   harness.device.forceBusy = true;
   for (int attempt = 0; attempt < 3; ++attempt)
   {
     harness.poller.update();
-    TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+    TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                       lastCommand(harness.modules));
   }
+  const size_t afterSkip = harness.modules.bus.protocolOpCount();
   harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+  TEST_ASSERT_EQUAL(afterSkip, harness.modules.bus.protocolOpCount());
+  harness.device.forceBusy = false;
+  harness.clock.advance(60000);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastSensorIndex(harness.modules));
 }
 
 void testSensorReadCommandPublishesWithoutBusUntilUpdate()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 2500;
+  setInputOn(harness.device, 0, 2500);
   plugAndPump(harness.modules, 0, harness.device);
   harness.poller.update();
   const size_t afterCount = harness.modules.bus.protocolOpCount();
@@ -427,6 +497,9 @@ void testSensorReadCommandPublishesWithoutBusUntilUpdate()
 
   harness.poller.update();
   TEST_ASSERT_EQUAL(afterCount + 1, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
                     lastCommand(harness.modules));
   harness.bridge.update();
@@ -438,8 +511,7 @@ void testSensorReadCommandRepeatsUnchangedReading()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 2500;
+  setInputOn(harness.device, 0, 2500);
   plugAndPump(harness.modules, 0, harness.device);
   harness.poller.update();
   harness.poller.update();
@@ -459,8 +531,7 @@ void testSensorReadCommandRejectsMalformedPayload()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 3;
+  setInputOn(harness.device, 0, 3);
   plugAndPump(harness.modules, 0, harness.device);
   harness.poller.update();
   const size_t afterCount = harness.modules.bus.protocolOpCount();
@@ -475,7 +546,7 @@ void testSensorReadCommandRejectsMalformedPayload()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(afterCount + 1, harness.modules.bus.protocolOpCount());
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
                              "1 1", false));
@@ -506,6 +577,7 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
+  harness.device.sensorState[0] = module_protocol::kSensorStateDisconnected;
   harness.device.sensorConnected[0] = false;
   harness.device.sensorValue[0] = 0;
   plugAndPump(harness.modules, 0, harness.device);
@@ -517,8 +589,7 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
                              "disconnected", false));
 
   harness.client.publishedMessages.clear();
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 2600;
+  setInputOn(harness.device, 0, 2600);
   harness.clock.advance(60000);
   harness.poller.update();
   harness.poller.update();
@@ -555,8 +626,7 @@ void testSensorBridgeFollowsDeviceId()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 2500;
+  setInputOn(harness.device, 0, 2500);
   plugAndPump(harness.modules, 0, harness.device);
   harness.poller.update();
   harness.poller.update();
@@ -599,14 +669,10 @@ void testSensorConnectedListPublishesIndexes()
 {
   SensorHarness harness;
   harness.device.sensorCount = 4;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorConnected[1] = true;
-  harness.device.sensorConnected[2] = false;
-  harness.device.sensorConnected[3] = true;
-  harness.device.sensorValue[0] = 1;
-  harness.device.sensorValue[1] = 2;
-  harness.device.sensorValue[2] = 0;
-  harness.device.sensorValue[3] = 4;
+  setInputOn(harness.device, 0, 1);
+  setInputOn(harness.device, 1, 2);
+  harness.device.sensorState[2] = module_protocol::kSensorStateDisconnected;
+  setInputOn(harness.device, 3, 4);
   plugAndPump(harness.modules, 0, harness.device);
   learnInputs(harness, 4);
   harness.bridge.update();
@@ -639,10 +705,8 @@ void testSensorConnectedQueryWaitsUntilPresenceIsKnown()
 {
   SensorHarness harness;
   harness.device.sensorCount = 2;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorConnected[1] = false;
-  harness.device.sensorValue[0] = 10;
-  harness.device.sensorValue[1] = 0;
+  setInputOn(harness.device, 0, 10);
+  harness.device.sensorState[1] = module_protocol::kSensorStateDisconnected;
   plugAndPump(harness.modules, 0, harness.device);
   const size_t seated = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kSensorConnectedTopic, "1");
@@ -660,7 +724,7 @@ void testSensorConnectedQueryWaitsUntilPresenceIsKnown()
 
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
                               "2 1", false));
@@ -674,7 +738,7 @@ void testSensorConnectedQueryWaitsUntilPresenceIsKnown()
 
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(1, lastSensorIndex(harness.modules));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
@@ -685,8 +749,7 @@ void testSensorConnectedQueryRejectsMalformedPayload()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 3;
+  setInputOn(harness.device, 0, 3);
   plugAndPump(harness.modules, 0, harness.device);
   learnInputs(harness, 1);
   harness.bridge.update();
@@ -717,10 +780,10 @@ void testSensorConnectedListForEmptyAndAllAbsent()
 
   SensorHarness absent;
   absent.device.sensorCount = 4;
-  absent.device.sensorConnected[0] = false;
-  absent.device.sensorConnected[1] = false;
-  absent.device.sensorConnected[2] = false;
-  absent.device.sensorConnected[3] = false;
+  absent.device.sensorState[0] = module_protocol::kSensorStateDisconnected;
+  absent.device.sensorState[1] = module_protocol::kSensorStateDisconnected;
+  absent.device.sensorState[2] = module_protocol::kSensorStateDisconnected;
+  absent.device.sensorState[3] = module_protocol::kSensorStateDisconnected;
   plugAndPump(absent.modules, 0, absent.device);
   learnInputs(absent, 4);
   absent.bridge.update();
@@ -732,18 +795,15 @@ void testSensorConnectedListFollowsPresenceChange()
 {
   SensorHarness harness;
   harness.device.sensorCount = 2;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorConnected[1] = false;
-  harness.device.sensorValue[0] = 10;
-  harness.device.sensorValue[1] = 0;
+  setInputOn(harness.device, 0, 10);
+  harness.device.sensorState[1] = module_protocol::kSensorStateDisconnected;
   plugAndPump(harness.modules, 0, harness.device);
   learnInputs(harness, 2);
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
                              "2 1", false));
 
-  harness.device.sensorConnected[1] = true;
-  harness.device.sensorValue[1] = 7;
+  setInputOn(harness.device, 1, 7);
   harness.clock.advance(60000);
   harness.client.publishedMessages.clear();
   readInputs(harness, 2);
@@ -759,8 +819,7 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
 {
   SensorHarness harness;
   harness.device.sensorCount = 1;
-  harness.device.sensorConnected[0] = true;
-  harness.device.sensorValue[0] = 4;
+  setInputOn(harness.device, 0, 4);
   plugAndPump(harness.modules, 0, harness.device);
   learnInputs(harness, 1);
   harness.bridge.update();
@@ -776,6 +835,392 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
                              "unavailable", false));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
                              "unavailable", false));
+}
+
+void testBootPublishesOffAndDoesNotRead()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 3;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount,
+                    lastCommand(harness.modules));
+  for (uint8_t index = 0; index < 3; ++index)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                      lastCommand(harness.modules));
+    TEST_ASSERT_EQUAL(index, lastSensorIndex(harness.modules));
+  }
+  const size_t afterCycle = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterCycle, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "off", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/2",
+                             "off", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/3",
+                             "off", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
+                             "3", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "disconnected", false));
+}
+
+void testSensorOnConfirmsStateThenPublishesReading()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = true;
+  harness.device.sensorValue[0] = 2500;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "off", false));
+  harness.client.publishedMessages.clear();
+
+  const size_t before = harness.modules.bus.protocolOpCount();
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  TEST_ASSERT_EQUAL(before, harness.modules.bus.protocolOpCount());
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOn,
+                    harness.modules.bus.ops.back().tx[3]);
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "unavailable", false));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 2500", false));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "connected 2500", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
+                             "1 1", false));
+}
+
+void testSensorOnWithOpenJackPublishesDisconnected()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = false;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  const size_t afterConfirm = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterConfirm, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "disconnected", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 0", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
+                             "1", false));
+}
+
+void testSensorOffConfirmsAndSecondOffSkipsSet()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  setInputOn(harness.device, 0, 80);
+  plugAndPump(harness.modules, 0, harness.device);
+  learnInputs(harness, 1);
+  harness.client.deliver(kSensorCommandTopic, "1 1 off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOff,
+                    harness.modules.bus.ops.back().tx[3]);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "off", false));
+
+  harness.client.deliver(kSensorCommandTopic, "1 1 off");
+  const size_t before = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(before + 1, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+}
+
+void testSensorOnWhileAlreadyOnConfirmsWithoutSet()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  setInputOn(harness.device, 0, 80);
+  plugAndPump(harness.modules, 0, harness.device);
+  learnInputs(harness, 1);
+  harness.client.publishedMessages.clear();
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "connected 80", false));
+}
+
+void testSensorFaultIgnoresOnAndOffUntilReset()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorState[0] = module_protocol::kSensorStateFault;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "fault", false));
+
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  const size_t beforeOn = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(beforeOn + 1, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+
+  harness.client.deliver(kSensorCommandTopic, "1 1 off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+
+  harness.client.deliver(kSensorCommandTopic, "1 1 reset");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdResetSensor,
+                    lastCommand(harness.modules));
+  SensorState state = SensorState::Fault;
+  TEST_ASSERT_TRUE(harness.poller.sensorState(0, 0, &state));
+  TEST_ASSERT_TRUE(state == SensorState::Off);
+  const size_t afterReset = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterReset, harness.modules.bus.protocolOpCount());
+
+  harness.device.sensorState[0] = module_protocol::kSensorStateFault;
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  harness.client.deliver(kSensorCommandTopic, "1 1 reset");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdResetSensor,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOn,
+                    harness.modules.bus.ops.back().tx[3]);
+}
+
+void testPeriodicFaultIsNotReset()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  setInputOn(harness.device, 0, 12);
+  plugAndPump(harness.modules, 0, harness.device);
+  learnInputs(harness, 1);
+  harness.device.sensorState[0] = module_protocol::kSensorStateFault;
+  harness.clock.advance(60000);
+  const size_t before = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(before + 1, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "fault", false));
+  const size_t after = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(after, harness.modules.bus.protocolOpCount());
+}
+
+void testImmediateReadOfOffPublishesOff()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  harness.client.publishedMessages.clear();
+  harness.client.deliver(kSensorReadTopic, "1 1");
+  const size_t before = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(before, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/sensor/1"));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "off", false));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOff,
+                    harness.device.sensorState[0]);
+}
+
+void testSensorCommandRejectsMalformedPayload()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  const size_t learned = harness.modules.bus.protocolOpCount();
+  harness.client.deliver(kSensorCommandTopic, "1 1 maybe");
+  harness.client.deliver(kSensorCommandTopic, "on");
+  harness.client.deliver(kSensorCommandTopic, "1 on");
+  harness.client.deliver(kSensorCommandTopic, "1 1 ON");
+  harness.client.deliver(kSensorCommandTopic, "1 1 on extra");
+  harness.client.deliver(kSensorCommandTopic, "1 17 on");
+  harness.client.deliver(kSensorCommandTopic, "0 1 off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "connected 0", false));
+}
+
+void testFifthSensorReadIsDropped()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  harness.client.publishedMessages.clear();
+  for (int i = 0; i < 5; ++i)
+  {
+    harness.client.deliver(kSensorReadTopic, "1 1");
+  }
+  for (int i = 0; i < 4; ++i)
+  {
+    harness.poller.update();
+    harness.bridge.update();
+  }
+  TEST_ASSERT_EQUAL(4, countTopic(harness.client, "watering/slot/1/sensor/1"));
+  const size_t after = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(after, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(4, countTopic(harness.client, "watering/slot/1/sensor/1"));
+}
+
+void testSensorCommandKeepsDesiredAcrossNewIdentity()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  harness.device.sensorConnected[0] = true;
+  harness.device.sensorValue[0] = 1800;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
+                    lastCommand(harness.modules));
+
+  harness.device.sensorState[0] = module_protocol::kSensorStateOff;
+  harness.device.sensorAwaitingSample[0] = false;
+  harness.device.resetToUnconfigured();
+  pumpMs(harness.modules, 4000);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSensor, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSensorStateOn,
+                    harness.modules.bus.ops.back().tx[3]);
+}
+
+void testSensorCommandDropsDesiredWhenSlotChangesType()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 1;
+  plugAndPump(harness.modules, 0, harness.device);
+  harness.poller.update();
+  harness.poller.update();
+  harness.client.deliver(kSensorCommandTopic, "1 1 on");
+
+  harness.device.typeId = module_protocol::kTypeSolenoidModule;
+  harness.device.resetToUnconfigured();
+  pumpMs(harness.modules, 4000);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+  harness.poller.update();
+
+  harness.device.typeId = module_protocol::kTypeSensorModule;
+  harness.device.sensorState[0] = module_protocol::kSensorStateOff;
+  harness.device.sensorAwaitingSample[0] = false;
+  harness.device.resetToUnconfigured();
+  pumpMs(harness.modules, 4000);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+  TEST_ASSERT_EQUAL(module_protocol::kTypeSensorModule,
+                    harness.modules.host.typeId(0));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorCount,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
+                    lastCommand(harness.modules));
+  const size_t afterState = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterState, harness.modules.bus.protocolOpCount());
+}
+
+void testConnectedListNamesOnlyInputsThatAreOn()
+{
+  SensorHarness harness;
+  harness.device.sensorCount = 3;
+  setInputOn(harness.device, 0, 5);
+  harness.device.sensorState[1] = module_protocol::kSensorStateOff;
+  harness.device.sensorState[2] = module_protocol::kSensorStateDisconnected;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnInputs(harness, 3);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
+                             "3 1", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
+                             "connected 5", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/2",
+                             "off", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/3",
+                             "disconnected", false));
+  const int once = countTopic(harness.client, "watering/slot/1/sensors");
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client, "watering/slot/1/sensors"));
+  harness.client.deliver(kSensorConnectedTopic, "1");
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(once + 1,
+                    countTopic(harness.client, "watering/slot/1/sensors"));
 }
 
 // ========== Runner ==========
@@ -809,4 +1254,17 @@ void runSensorTests()
   RUN_TEST(testSensorConnectedListForEmptyAndAllAbsent);
   RUN_TEST(testSensorConnectedListFollowsPresenceChange);
   RUN_TEST(testSensorConnectedInventoryClearsWhenModuleUnplugged);
+  RUN_TEST(testBootPublishesOffAndDoesNotRead);
+  RUN_TEST(testSensorOnConfirmsStateThenPublishesReading);
+  RUN_TEST(testSensorOnWithOpenJackPublishesDisconnected);
+  RUN_TEST(testSensorOffConfirmsAndSecondOffSkipsSet);
+  RUN_TEST(testSensorOnWhileAlreadyOnConfirmsWithoutSet);
+  RUN_TEST(testSensorFaultIgnoresOnAndOffUntilReset);
+  RUN_TEST(testPeriodicFaultIsNotReset);
+  RUN_TEST(testImmediateReadOfOffPublishesOff);
+  RUN_TEST(testSensorCommandRejectsMalformedPayload);
+  RUN_TEST(testFifthSensorReadIsDropped);
+  RUN_TEST(testSensorCommandKeepsDesiredAcrossNewIdentity);
+  RUN_TEST(testSensorCommandDropsDesiredWhenSlotChangesType);
+  RUN_TEST(testConnectedListNamesOnlyInputsThatAreOn);
 }

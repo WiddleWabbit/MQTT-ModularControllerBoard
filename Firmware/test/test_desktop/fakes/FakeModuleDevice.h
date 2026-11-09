@@ -28,6 +28,9 @@ public:
   uint8_t sensorCount = 0;
   bool sensorConnected[module_protocol::kMaxSensorsPerModule] = {};
   int32_t sensorValue[module_protocol::kMaxSensorsPerModule] = {};
+  uint8_t sensorState[module_protocol::kMaxSensorsPerModule] = {};
+  bool sensorAwaitingSample[module_protocol::kMaxSensorsPerModule] = {};
+  uint8_t sensorStateBusyReads[module_protocol::kMaxSensorsPerModule] = {};
   bool shortSolenoidPayload = false;
   uint8_t solenoidCount = 0;
   uint8_t solenoidState[module_protocol::kMaxSolenoidsPerModule] = {};
@@ -212,7 +215,10 @@ public:
     }
     if (cmd == module_protocol::kCmdGetSensorCount ||
         cmd == module_protocol::kCmdGetSensorConnected ||
-        cmd == module_protocol::kCmdGetSensorReading)
+        cmd == module_protocol::kCmdGetSensorReading ||
+        cmd == module_protocol::kCmdGetSensorState ||
+        cmd == module_protocol::kCmdSetSensor ||
+        cmd == module_protocol::kCmdResetSensor)
     {
       if (shortSensorPayload)
       {
@@ -243,12 +249,66 @@ public:
         _writeStatus(rx, module_protocol::kStatusOk, body, 2);
         return I2cTxnStatus::Ok;
       }
-      uint8_t body[module_protocol::kSensorReadingPayloadLen];
-      body[0] = index;
-      body[1] = static_cast<uint8_t>(sensorConnected[index] ? 1 : 0);
-      module_protocol::writeInt32Be(body + 2, sensorValue[index]);
-      _writeStatus(rx, module_protocol::kStatusOk, body,
-                   module_protocol::kSensorReadingPayloadLen);
+      if (cmd == module_protocol::kCmdGetSensorReading)
+      {
+        uint8_t body[module_protocol::kSensorReadingPayloadLen];
+        body[0] = index;
+        body[1] = static_cast<uint8_t>(sensorConnected[index] ? 1 : 0);
+        module_protocol::writeInt32Be(body + 2, sensorValue[index]);
+        _writeStatus(rx, module_protocol::kStatusOk, body,
+                     module_protocol::kSensorReadingPayloadLen);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdSetSensor)
+      {
+        if (tx[0] < 4)
+        {
+          _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+          return I2cTxnStatus::Ok;
+        }
+        const uint8_t desired = tx[3];
+        if (desired != module_protocol::kSensorStateOff &&
+            desired != module_protocol::kSensorStateOn)
+        {
+          _writeStatus(rx, module_protocol::kStatusBadLength, nullptr, 0);
+          return I2cTxnStatus::Ok;
+        }
+        if (sensorState[index] == module_protocol::kSensorStateFault)
+        {
+          _replySensorState(rx, index);
+          return I2cTxnStatus::Ok;
+        }
+        if (desired == module_protocol::kSensorStateOff)
+        {
+          sensorState[index] = module_protocol::kSensorStateOff;
+          sensorAwaitingSample[index] = false;
+          _replySensorState(rx, index);
+          return I2cTxnStatus::Ok;
+        }
+        if (sensorState[index] == module_protocol::kSensorStateOff &&
+            !sensorAwaitingSample[index])
+        {
+          sensorAwaitingSample[index] = true;
+          _writeStatus(rx, module_protocol::kStatusBusy, nullptr, 0);
+          return I2cTxnStatus::Ok;
+        }
+        if (sensorAwaitingSample[index])
+        {
+          _writeStatus(rx, module_protocol::kStatusBusy, nullptr, 0);
+          return I2cTxnStatus::Ok;
+        }
+        _replySensorState(rx, index);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdResetSensor)
+      {
+        sensorState[index] = module_protocol::kSensorStateOff;
+        sensorAwaitingSample[index] = false;
+        sensorStateBusyReads[index] = 0;
+        _replySensorState(rx, index);
+        return I2cTxnStatus::Ok;
+      }
+      _replySensorState(rx, index);
       return I2cTxnStatus::Ok;
     }
     if (cmd == module_protocol::kCmdGetSolenoidCount ||
@@ -396,6 +456,37 @@ private:
     }
     return static_cast<uint32_t>(clock.millis() - _modLowSince) >=
            modAckDelayMs;
+  }
+
+  /**
+   * Replies with one input's state. A loop that just closed stays
+   * Busy until the held busy reads are spent, then becomes on or
+   * disconnected from the connected flag.
+   *
+   * @param rx Destination frame.
+   * @param index Zero-based input.
+   * @return Nothing.
+   */
+  void _replySensorState(uint8_t* rx, uint8_t index)
+  {
+    if (sensorAwaitingSample[index])
+    {
+      if (sensorStateBusyReads[index] > 0)
+      {
+        sensorStateBusyReads[index] =
+            static_cast<uint8_t>(sensorStateBusyReads[index] - 1);
+        _writeStatus(rx, module_protocol::kStatusBusy, nullptr, 0);
+        return;
+      }
+      sensorAwaitingSample[index] = false;
+      sensorState[index] = sensorConnected[index]
+                               ? module_protocol::kSensorStateOn
+                               : module_protocol::kSensorStateDisconnected;
+    }
+    const uint8_t body[module_protocol::kSensorStatePayloadLen] = {
+      index, sensorState[index]};
+    _writeStatus(rx, module_protocol::kStatusOk, body,
+                 module_protocol::kSensorStatePayloadLen);
   }
 
   /**

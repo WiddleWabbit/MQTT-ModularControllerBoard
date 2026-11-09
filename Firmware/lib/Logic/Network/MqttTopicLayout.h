@@ -11,7 +11,8 @@
  *
  * The device id is a single path segment. Slot 1 is "{id}/slot/1".
  * Command topics are "{id}/solenoids", "{id}/solenoids/connected",
- * "{id}/pump", "{id}/sensor/read", and "{id}/sensor/connected". The
+ * "{id}/pump", "{id}/sensor/read", "{id}/sensor/connected", and
+ * "{id}/sensor". The
  * id itself is chosen by the application; this object does not invent
  * a default.
  */
@@ -21,7 +22,7 @@ public:
   /**
    * Number of command topics subscribed at QoS 1.
    */
-  static const size_t kSubscriptionCount = 5;
+  static const size_t kSubscriptionCount = 6;
 
   /**
    * Creates a layout for one device id.
@@ -100,11 +101,18 @@ public:
   const char* sensorConnected() const;
 
   /**
-   * Returns the five QoS 1 command subscriptions.
+   * Returns the sensor on/off/reset topic.
+   *
+   * @return "{id}/sensor".
+   */
+  const char* sensorCommand() const;
+
+  /**
+   * Returns the six QoS 1 command subscriptions.
    *
    * The pointer stays valid until the next setDeviceId call. Order is
-   * solenoids, solenoids/connected, pump, sensor/read, then
-   * sensor/connected.
+   * solenoids, solenoids/connected, pump, sensor/read,
+   * sensor/connected, then sensor.
    *
    * @return Subscription array of kSubscriptionCount entries.
    */
@@ -125,6 +133,7 @@ private:
   std::string _pumpCommand;
   std::string _sensorRead;
   std::string _sensorConnected;
+  std::string _sensorCommand;
   MqttSubscription _subscriptions[kSubscriptionCount];
   uint32_t _generation;
 

@@ -75,6 +75,7 @@ watering/slot/N/pump
 watering/solenoids
 watering/solenoids/connected
 watering/pump
+watering/sensor
 watering/sensor/read
 watering/sensor/connected
 ```

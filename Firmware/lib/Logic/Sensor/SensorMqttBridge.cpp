@@ -17,7 +17,8 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
   _heldDemand.moduleSlot = 0;
   _heldDemand.sensorIndex = 0;
   _heldDemand.ok = false;
-  _heldDemand.connected = false;
+  _heldDemand.state = SensorState::Off;
+  _heldDemand.hasValue = false;
   _heldDemand.value = 0;
   for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
   {
@@ -137,8 +138,7 @@ bool readUnsigned(const char*& cursor, const char* end, unsigned* value)
 }
 
 /**
- * Parses a read command and enqueues it, or records a connected-list
- * request.
+ * Parses an on/off/reset, a read, or a connected-list request.
  *
  * @param topic Received topic.
  * @param payload Payload bytes.
@@ -150,6 +150,11 @@ void SensorMqttBridge::_handleMessage(const char* topic,
 {
   if (topic == nullptr)
   {
+    return;
+  }
+  if (std::strcmp(topic, _topics.sensorCommand()) == 0)
+  {
+    _handleCommand(payload, length);
     return;
   }
   if (std::strcmp(topic, _topics.sensorConnected()) == 0)
@@ -248,6 +253,104 @@ void SensorMqttBridge::_handleConnectedQuery(const uint8_t* payload,
   _inventoryPending[moduleNumber - 1] = true;
 }
 
+/**
+ * Parses an on, off, or reset for one input and records it.
+ *
+ * @param payload Payload bytes.
+ * @param length Payload length.
+ * @return Nothing.
+ */
+void SensorMqttBridge::_handleCommand(const uint8_t* payload, size_t length)
+{
+  if (payload == nullptr && length > 0)
+  {
+    return;
+  }
+  const char* cursor = reinterpret_cast<const char*>(payload);
+  const char* end = cursor + length;
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  unsigned moduleNumber = 0;
+  if (!readUnsigned(cursor, end, &moduleNumber))
+  {
+    return;
+  }
+  if (moduleNumber < 1 || moduleNumber > module_protocol::kSlotCount)
+  {
+    return;
+  }
+  if (cursor >= end || (*cursor != ' ' && *cursor != '\t'))
+  {
+    return;
+  }
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  unsigned sensorNumber = 0;
+  if (!readUnsigned(cursor, end, &sensorNumber))
+  {
+    return;
+  }
+  if (sensorNumber < 1 ||
+      sensorNumber > module_protocol::kMaxSensorsPerModule)
+  {
+    return;
+  }
+  if (cursor >= end || (*cursor != ' ' && *cursor != '\t'))
+  {
+    return;
+  }
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  const size_t remaining = static_cast<size_t>(end - cursor);
+  bool on = false;
+  bool reset = false;
+  if (remaining >= 2 && cursor[0] == 'o' && cursor[1] == 'n' &&
+      (remaining == 2 || cursor[2] == ' ' || cursor[2] == '\t'))
+  {
+    on = true;
+    cursor += 2;
+  }
+  else if (remaining >= 3 && cursor[0] == 'o' && cursor[1] == 'f' &&
+           cursor[2] == 'f' &&
+           (remaining == 3 || cursor[3] == ' ' || cursor[3] == '\t'))
+  {
+    cursor += 3;
+  }
+  else if (remaining >= 5 && cursor[0] == 'r' && cursor[1] == 'e' &&
+           cursor[2] == 's' && cursor[3] == 'e' && cursor[4] == 't' &&
+           (remaining == 5 || cursor[5] == ' ' || cursor[5] == '\t'))
+  {
+    reset = true;
+    cursor += 5;
+  }
+  else
+  {
+    return;
+  }
+  while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+  {
+    ++cursor;
+  }
+  if (cursor != end)
+  {
+    return;
+  }
+  const uint8_t moduleSlot = static_cast<uint8_t>(moduleNumber - 1);
+  const uint8_t sensorIndex = static_cast<uint8_t>(sensorNumber - 1);
+  if (reset)
+  {
+    _poller.commandReset(moduleSlot, sensorIndex);
+    return;
+  }
+  _poller.commandState(moduleSlot, sensorIndex, on);
+}
+
 
 // ========== Publication ==========
 
@@ -270,8 +373,13 @@ void SensorMqttBridge::_publishDemand()
   char payload[32];
   if (_heldDemand.ok)
   {
-    _formatReading(_heldDemand.connected, _heldDemand.value, payload,
-                   sizeof(payload));
+    if (_heldDemand.state == SensorState::On && !_heldDemand.hasValue)
+    {
+      _demandHeld = false;
+      return;
+    }
+    _formatState(_heldDemand.state, _heldDemand.hasValue, _heldDemand.value,
+                 payload, sizeof(payload));
   }
   else
   {
@@ -310,8 +418,9 @@ void SensorMqttBridge::_publishSnapshots()
          ++index)
     {
       char payload[32];
-      if (!active || index >= count ||
-          !_formatSample(slot, index, payload, sizeof(payload)))
+      SensorState state = SensorState::Off;
+      const bool known = _poller.sensorState(slot, index, &state);
+      if (!active || index >= count || !known)
       {
         if (_publishedOk[slot][index] &&
             std::strcmp(_published[slot][index], "unavailable") != 0)
@@ -322,6 +431,10 @@ void SensorMqttBridge::_publishSnapshots()
                           sizeof(_published[slot][index]), "unavailable");
           }
         }
+        continue;
+      }
+      if (!_formatSample(slot, index, payload, sizeof(payload)))
+      {
         continue;
       }
       const uint32_t revision = _poller.sampleRevision(slot, index);
@@ -486,6 +599,11 @@ bool SensorMqttBridge::_publish(uint8_t moduleSlot, uint8_t sensorIndex,
 bool SensorMqttBridge::_formatSample(uint8_t moduleSlot, uint8_t sensorIndex,
                                      char* out, size_t outCap) const
 {
+  SensorState state = SensorState::Off;
+  if (!_poller.sensorState(moduleSlot, sensorIndex, &state))
+  {
+    return false;
+  }
   bool connected = false;
   bool hasValue = false;
   int32_t value = 0;
@@ -494,29 +612,48 @@ bool SensorMqttBridge::_formatSample(uint8_t moduleSlot, uint8_t sensorIndex,
   {
     return false;
   }
-  if (connected && !hasValue)
+  if (state == SensorState::On && !hasValue)
   {
     return false;
   }
-  _formatReading(connected, value, out, outCap);
+  _formatState(state, hasValue, value, out, outCap);
   return true;
 }
 
 /**
- * Formats a successful reading payload.
+ * Formats the text for one stored state.
+ * An on input uses its raw value. The caller skips an on input
+ * that does not have a value yet.
  *
- * @param connected Presence flag.
- * @param value Raw value, used only when connected is true.
+ * @param state Stored state.
+ * @param hasValue True when value is a stored reading.
+ * @param value Raw value, used only when state is on.
  * @param out Destination buffer.
  * @param outCap Destination capacity.
  * @return Nothing.
  */
-void SensorMqttBridge::_formatReading(bool connected, int32_t value, char* out,
-                                      size_t outCap)
+void SensorMqttBridge::_formatState(SensorState state, bool hasValue,
+                                    int32_t value, char* out,
+                                    size_t outCap)
 {
-  if (!connected)
+  if (state == SensorState::Off)
+  {
+    std::snprintf(out, outCap, "off");
+    return;
+  }
+  if (state == SensorState::Fault)
+  {
+    std::snprintf(out, outCap, "fault");
+    return;
+  }
+  if (state == SensorState::Disconnected)
   {
     std::snprintf(out, outCap, "disconnected");
+    return;
+  }
+  if (!hasValue)
+  {
+    std::snprintf(out, outCap, "off");
     return;
   }
   std::snprintf(out, outCap, "connected %ld", static_cast<long>(value));

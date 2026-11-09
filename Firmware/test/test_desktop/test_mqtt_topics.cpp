@@ -17,6 +17,7 @@ void testMqttTopicLayoutBuildsPlantRoomTopics()
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/read", topics.sensorRead());
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/connected",
                            topics.sensorConnected());
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor", topics.sensorCommand());
   TEST_ASSERT_EQUAL(MqttTopicLayout::kSubscriptionCount,
                     topics.subscriptionCount());
 
@@ -33,6 +34,8 @@ void testMqttTopicLayoutBuildsPlantRoomTopics()
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/connected",
                            subscriptions[4].topic);
   TEST_ASSERT_EQUAL(1, subscriptions[4].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor", subscriptions[5].topic);
+  TEST_ASSERT_EQUAL(1, subscriptions[5].qos);
 }
 
 void testMqttTopicLayoutSetDeviceIdBumpsGenerationOnce()
@@ -57,6 +60,7 @@ void testMqttTopicLayoutSetDeviceIdBumpsGenerationOnce()
   TEST_ASSERT_EQUAL_STRING("shed/pump", topics.pumpCommand());
   TEST_ASSERT_EQUAL_STRING("shed/sensor/read", topics.sensorRead());
   TEST_ASSERT_EQUAL_STRING("shed/sensor/connected", topics.sensorConnected());
+  TEST_ASSERT_EQUAL_STRING("shed/sensor", topics.sensorCommand());
   TEST_ASSERT_EQUAL_STRING("shed/solenoids",
                            topics.subscriptions()[0].topic);
 }

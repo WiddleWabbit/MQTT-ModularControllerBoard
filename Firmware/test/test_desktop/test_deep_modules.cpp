@@ -486,7 +486,7 @@ void testNetworkUpdateConnectsMqttOnlyAfterWifi()
   TEST_ASSERT_EQUAL_STRING("", kit.mqtt.lastUsername.c_str());
   TEST_ASSERT_EQUAL_STRING("broker.local", kit.mqtt.brokerHost.c_str());
   TEST_ASSERT_EQUAL(1883, kit.mqtt.brokerPort);
-  TEST_ASSERT_EQUAL(5, kit.mqtt.subscribeCallCount);
+  TEST_ASSERT_EQUAL(6, kit.mqtt.subscribeCallCount);
   TEST_ASSERT_EQUAL_STRING("watering/solenoids",
                            kit.mqtt.subscribedTopics[0].c_str());
   TEST_ASSERT_EQUAL_STRING("watering/solenoids/connected",
@@ -497,6 +497,8 @@ void testNetworkUpdateConnectsMqttOnlyAfterWifi()
                            kit.mqtt.subscribedTopics[3].c_str());
   TEST_ASSERT_EQUAL_STRING("watering/sensor/connected",
                            kit.mqtt.subscribedTopics[4].c_str());
+  TEST_ASSERT_EQUAL_STRING("watering/sensor",
+                           kit.mqtt.subscribedTopics[5].c_str());
   TEST_ASSERT_EQUAL(1, kit.mqtt.subscribedQos[0]);
 
   kit.network.update();
@@ -530,7 +532,7 @@ void testNetworkReconnectsAfterWifiDropUsingBackoff()
 
   kit.network.update();
   TEST_ASSERT_EQUAL(2, kit.mqtt.connectCallCount);
-  TEST_ASSERT_EQUAL(10, kit.mqtt.subscribeCallCount);
+  TEST_ASSERT_EQUAL(12, kit.mqtt.subscribeCallCount);
 }
 
 void testNetworkPublishFollowsBrokerConnection()
@@ -734,7 +736,7 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
   board.network.update();
   const char* last =
     board.mqtt.subscribedTopics.back().c_str();
-  TEST_ASSERT_EQUAL_STRING("shed/sensor/connected", last);
+  TEST_ASSERT_EQUAL_STRING("shed/sensor", last);
   board.bus.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/1", "Empty", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/4", "Empty", true));
@@ -766,6 +768,7 @@ void testSensorModulePublishesReadingOnTheSameUpdate()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeSensorModule;
   device.sensorCount = 1;
+  device.sensorState[0] = module_protocol::kSensorStateOn;
   device.sensorConnected[0] = true;
   device.sensorValue[0] = 10;
   const SeatResult seated =
@@ -781,7 +784,7 @@ void testSensorModulePublishesReadingOnTheSameUpdate()
                               "connected 10", false));
 
   board.sensor.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(board.slots.i2c));
   board.sensor.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
@@ -804,6 +807,7 @@ void testSensorModuleReadCommandAndMalformedPayload()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeSensorModule;
   device.sensorCount = 1;
+  device.sensorState[0] = module_protocol::kSensorStateOn;
   device.sensorConnected[0] = true;
   device.sensorValue[0] = 10;
   TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
@@ -854,6 +858,7 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeSensorModule;
   device.sensorCount = 1;
+  device.sensorState[0] = module_protocol::kSensorStateDisconnected;
   device.sensorConnected[0] = false;
   device.sensorValue[0] = 0;
   TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
@@ -868,11 +873,12 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   board.sensor.update();
   TEST_ASSERT_EQUAL(afterCycle, board.slots.i2c.protocolOpCount());
 
+  device.sensorState[0] = module_protocol::kSensorStateOn;
   device.sensorConnected[0] = true;
   device.sensorValue[0] = -5;
   board.clock.advance(1);
   board.sensor.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorConnected,
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorState,
                     lastCommand(board.slots.i2c));
   board.sensor.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSensorReading,
@@ -901,6 +907,10 @@ void testSensorModulePublishesConnectedList()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeSensorModule;
   device.sensorCount = 4;
+  device.sensorState[0] = module_protocol::kSensorStateOn;
+  device.sensorState[1] = module_protocol::kSensorStateOn;
+  device.sensorState[2] = module_protocol::kSensorStateDisconnected;
+  device.sensorState[3] = module_protocol::kSensorStateOn;
   device.sensorConnected[0] = true;
   device.sensorConnected[1] = true;
   device.sensorConnected[2] = false;

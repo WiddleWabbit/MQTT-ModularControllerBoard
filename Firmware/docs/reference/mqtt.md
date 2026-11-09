@@ -10,7 +10,7 @@ This page is the command catalog. It lists every subscription and every publicat
 
 ## Purpose
 
-`MqttTopicLayout` builds five QoS 1 subscriptions. `MqttService` subscribes after the broker connection succeeds, and it stays connected only when every subscribe succeeds. Sensor, solenoid, and pump each register one handler. The sensor handler serves both sensor topics. The solenoid handler serves both solenoid topics.
+`MqttTopicLayout` builds six QoS 1 subscriptions. `MqttService` subscribes after the broker connection succeeds, and it stays connected only when every subscribe succeeds. Sensor, solenoid, and pump each register one handler. The sensor handler serves `{id}/sensor`, `{id}/sensor/read`, and `{id}/sensor/connected`. The solenoid handler serves both solenoid topics.
 
 Outbound publishes are QoS 0. `IMqttClient::publish` has no QoS argument, and `PubSubClient`'s publish sets the retain bit only.
 
@@ -20,8 +20,9 @@ Publish a command with retain off. A retained command is delivered again each ti
 
 | You want                                   | Publish to                 | Payload                       | Result arrives on                              |
 | ------------------------------------------ | -------------------------- | ----------------------------- | ---------------------------------------------- |
+| Turn one sensor input on, off, or reset it | `{id}/sensor`              | `1 2 on`                      | `{id}/slot/1/sensor/2`                         |
 | One sensor reading                         | `{id}/sensor/read`         | `1 2`                         | `{id}/slot/1/sensor/2`                         |
-| Which sensor inputs are connected          | `{id}/sensor/connected`    | `1`                           | `{id}/slot/1/sensors`                          |
+| Which sensor inputs are on                 | `{id}/sensor/connected`    | `1`                           | `{id}/slot/1/sensors`                          |
 | Desired state of every solenoid output     | `{id}/solenoids`           | `1 on on off off`             | `{id}/slot/1/solenoid/1` and the other outputs |
 | Which solenoid outputs are connected       | `{id}/solenoids/connected` | `1`                           | `{id}/slot/1/solenoids`                        |
 | Pump on, off, or reset                     | `{id}/pump`                | `1 on`                        | `{id}/slot/1/pump`                             |
@@ -44,7 +45,7 @@ A new subscriber receives the last retained slot line from the broker. Sensor, s
 
 ## Subscriptions
 
-All five are QoS 1. They are not stored in NVS. `set mqtt.prefix` rebuilds the list under the new root.
+All six are QoS 1. They are not stored in NVS. `set mqtt.prefix` rebuilds the list under the new root.
 
 | Topic | Payload | Handler |
 | --- | --- | --- |
@@ -53,6 +54,7 @@ All five are QoS 1. They are not stored in NVS. `set mqtt.prefix` rebuilds the l
 | `{id}/pump` | `N on`, `N off`, or `N reset` | Pump bridge |
 | `{id}/sensor/read` | `N M` | Sensor bridge |
 | `{id}/sensor/connected` | `N` | Sensor bridge, same handler |
+| `{id}/sensor` | `N M on`, `N M off`, or `N M reset` | Sensor bridge, same handler |
 
 Words are lowercase. Separators are spaces or tabs. Leading and trailing spaces and tabs are accepted. A `+`, a sign, a decimal point, or an empty payload is ignored. An ignored command publishes nothing.
 
@@ -66,17 +68,35 @@ Asks for one reading. `1 2` is slot 1, sensor 2.
 mosquitto_pub -h <broker> -t watering/sensor/read -q 1 -m "1 2"
 ```
 
-The result is published on `{id}/slot/N/sensor/M` with retain off:
+The result is published on `{id}/slot/N/sensor/M` with retain off. A read does not turn the input on. Off, fault, and disconnected publish that word and do not take a reading. On publishes the raw value:
 
 ```text
+off
+fault
+disconnected
 connected 2500
 connected -4
-disconnected
 ```
 
-`connected` is followed by one raw int32. `disconnected` has no value.
+`connected` is followed by one raw int32. There is no payload word `on`.
 
 A read that cannot be done publishes `unavailable` on that same topic with retain off. The request waits while the slot is still coming online or the count is not known yet. Up to four reads can wait. A fifth, while four are waiting, is dropped.
+
+Behaviour: [sensor reference](sensor-module.md).
+
+### `{id}/sensor`
+
+Turns one input on or off, or resets a fault. `1 2 on` is slot 1, sensor 2, desired on.
+
+```text
+mosquitto_pub -h <broker> -t watering/sensor -q 1 -m "1 2 on"
+mosquitto_pub -h <broker> -t watering/sensor -q 1 -m "1 2 off"
+mosquitto_pub -h <broker> -t watering/sensor -q 1 -m "1 2 reset"
+```
+
+The words are lowercase `on`, `off`, and `reset`. The result is published on `{id}/slot/N/sensor/M` with retain off, using the same words as a reading. After `on` or `off`, the controller reads the state on the next passes, and it reads the value when that state is on, without waiting for the 60 second cycle. `reset` is the only command that clears a fault. The input is left off. If it is still desired on, a later pass turns it on. There is no silence timer.
+
+`ON`, a missing word, an extra token, a slot outside 1..4, and a sensor outside 1..16 are ignored and publish nothing.
 
 Behaviour: [sensor reference](sensor-module.md).
 
@@ -88,7 +108,7 @@ Asks for the connected-input list of one slot. The payload is the slot number al
 mosquitto_pub -h <broker> -t watering/sensor/connected -q 1 -m "1"
 ```
 
-The result is published on `{id}/slot/N/sensors` with retain off. The text is the count, then each connected index, 1-based, separated by a single space:
+The result is published on `{id}/slot/N/sensors` with retain off. The text is the count, then each index whose state is on, 1-based, separated by a single space:
 
 ```text
 2 1
@@ -97,7 +117,7 @@ The result is published on `{id}/slot/N/sensors` with retain off. The text is th
 4 1 2 4
 ```
 
-`2 1` is two inputs, and input 1 is connected. `0` is a count of 0. `4` is four inputs, none connected. An extra token is ignored. The list is sent when the count and every presence are known. An unchanged list is sent again when this command asks.
+`2 1` is two inputs, and input 1 is on. `0` is a count of 0. `4` is four inputs, none on. Off, fault, and disconnected are left out. An extra token is ignored. The list is sent when the count and every state are known. An unchanged list is sent again when this command asks.
 
 Behaviour: [sensor reference](sensor-module.md).
 
@@ -191,7 +211,7 @@ A reading or a solenoid or pump state is published again each time a new sample 
 
 `unavailable` is published with retain off when that point disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
 
-A count query publishes nothing by itself. A sensor presence query publishes nothing on the reading topic. It can publish `{id}/slot/N/sensors` when the list becomes complete or the connected set changes.
+A count query publishes nothing by itself. A sensor state query can publish `off`, `fault`, or `disconnected` on `{id}/slot/N/sensor/M`, and it can publish `{id}/slot/N/sensors` when the list becomes complete or the set of inputs that are on changes. On does not publish a reading until the value is stored.
 
 Slot text and the retry rule: [module bus reference](module-bus.md).
 
@@ -213,6 +233,7 @@ An ignored command publishes no result. It does not change the retained slot lin
 | --- | --- |
 | Empty, a slot of 0, a slot above 4, or a trailing extra word | Ignored |
 | `{id}/sensor/read` with one number, or a sensor above 16 | Ignored |
+| `{id}/sensor` with `ON`, a missing word, or an extra token | Ignored |
 | `{id}/solenoids` with `ON`, `disconnected`, or no on/off word | Ignored |
 | `{id}/solenoids` with 1..16 words, and that count is not the module count | Recorded, absence window restarted, states not applied |
 | `{id}/solenoids` with more than 16 on/off words | Ignored |
@@ -229,7 +250,7 @@ While an ISP session is active, `Network` still delivers commands, and the handl
 | Item | Value |
 | --- | --- |
 | Default `{id}` | `kMqttDeviceId` = `watering` |
-| Subscriptions | 5, all QoS 1 (`kSubscriptionCount`) |
+| Subscriptions | 6, all QoS 1 (`kSubscriptionCount`) |
 | Inbound handlers | 4 accepted, 3 registered (`kMaxInboundHandlers`) |
 | Outbound QoS | 0 |
 | Broker port default | `1883`, from `main.cpp` |
@@ -239,14 +260,14 @@ A new command topic means raising `kSubscriptionCount`. One handler may serve mo
 
 ## Tests
 
-- `test/test_desktop/test_mqtt_topics.cpp` — the five topic strings and the generation counter.
+- `test/test_desktop/test_mqtt_topics.cpp` — the six topic strings and the generation counter.
 - `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, a new prefix.
 - `test/test_desktop/test_sensor.cpp`, `test_solenoid.cpp`, and `test_pump.cpp` — result payloads with retain off.
-- `test/test_desktop/test_sensor.cpp` — read, connected list, malformed payloads, `unavailable`.
+- `test/test_desktop/test_sensor.cpp` — on, off, reset, the state confirm, read, connected list, malformed payloads, `unavailable`.
 - `test/test_desktop/test_solenoid.cpp` — desired state, inventory, the absence window.
 - `test/test_desktop/test_pump.cpp` — on, off, reset, the absence window.
-- `test/test_desktop/test_deep_modules.cpp` — the five subscribes through `Network`, and each module `update()`.
+- `test/test_desktop/test_deep_modules.cpp` — the six subscribes through `Network`, and each module `update()`.
 
 ## Source
 
-`lib/Logic/Network/MqttTopicLayout.cpp` builds the topic strings. `lib/Logic/Network/MqttService.cpp` subscribes and publishes. `lib/Drivers/PubSubClientAdapter.cpp` forwards publish with the retain flag and no QoS. The payload formatters are `_formatReading` and `_formatInventory` in `SensorMqttBridge.cpp`, `_formatState` and `_formatInventory` in `SolenoidMqttBridge.cpp`, `_formatState` in `PumpMqttBridge.cpp`, and `writeSlotStatusBody` in `SlotStatusText.cpp`.
+`lib/Logic/Network/MqttTopicLayout.cpp` builds the topic strings. `lib/Logic/Network/MqttService.cpp` subscribes and publishes. `lib/Drivers/PubSubClientAdapter.cpp` forwards publish with the retain flag and no QoS. The payload formatters are `_formatState` and `_formatInventory` in `SensorMqttBridge.cpp`, `_formatState` and `_formatInventory` in `SolenoidMqttBridge.cpp`, `_formatState` in `PumpMqttBridge.cpp`, and `writeSlotStatusBody` in `SlotStatusText.cpp`.

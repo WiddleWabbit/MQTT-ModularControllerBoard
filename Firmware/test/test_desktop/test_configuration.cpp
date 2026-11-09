@@ -1070,7 +1070,7 @@ void testMqttPrefixStagesUntilApplyAndRestartsMqttOnly()
   TEST_ASSERT_EQUAL(mqttDisconnects + 1, stack.mqttClient.disconnectCallCount);
 
   const MqttConfig& mqtt = stack.mqttService.config();
-  TEST_ASSERT_EQUAL(5, mqtt.subscriptionCount);
+  TEST_ASSERT_EQUAL(6, mqtt.subscriptionCount);
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids", mqtt.subscriptions[0].topic);
   TEST_ASSERT_EQUAL(1, mqtt.subscriptions[0].qos);
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids/connected",
@@ -1083,6 +1083,8 @@ void testMqttPrefixStagesUntilApplyAndRestartsMqttOnly()
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/connected",
                            mqtt.subscriptions[4].topic);
   TEST_ASSERT_EQUAL(1, mqtt.subscriptions[4].qos);
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor", mqtt.subscriptions[5].topic);
+  TEST_ASSERT_EQUAL(1, mqtt.subscriptions[5].qos);
   TEST_ASSERT_EQUAL_STRING("plant-room/slot", stack.topics.slotPrefix());
 }
 
@@ -1251,7 +1253,7 @@ void testBootAppliesStoredPrefixToSubscriptions()
   TEST_ASSERT_EQUAL(2, topics.generation());
   TEST_ASSERT_EQUAL_STRING("plant-room/slot", topics.slotPrefix());
   const MqttConfig& active = mqtt.config();
-  TEST_ASSERT_EQUAL(5, active.subscriptionCount);
+  TEST_ASSERT_EQUAL(6, active.subscriptionCount);
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids", active.subscriptions[0].topic);
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids/connected",
                            active.subscriptions[1].topic);
@@ -1260,6 +1262,7 @@ void testBootAppliesStoredPrefixToSubscriptions()
                            active.subscriptions[3].topic);
   TEST_ASSERT_EQUAL_STRING("plant-room/sensor/connected",
                            active.subscriptions[4].topic);
+  TEST_ASSERT_EQUAL_STRING("plant-room/sensor", active.subscriptions[5].topic);
 }
 
 

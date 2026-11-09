@@ -4,21 +4,21 @@
 
 ## Summary
 
-`SensorModule` talks to daughter boards of type `0x0200`. A board reports up to 16 inputs. The module learns that count when the board is identified, then reads presence and a raw value for each input. Every stored reading is published, including a repeated value.
+`SensorModule` talks to daughter boards of type `0x0200`. A board reports up to 16 inputs. Each input stays off until `{id}/sensor` turns it on. The module reads that input's state, and it reads a raw value only while the state is on. Off, fault, and an empty jack are published from the state. A fault stays until an MQTT reset.
 
 Wire indexes are 0-based. MQTT slot and sensor numbers are 1-based. The controller does not scale the value.
 
 ## Where it sits
 
-`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, and `kSensorPollIntervalMs` (60 seconds). The constructor registers the handler for `{id}/sensor/read` and `{id}/sensor/connected`, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
+`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, and `kSensorPollIntervalMs` (60 seconds). The constructor registers one handler for `{id}/sensor`, `{id}/sensor/read`, and `{id}/sensor/connected`, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
 
 ## What it creates
 
 ```text
 main.cpp
   SensorModule
-    SensorPoller         one query per pass; per-slot count, samples, and timer
-    SensorMqttBridge     publishes stored readings and the connected list
+    SensorPoller         one query per pass; per-slot count, desired state, and samples
+    SensorMqttBridge     records commands and publishes stored state
 ```
 
 `ModuleHost`, inside the bus, is the only I2C caller. The poller's exchange is separate from the one transaction inside `moduleBus.update()`.
@@ -28,19 +28,21 @@ main.cpp
 ```mermaid
 flowchart TD
   upd["SensorModule.update()"] --> poll["SensorPoller: at most one exchange"]
-  poll --> order["Immediate read, else a missing count, else the next cycle step"]
-  order --> mem["Store the count or the sample"]
+  poll --> order["Count, reset, set, confirm state, reading if on, else the state cycle"]
+  order --> mem["Store the count or the state"]
   mem --> bridge["SensorMqttBridge"]
-  bridge --> pub{"A reading was stored, or the connected list changed?"}
-  pub -->|yes| mqtt["Publish the reading and the list with retain off"]
+  bridge --> pub{"A state or reading was stored, or the connected list changed?"}
+  pub -->|yes| mqtt["Publish with retain off"]
   pub -->|no| quiet["Do not repeat them"]
 ```
 
-The callback for `{id}/sensor/read` only enqueues a slot and a sensor index. The poller sends `GET_SENSOR_READING` on a later pass. While the count is still unknown, that request waits and the count query runs instead. `{id}/sensor/connected` only asks for the connected-input list. It does not enqueue a reading.
+`{id}/sensor` with `N M on`, `N M off`, or `N M reset` only records the request. The poller sends `SET_SENSOR` or `RESET_SENSOR` on a later pass, then reads `GET_SENSOR_STATE` on the next passes. An on result is followed by `GET_SENSOR_READING`, so the value is published without waiting out `kSensorPollIntervalMs`. `{id}/sensor/read` asks for one input and does not turn it on. `{id}/sensor/connected` only asks for the list of inputs whose state is on.
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, samples, revision, and poll timer. The bridge reads those and publishes `{id}/slot/N/sensor/M` when a reading was stored, and `{id}/slot/N/sensors` as the count plus the connected indexes. Those publishes are not retained. A retained reading stayed on the broker after the board was removed, and a new subscriber received it as if the input were still there. `{id}/slot/N` stays retained. Unplug publishes `unavailable` once, with retain off, for that slot's inputs and for its list. Another slot keeps its own cache. The retain rule is in the [sensor reference](reference/sensor-module.md).
+Each slot keeps its own count, the desired on or off for each input, a pending reset, the last state, and a reading when that state is on. The bridge publishes `{id}/slot/N/sensor/M` from that store, and `{id}/slot/N/sensors` as the count plus the indexes whose state is on. Those publishes are not retained. Unplug publishes `unavailable` once, with retain off. Another slot keeps its own cache.
+
+There is no silence timer. An input that was turned on stays on until an off command, a fault, or the slot is cleared. On and off are ignored while the input is faulted. `reset` is the only command that clears a fault, and the module leaves that input off. If it is still desired on, a later pass sends `SET_SENSOR` on.
 
 Serial status prints the slot line (`Online Sensor addr=0x10`). It does not print individual inputs.
 
