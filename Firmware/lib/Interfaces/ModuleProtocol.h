@@ -68,15 +68,27 @@ constexpr uint8_t kCmdSetAddress = 0x03;
 constexpr uint8_t kCmdEcho = 0x40;
 
 // Sensor module (type 0x0200) commands. Other types are not required
-// to implement these. Requests for connected/reading carry a 0-based
-// sensor index. Responses are big-endian.
+// to implement these. Requests for one sensor carry a 0-based index.
+// Responses are big-endian. State bytes are kSensorStateOff,
+// kSensorStateOn, kSensorStateFault, and kSensorStateDisconnected.
+// SET_SENSOR accepts only off or on. RESET_SENSOR is a separate
+// command and leaves that sensor off.
 constexpr uint8_t kCmdGetSensorCount = 0x41;
 constexpr uint8_t kCmdGetSensorConnected = 0x42;
 constexpr uint8_t kCmdGetSensorReading = 0x43;
+constexpr uint8_t kCmdGetSensorState = 0x44;
+constexpr uint8_t kCmdSetSensor = 0x45;
+constexpr uint8_t kCmdResetSensor = 0x46;
 constexpr uint8_t kMaxSensorsPerModule = 16;
 constexpr uint8_t kSensorCountPayloadLen = 1;
 constexpr uint8_t kSensorConnectedPayloadLen = 2;
 constexpr uint8_t kSensorReadingPayloadLen = 6;
+constexpr uint8_t kSensorStatePayloadLen = 2;
+constexpr uint8_t kSensorSetPayloadLen = 2;
+constexpr uint8_t kSensorStateOff = 0;
+constexpr uint8_t kSensorStateOn = 1;
+constexpr uint8_t kSensorStateFault = 2;
+constexpr uint8_t kSensorStateDisconnected = 3;
 
 // Solenoid module (type 0x0100) commands. Other types are not required
 // to implement these. Indexes are 0-based. State bytes are

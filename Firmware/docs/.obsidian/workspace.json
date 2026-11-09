@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "architecture.md",
+                "file": "reference/sensor-module.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "architecture"
+              "title": "sensor-module"
             }
           }
         ]
@@ -190,22 +190,22 @@
   },
   "active": "f51934d8476ef699",
   "lastOpenFiles": [
+    "reference/solenoid-module.md",
+    "reference/sensor-module.md",
     "reference/pump-module.md",
+    "reference/mqtt.md",
+    "architecture.md",
     "reference/programming.md",
     "programming.md",
     "module-bus.md",
     "networking.md",
     "configuration.md",
-    "reference/sensor-module.md",
-    "reference/mqtt.md",
     "reference/module-bus.md",
     "reference/index.md",
     "reference/configuration.md",
     "reference/networking.md",
-    "reference/solenoid-module.md",
     "sensor-module.md",
     "home.md",
-    "architecture.md",
     "Home.md",
     "SENSORMODULE.md",
     "home-renametmp.md",

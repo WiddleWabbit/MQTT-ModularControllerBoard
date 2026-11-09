@@ -28,6 +28,8 @@ Indexes on the wire are 0-based. Module numbers and sensor numbers in MQTT are 1
 
 `value` is a raw module unit. This firmware does not scale it or attach a unit.
 
+`ModuleProtocol.h` also defines `GET_SENSOR_STATE` (`0x44`), `SET_SENSOR` (`0x45`), and `RESET_SENSOR` (`0x46`). A state byte is off (`0`), on (`1`), fault (`2`), or disconnected (`3`). `SET_SENSOR` carries an index and off or on. `RESET_SENSOR` carries an index. This poller does not send these three commands.
+
 ## Sequences
 
 A first connection, and a module that is identified again, both start with `GET_SENSOR_COUNT`. Each successful identify is a new session. The previous count and samples are forgotten.
