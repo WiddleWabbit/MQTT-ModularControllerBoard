@@ -72,6 +72,10 @@ watering/slot/N/sensors
 watering/slot/N/solenoid/M
 watering/slot/N/solenoids
 watering/slot/N/pump
+watering/slot/N/pump/now
+watering/slot/N/pump/cycle
+watering/slot/N/pump/totals
+watering/slot/N/pump/fault
 watering/solenoids
 watering/solenoids/connected
 watering/pump

@@ -37,6 +37,27 @@ public:
   bool shortPumpPayload = false;
   uint8_t pumpState = module_protocol::kPumpStateOff;
   bool pumpResetLeavesFault = false;
+  uint8_t pumpPhase = module_protocol::kPumpPhaseOff;
+  uint8_t pumpFlags = 0;
+  uint16_t pumpMillivolts = 0;
+  uint16_t pumpMilliamps = 0;
+  uint16_t pumpRunSeconds = 0;
+  uint16_t pumpCyclePeakMillivolts = 0;
+  uint16_t pumpCycleMinimumMillivolts = 0;
+  uint16_t pumpCyclePeakMilliamps = 0;
+  uint16_t pumpCycleAverageMillivolts = 0;
+  uint16_t pumpCycleAverageMilliamps = 0;
+  uint16_t pumpCycleSoftStartMs = 0;
+  uint16_t pumpCyclePowerGoodMs = 0;
+  uint16_t pumpCycleRunSeconds = 0;
+  uint32_t pumpCompletedCycles = 0;
+  uint32_t pumpTotalSeconds = 0;
+  uint16_t pumpLifetimePeakMillivolts = 0;
+  uint16_t pumpLifetimePeakMilliamps = 0;
+  uint16_t pumpFailedStarts = 0;
+  uint16_t pumpLastRunSeconds = 0;
+  uint8_t pumpFaultReason = module_protocol::kFaultNone;
+  uint8_t pumpFaultIndex = 0;
   uint8_t identityLengthField = module_protocol::kIdentityLengthField;
   int nackRemaining = 0;
   bool nackIdentity = false;
@@ -406,6 +427,62 @@ public:
       _writeStatus(rx, module_protocol::kStatusOk, &pumpState, 1);
       return I2cTxnStatus::Ok;
     }
+    if (cmd == module_protocol::kCmdGetPumpNow ||
+        cmd == module_protocol::kCmdGetPumpCycle ||
+        cmd == module_protocol::kCmdGetPumpTotals ||
+        cmd == module_protocol::kCmdGetFault)
+    {
+      if (shortPumpPayload)
+      {
+        _writeStatus(rx, module_protocol::kStatusOk, nullptr, 0);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetFault)
+      {
+        const uint8_t body[module_protocol::kFaultPayloadLen] = {
+          pumpFaultReason, pumpFaultIndex};
+        _writeStatus(rx, module_protocol::kStatusOk, body,
+                     module_protocol::kFaultPayloadLen);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetPumpNow)
+      {
+        uint8_t body[module_protocol::kPumpNowPayloadLen];
+        body[0] = pumpPhase;
+        body[1] = pumpFlags;
+        _putU16(body + 2, pumpMillivolts);
+        _putU16(body + 4, pumpMilliamps);
+        _putU16(body + 6, pumpRunSeconds);
+        _writeStatus(rx, module_protocol::kStatusOk, body,
+                     module_protocol::kPumpNowPayloadLen);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetPumpCycle)
+      {
+        uint8_t body[module_protocol::kPumpCyclePayloadLen];
+        _putU16(body, pumpCyclePeakMillivolts);
+        _putU16(body + 2, pumpCycleMinimumMillivolts);
+        _putU16(body + 4, pumpCyclePeakMilliamps);
+        _putU16(body + 6, pumpCycleAverageMillivolts);
+        _putU16(body + 8, pumpCycleAverageMilliamps);
+        _putU16(body + 10, pumpCycleSoftStartMs);
+        _putU16(body + 12, pumpCyclePowerGoodMs);
+        _putU16(body + 14, pumpCycleRunSeconds);
+        _writeStatus(rx, module_protocol::kStatusOk, body,
+                     module_protocol::kPumpCyclePayloadLen);
+        return I2cTxnStatus::Ok;
+      }
+      uint8_t body[module_protocol::kPumpTotalsPayloadLen];
+      _putU32(body, pumpCompletedCycles);
+      _putU32(body + 4, pumpTotalSeconds);
+      _putU16(body + 8, pumpLifetimePeakMillivolts);
+      _putU16(body + 10, pumpLifetimePeakMilliamps);
+      _putU16(body + 12, pumpFailedStarts);
+      _putU16(body + 14, pumpLastRunSeconds);
+      _writeStatus(rx, module_protocol::kStatusOk, body,
+                   module_protocol::kPumpTotalsPayloadLen);
+      return I2cTxnStatus::Ok;
+    }
 
     _writeStatus(rx, module_protocol::kStatusUnknownCmd, nullptr, 0);
     return I2cTxnStatus::Ok;
@@ -487,6 +564,34 @@ private:
       index, sensorState[index]};
     _writeStatus(rx, module_protocol::kStatusOk, body,
                  module_protocol::kSensorStatePayloadLen);
+  }
+
+  /**
+   * Writes a big-endian uint16.
+   *
+   * @param dest Two-byte destination.
+   * @param value Value to store.
+   * @return Nothing.
+   */
+  void _putU16(uint8_t* dest, uint16_t value)
+  {
+    dest[0] = static_cast<uint8_t>(value >> 8);
+    dest[1] = static_cast<uint8_t>(value);
+  }
+
+  /**
+   * Writes a big-endian uint32.
+   *
+   * @param dest Four-byte destination.
+   * @param value Value to store.
+   * @return Nothing.
+   */
+  void _putU32(uint8_t* dest, uint32_t value)
+  {
+    dest[0] = static_cast<uint8_t>(value >> 24);
+    dest[1] = static_cast<uint8_t>(value >> 16);
+    dest[2] = static_cast<uint8_t>(value >> 8);
+    dest[3] = static_cast<uint8_t>(value);
   }
 
   /**

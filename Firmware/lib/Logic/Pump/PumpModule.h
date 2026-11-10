@@ -11,9 +11,10 @@ class Network;
 
 /**
  * Pump daughter behaviour: state polls, on/off and reset commands,
- * the repeated on refresh, the absence cutoff, and publication
- * with retain off. update() issues at most one bus exchange and then
- * publishes what that exchange stored.
+ * the repeated on refresh, the absence cutoff, the info samples,
+ * the fault reason, and publication with retain off. update()
+ * issues at most one bus exchange and then publishes what that
+ * exchange stored.
  */
 class PumpModule
 {
@@ -28,9 +29,12 @@ public:
    *        repeated on commands. Zero selects the poller's default.
    * @param commandTimeoutMs Silence after which a pump that is on is
    *        commanded off. Zero selects the poller's default.
+   * @param infoIntervalMs Period between now, cycle, and totals
+   *        reads. Zero selects the poller's default.
    */
   PumpModule(ModuleBus& bus, Network& network, IClock& clock,
-             uint32_t pollIntervalMs, uint32_t commandTimeoutMs);
+             uint32_t pollIntervalMs, uint32_t commandTimeoutMs,
+             uint32_t infoIntervalMs);
 
   /**
    * Issues at most one pump exchange, then publishes the stored state.

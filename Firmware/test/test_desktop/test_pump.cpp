@@ -106,13 +106,16 @@ struct PumpHarness
    *
    * @param pollIntervalMs State-poll period.
    * @param commandTimeoutMs Silence before a running pump is turned off.
+   * @param infoIntervalMs Period between now, cycle, and totals.
    */
   explicit PumpHarness(uint32_t pollIntervalMs = 60000,
-                       uint32_t commandTimeoutMs = 3UL * 60UL * 1000UL)
+                       uint32_t commandTimeoutMs = 3UL * 60UL * 1000UL,
+                       uint32_t infoIntervalMs = 15000)
     : modules(clock),
       device(clock, modules.mod1),
       mqtt(client, clock, pumpMqttConfig()),
-      poller(modules.host, clock, pollIntervalMs, commandTimeoutMs),
+      poller(modules.host, clock, pollIntervalMs, commandTimeoutMs,
+             infoIntervalMs),
       topics("watering"),
       bridge(poller, mqtt, topics)
   {
@@ -179,6 +182,62 @@ bool published(const FakeMqttClient& client, const char* topic,
 void learnState(PumpHarness& harness)
 {
   harness.poller.update();
+}
+
+/**
+ * Info interval long enough that a drained round does not return
+ * during a state-poll or absence-window test.
+ */
+const uint32_t kQuietInfoMs = 1000000;
+
+/**
+ * Reads now, then cycle, then totals. The state must already be known,
+ * and none of those reads may be waiting on a retry.
+ *
+ * @param harness Pump harness.
+ * @return Nothing.
+ */
+void drainInfo(PumpHarness& harness)
+{
+  const uint8_t order[] = {
+    module_protocol::kCmdGetPumpNow,
+    module_protocol::kCmdGetPumpCycle,
+    module_protocol::kCmdGetPumpTotals,
+  };
+  for (size_t i = 0; i < 3; ++i)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(order[i], lastCommand(harness.modules));
+  }
+}
+
+/**
+ * Loads the worked held-pump sample: 12 V, 4 A, enable high.
+ *
+ * @param device Simulated pump board.
+ * @return Nothing.
+ */
+void loadHeldSample(FakeModuleDevice& device)
+{
+  device.pumpPhase = module_protocol::kPumpPhaseHeld;
+  device.pumpFlags = module_protocol::kPumpFlagEnableHigh;
+  device.pumpMillivolts = 12000;
+  device.pumpMilliamps = 4000;
+  device.pumpRunSeconds = 0;
+  device.pumpCyclePeakMillivolts = 12000;
+  device.pumpCycleMinimumMillivolts = 0;
+  device.pumpCyclePeakMilliamps = 4000;
+  device.pumpCycleAverageMillivolts = 0;
+  device.pumpCycleAverageMilliamps = 0;
+  device.pumpCycleSoftStartMs = 0;
+  device.pumpCyclePowerGoodMs = 0;
+  device.pumpCycleRunSeconds = 0;
+  device.pumpCompletedCycles = 0;
+  device.pumpTotalSeconds = 0;
+  device.pumpLifetimePeakMillivolts = 12000;
+  device.pumpLifetimePeakMilliamps = 4000;
+  device.pumpFailedStarts = 0;
+  device.pumpLastRunSeconds = 0;
 }
 }
 
@@ -280,6 +339,11 @@ void testHostRejectsPumpQueryUnlessOnlinePump()
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, absent.status);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, setPump(fixture.host, 0, true).status);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, resetPump(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, queryPumpNow(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, queryPumpCycle(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected,
+                    queryPumpTotals(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Rejected, queryPumpFault(fixture.host, 0).status);
   TEST_ASSERT_EQUAL(before, fixture.bus.protocolOpCount());
 
   FakeModuleDevice device(clock, fixture.mod1);
@@ -321,6 +385,14 @@ void testHostRejectsShortPumpPayload()
   TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpState(fixture.host, 0).status);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, setPump(fixture.host, 0, true).status);
   TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, resetPump(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpNow(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpCycle(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpTotals(fixture.host, 0).status);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpFault(fixture.host, 0).status);
+
+  device.shortPumpPayload = false;
+  device.pumpPhase = 4;
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Failed, queryPumpNow(fixture.host, 0).status);
 }
 
 void testPumpTimingDefaultsAreThreeMinutesAndOneMinute()
@@ -330,14 +402,18 @@ void testPumpTimingDefaultsAreThreeMinutesAndOneMinute()
   PumpPoller poller(fixture.host, clock);
   TEST_ASSERT_EQUAL(60000, poller.pollIntervalMs());
   TEST_ASSERT_EQUAL(3UL * 60UL * 1000UL, poller.commandTimeoutMs());
-  PumpPoller zeros(fixture.host, clock, 0, 0);
+  TEST_ASSERT_EQUAL(15000, poller.infoIntervalMs());
+  PumpPoller zeros(fixture.host, clock, 0, 0, 0);
   TEST_ASSERT_EQUAL(60000, zeros.pollIntervalMs());
   TEST_ASSERT_EQUAL(3UL * 60UL * 1000UL, zeros.commandTimeoutMs());
+  TEST_ASSERT_EQUAL(15000, zeros.infoIntervalMs());
+  PumpPoller custom(fixture.host, clock, 60000, 5000, 1500);
+  TEST_ASSERT_EQUAL(1500, custom.infoIntervalMs());
 }
 
 void testPollerReadsPumpStateThenRepeatsAtInterval()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, 120000);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
 
@@ -347,6 +423,7 @@ void testPollerReadsPumpStateThenRepeatsAtInterval()
   PumpState state = PumpState::Off;
   TEST_ASSERT_TRUE(harness.poller.pumpState(0, &state));
   TEST_ASSERT_EQUAL(PumpState::On, state);
+  drainInfo(harness);
 
   const size_t afterRead = harness.modules.bus.protocolOpCount();
   harness.clock.advance(59999);
@@ -411,10 +488,11 @@ void testPollerRetriesBusyPumpStateThenWaits()
 
 void testPumpCommandSetsOnlyWhenStateDiffers()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOff;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   const size_t learned = harness.modules.bus.protocolOpCount();
 
   harness.client.deliver(kPumpCommandTopic, "1 off");
@@ -491,6 +569,10 @@ void testPumpCommandAddressesSlotTwo()
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(modules, 2));
   bridge.update();
   TEST_ASSERT_TRUE(published(client, "watering/slot/2/pump", "on", false));
+
+  poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow, lastCommand(modules));
+  TEST_ASSERT_EQUAL(0x11, modules.bus.ops.back().address);
 }
 
 void testPumpFaultIsPublishedAndNotResetUntilCommand()
@@ -506,7 +588,8 @@ void testPumpFaultIsPublishedAndNotResetUntilCommand()
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
-  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(learned + 1, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
 }
 
@@ -518,8 +601,8 @@ void testPumpResetThenTurnsOnWhenDesired()
   learnState(harness);
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
-                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
 
   harness.client.deliver(kPumpCommandTopic, "1 reset");
   harness.poller.update();
@@ -543,17 +626,18 @@ void testPumpResetThatStaysFaultDoesNotTurnOn()
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdResetPump, lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
-  const size_t afterReset = harness.modules.bus.protocolOpCount();
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterReset, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
 }
 
 void testPumpResetWhileOffDoesNotTurnOn()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOff;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   harness.client.deliver(kPumpCommandTopic, "1 off");
   harness.poller.update();
   harness.client.deliver(kPumpCommandTopic, "1 reset");
@@ -567,10 +651,11 @@ void testPumpResetWhileOffDoesNotTurnOn()
 
 void testPumpCommandRejectsMalformedPayload()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   const size_t learned = harness.modules.bus.protocolOpCount();
   harness.client.deliver(kPumpCommandTopic, "1");
   harness.client.deliver(kPumpCommandTopic, "on");
@@ -624,13 +709,15 @@ void testPumpCommandReappliesAfterModuleReset()
 
 void testPumpCommandTimeoutTurnsPumpOff()
 {
-  PumpHarness harness(60000, 5000);
+  PumpHarness harness(60000, 5000, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  harness.clock.advance(4000);
+  drainInfo(harness);
   const size_t learned = harness.modules.bus.protocolOpCount();
 
-  harness.clock.advance(4999);
+  harness.clock.advance(999);
   harness.poller.update();
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
 
@@ -647,10 +734,11 @@ void testPumpCommandTimeoutTurnsPumpOff()
 
 void testPumpCommandRefreshesAbsenceTimeout()
 {
-  PumpHarness harness(60000, 5000);
+  PumpHarness harness(60000, 5000, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
   const size_t afterMatch = harness.modules.bus.protocolOpCount();
@@ -741,10 +829,15 @@ void testPumpTimeoutDoesNotResetFault()
   harness.device.pumpState = module_protocol::kPumpStateFault;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
-  const size_t learned = harness.modules.bus.protocolOpCount();
   harness.clock.advance(1000);
   harness.poller.update();
-  TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
+  const size_t afterFault = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(afterFault + 1, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
 }
 
@@ -774,7 +867,7 @@ void testPumpCommandWaitsThroughEnumeration()
 
 void testPeriodicPumpPublishEachStateAndClearOnUnplug()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, 180000);
   harness.device.pumpState = module_protocol::kPumpStateOff;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
@@ -785,10 +878,13 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   harness.client.publishedMessages.clear();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump"));
+  drainInfo(harness);
 
   harness.device.pumpState = module_protocol::kPumpStateOn;
   harness.clock.advance(60000);
   harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
                              false));
@@ -796,6 +892,8 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   harness.client.publishedMessages.clear();
   harness.clock.advance(60000);
   harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1/pump"));
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
@@ -817,10 +915,11 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
 
 void testPumpOnRefreshFollowsCommandAndInterval()
 {
-  PumpHarness harness(1000, 60000);
+  PumpHarness harness(1000, 60000, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   harness.bridge.update();
   harness.client.publishedMessages.clear();
 
@@ -865,10 +964,11 @@ void testPumpOnRefreshFollowsCommandAndInterval()
 
 void testPumpOnRefreshRetriesAfterBusy()
 {
-  PumpHarness harness(1000, 60000);
+  PumpHarness harness(1000, 60000, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOn;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
+  drainInfo(harness);
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
@@ -898,17 +998,23 @@ void testPumpOnRefreshRetriesAfterBusy()
 
 void testPumpOnRefreshLeavesFaultAlone()
 {
-  PumpHarness harness(1000, 60000);
+  PumpHarness harness(1000, 60000, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateFault;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
   harness.client.deliver(kPumpCommandTopic, "1 on");
   harness.poller.update();
-  const size_t afterCommand = harness.modules.bus.protocolOpCount();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
+  drainInfo(harness);
+  const size_t afterInfo = harness.modules.bus.protocolOpCount();
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterCommand, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(afterInfo, harness.modules.bus.protocolOpCount());
 
-  harness.clock.advance(1000);
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterInfo, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
                     lastCommand(harness.modules));
@@ -917,7 +1023,7 @@ void testPumpOnRefreshLeavesFaultAlone()
 
 void testPumpBridgeFollowsDeviceId()
 {
-  PumpHarness harness;
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOff;
   plugAndPump(harness.modules, 0, harness.device);
   learnState(harness);
@@ -927,6 +1033,7 @@ void testPumpBridgeFollowsDeviceId()
   harness.client.publishedMessages.clear();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump"));
+  drainInfo(harness);
 
   harness.client.publishedMessages.clear();
   harness.topics.setDeviceId("shed");
@@ -943,6 +1050,440 @@ void testPumpBridgeFollowsDeviceId()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "shed/slot/1/pump", "on", false));
+}
+
+void testHostDecodesHeldPumpSample()
+{
+  FakeClock clock;
+  EmptyModuleHostFixture fixture(clock);
+  FakeModuleDevice device(clock, fixture.mod1);
+  device.typeId = module_protocol::kTypePumpModule;
+  loadHeldSample(device);
+  fixture.host.begin();
+  plugAndPump(fixture, 0, device);
+
+  const PumpNowResult now = queryPumpNow(fixture.host, 0);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, now.status);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow, lastCommand(fixture));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpPhaseHeld, now.sample.phase);
+  TEST_ASSERT_EQUAL(module_protocol::kPumpFlagEnableHigh, now.sample.flags);
+  TEST_ASSERT_EQUAL(12000, now.sample.millivolts);
+  TEST_ASSERT_EQUAL(4000, now.sample.milliamps);
+  TEST_ASSERT_EQUAL(0, now.sample.runSeconds);
+
+  const PumpCycleResult cycle = queryPumpCycle(fixture.host, 0);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, cycle.status);
+  TEST_ASSERT_EQUAL(12000, cycle.sample.peakMillivolts);
+  TEST_ASSERT_EQUAL(0, cycle.sample.minimumMillivolts);
+  TEST_ASSERT_EQUAL(4000, cycle.sample.peakMilliamps);
+  TEST_ASSERT_EQUAL(0, cycle.sample.runSeconds);
+
+  const PumpTotalsResult totals = queryPumpTotals(fixture.host, 0);
+  TEST_ASSERT_EQUAL(PumpQueryStatus::Ok, totals.status);
+  TEST_ASSERT_EQUAL(0, totals.sample.completedCycles);
+  TEST_ASSERT_EQUAL(0, totals.sample.totalSeconds);
+  TEST_ASSERT_EQUAL(12000, totals.sample.peakMillivolts);
+  TEST_ASSERT_EQUAL(4000, totals.sample.peakMilliamps);
+}
+
+void testPumpPublishesHeldInfoSamples()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateOn;
+  loadHeldSample(harness.device);
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.poller.update();
+  harness.poller.update();
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "on",
+                             false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
+                             "held 0 1 0 12000 4000 0", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/cycle",
+                             "12000 0 4000 0 0 0 0 0", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/totals",
+                             "0 0 12000 4000 0 0", false));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/fault"));
+}
+
+void testPumpInfoFollowsItsOwnInterval()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, 15000);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  drainInfo(harness);
+
+  const size_t afterBurst = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(14999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterBurst, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpCycle,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpTotals,
+                    lastCommand(harness.modules));
+
+  const size_t afterRepeat = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterRepeat, harness.modules.bus.protocolOpCount());
+
+  harness.clock.advance(45000);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpCycle,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpTotals,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+}
+
+void testPumpInfoServesSlotZeroBeforeSlotOne()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  FakeModuleDevice other(harness.clock, harness.modules.mod(1));
+  other.typeId = module_protocol::kTypePumpModule;
+  other.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 1, other);
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0x10, harness.modules.bus.ops.back().address);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0x11, harness.modules.bus.ops.back().address);
+
+  const uint8_t slotZero[] = {
+    module_protocol::kCmdGetPumpNow,
+    module_protocol::kCmdGetPumpCycle,
+    module_protocol::kCmdGetPumpTotals,
+  };
+  for (size_t i = 0; i < 3; ++i)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(slotZero[i], lastCommand(harness.modules));
+    TEST_ASSERT_EQUAL(0x10, harness.modules.bus.ops.back().address);
+  }
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0x11, harness.modules.bus.ops.back().address);
+}
+
+void testPumpOnAndOffDoNotReadFault()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  drainInfo(harness);
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  harness.client.deliver(kPumpCommandTopic, "1 off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, harness.device.pumpState);
+  const size_t afterOff = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterOff, harness.modules.bus.protocolOpCount());
+}
+
+void testPumpFaultReasonIsPublishedOnce()
+{
+  PumpHarness harness(1000, 60000, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateFault;
+  harness.device.pumpFaultReason = module_protocol::kPumpFaultSlowStart;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "fault",
+                             false));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/fault"));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
+                             "slow-start 0", false));
+  const int once = countTopic(harness.client, "watering/slot/1/pump/fault");
+
+  const size_t afterFault = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(afterFault + 1, harness.modules.bus.protocolOpCount());
+  harness.poller.update();
+  harness.poller.update();
+  harness.clock.advance(1000);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client,
+                                     "watering/slot/1/pump/fault"));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, harness.device.pumpState);
+}
+
+void testPumpFaultReasonZeroAndUnknownArePublished()
+{
+  PumpHarness none(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  none.device.pumpState = module_protocol::kPumpStateFault;
+  none.device.pumpFaultReason = module_protocol::kFaultNone;
+  plugAndPump(none.modules, 0, none.device);
+  learnState(none);
+  none.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(none.modules));
+  none.bridge.update();
+  TEST_ASSERT_TRUE(published(none.client, "watering/slot/1/pump/fault",
+                             "none 0", false));
+  const size_t afterNone = none.modules.bus.protocolOpCount();
+  none.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow, lastCommand(none.modules));
+  TEST_ASSERT_EQUAL(afterNone + 1, none.modules.bus.protocolOpCount());
+
+  PumpHarness unknown(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  unknown.device.pumpState = module_protocol::kPumpStateFault;
+  unknown.device.pumpFaultReason = 9;
+  plugAndPump(unknown.modules, 0, unknown.device);
+  learnState(unknown);
+  unknown.poller.update();
+  unknown.bridge.update();
+  TEST_ASSERT_TRUE(published(unknown.client, "watering/slot/1/pump/fault",
+                             "9 0", false));
+}
+
+void testPumpResetPublishesNoneWithoutFaultRead()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateFault;
+  harness.device.pumpFaultReason = module_protocol::kPumpFaultOvercurrent;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.client.deliver(kPumpCommandTopic, "1 reset");
+  const size_t before = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdResetPump,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(before + 1, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, harness.device.pumpState);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump", "off",
+                             false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
+                             "none 0", false));
+}
+
+void testPumpControlPreemptsInfo()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, 15000);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+
+  harness.client.deliver(kPumpCommandTopic, "1 reset");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdResetPump,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOff, harness.device.pumpState);
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, harness.device.pumpState);
+
+  harness.client.deliver(kPumpCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateOn, lastTx(harness.modules, 2));
+}
+
+void testPumpNowBusySkipsToCycleThenRetries()
+{
+  PumpHarness harness(1000000, 1000000, 1000);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.device.forceBusy = true;
+  for (int attempt = 0; attempt < 3; ++attempt)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                      lastCommand(harness.modules));
+  }
+  harness.device.forceBusy = false;
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpCycle,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpTotals,
+                    lastCommand(harness.modules));
+  const size_t quiet = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(quiet, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(quiet, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+}
+
+void testPumpFaultBusyWaitsThenRetries()
+{
+  PumpHarness harness(1000000, 1000000, 1000);
+  harness.device.pumpState = module_protocol::kPumpStateFault;
+  harness.device.pumpFaultReason = module_protocol::kPumpFaultStuckOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.device.forceBusy = true;
+  for (int attempt = 0; attempt < 3; ++attempt)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault,
+                      lastCommand(harness.modules));
+  }
+  harness.device.forceBusy = false;
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  harness.poller.update();
+  const size_t quiet = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(quiet, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1000);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
+                             "stuck-on 0", false));
+}
+
+void testPumpRecordsClearOnceOnUnplug()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  drainInfo(harness);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
+                             "off 0 0 0 0 0 0", false));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/fault"));
+
+  harness.modules.sense(0).setPresent(false);
+  pumpMs(harness.modules, 80);
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
+                             "unavailable", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/cycle",
+                             "unavailable", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/totals",
+                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/fault",
+                              "unavailable", false));
+  const int nowOnce = countTopic(harness.client, "watering/slot/1/pump/now");
+  const int cycleOnce =
+      countTopic(harness.client, "watering/slot/1/pump/cycle");
+  const int totalsOnce =
+      countTopic(harness.client, "watering/slot/1/pump/totals");
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(nowOnce, countTopic(harness.client,
+                                        "watering/slot/1/pump/now"));
+  TEST_ASSERT_EQUAL(cycleOnce, countTopic(harness.client,
+                                          "watering/slot/1/pump/cycle"));
+  TEST_ASSERT_EQUAL(totalsOnce, countTopic(harness.client,
+                                           "watering/slot/1/pump/totals"));
+}
+
+void testPumpFaultRecordClearsOnlyAfterPublish()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateFault;
+  harness.device.pumpFaultReason = module_protocol::kPumpFaultUndercurrent;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
+                             "undercurrent 0", false));
+
+  harness.modules.sense(0).setPresent(false);
+  pumpMs(harness.modules, 80);
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
+                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/now",
+                              "unavailable", false));
+  const int once = countTopic(harness.client, "watering/slot/1/pump/fault");
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client,
+                                     "watering/slot/1/pump/fault"));
+}
+
+void testPumpReidentifyKeepsRecordsUntilOffline()
+{
+  PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
+  harness.device.pumpState = module_protocol::kPumpStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnState(harness);
+  drainInfo(harness);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
+                             "off 0 0 0 0 0 0", false));
+  const uint32_t firstEpoch = harness.modules.host.identityEpoch(0);
+
+  harness.device.resetToUnconfigured();
+  pumpMs(harness.modules, 4000);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+  TEST_ASSERT_TRUE(harness.modules.host.identityEpoch(0) > firstEpoch);
+  harness.client.publishedMessages.clear();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
+                    lastCommand(harness.modules));
+  harness.bridge.update();
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/now",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/cycle",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/totals",
+                              "unavailable", false));
+
+  drainInfo(harness);
+  harness.bridge.update();
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
+                             "off 0 0 0 0 0 0", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/cycle",
+                             "0 0 0 0 0 0 0 0", false));
+  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/totals",
+                             "0 0 0 0 0 0", false));
 }
 
 // ========== Runner ==========
@@ -986,4 +1527,18 @@ void runPumpTests()
   RUN_TEST(testPumpOnRefreshRetriesAfterBusy);
   RUN_TEST(testPumpOnRefreshLeavesFaultAlone);
   RUN_TEST(testPumpBridgeFollowsDeviceId);
+  RUN_TEST(testHostDecodesHeldPumpSample);
+  RUN_TEST(testPumpPublishesHeldInfoSamples);
+  RUN_TEST(testPumpInfoFollowsItsOwnInterval);
+  RUN_TEST(testPumpInfoServesSlotZeroBeforeSlotOne);
+  RUN_TEST(testPumpOnAndOffDoNotReadFault);
+  RUN_TEST(testPumpFaultReasonIsPublishedOnce);
+  RUN_TEST(testPumpFaultReasonZeroAndUnknownArePublished);
+  RUN_TEST(testPumpResetPublishesNoneWithoutFaultRead);
+  RUN_TEST(testPumpControlPreemptsInfo);
+  RUN_TEST(testPumpNowBusySkipsToCycleThenRetries);
+  RUN_TEST(testPumpFaultBusyWaitsThenRetries);
+  RUN_TEST(testPumpRecordsClearOnceOnUnplug);
+  RUN_TEST(testPumpFaultRecordClearsOnlyAfterPublish);
+  RUN_TEST(testPumpReidentifyKeepsRecordsUntilOffline);
 }

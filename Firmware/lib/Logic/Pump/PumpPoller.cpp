@@ -3,12 +3,15 @@
 // ========== Construction ==========
 
 PumpPoller::PumpPoller(ModuleHost& moduleHost, IClock& clock,
-                       uint32_t pollIntervalMs, uint32_t commandTimeoutMs)
+                       uint32_t pollIntervalMs, uint32_t commandTimeoutMs,
+                       uint32_t infoIntervalMs)
   : _moduleHost(moduleHost),
     _clock(clock),
     _intervalMs(pollIntervalMs == 0 ? kDefaultPollIntervalMs : pollIntervalMs),
     _commandTimeoutMs(commandTimeoutMs == 0 ? kDefaultCommandTimeoutMs
                                             : commandTimeoutMs),
+    _infoIntervalMs(infoIntervalMs == 0 ? kDefaultInfoIntervalMs
+                                        : infoIntervalMs),
     _silenceStarted(false),
     _silenceAnchor(0),
     _failsafeActive(false)
@@ -46,6 +49,14 @@ void PumpPoller::update()
     return;
   }
   if (_serviceRefresh())
+  {
+    return;
+  }
+  if (_serviceFault())
+  {
+    return;
+  }
+  if (_serviceInfo())
   {
     return;
   }
@@ -181,6 +192,225 @@ uint32_t PumpPoller::commandTimeoutMs() const
   return _commandTimeoutMs;
 }
 
+/**
+ * Reads the now, cycle, and totals interval in use.
+ *
+ * @return Interval in milliseconds.
+ */
+uint32_t PumpPoller::infoIntervalMs() const
+{
+  return _infoIntervalMs;
+}
+
+/**
+ * Reports whether a now sample is stored for the current identity.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True after a successful GET_PUMP_NOW.
+ */
+bool PumpPoller::nowKnown(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return false;
+  }
+  return _runtime[moduleSlot].nowKnown;
+}
+
+/**
+ * Reads the cached now sample.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sample Set when a sample has been stored.
+ * @return False when no sample has been stored.
+ */
+bool PumpPoller::pumpNow(uint8_t moduleSlot, PumpNow* sample) const
+{
+  if (sample == nullptr || moduleSlot >= module_protocol::kSlotCount ||
+      !_runtime[moduleSlot].nowKnown)
+  {
+    return false;
+  }
+  *sample = _runtime[moduleSlot].now;
+  return true;
+}
+
+/**
+ * Reads how many now samples have been stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Generation, or 0 when none has been stored.
+ */
+uint32_t PumpPoller::nowRevision(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return 0;
+  }
+  return _runtime[moduleSlot].nowRevision;
+}
+
+/**
+ * Reports whether a cycle sample is stored for the current identity.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True after a successful GET_PUMP_CYCLE.
+ */
+bool PumpPoller::cycleKnown(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return false;
+  }
+  return _runtime[moduleSlot].cycleKnown;
+}
+
+/**
+ * Reads the cached cycle sample.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sample Set when a sample has been stored.
+ * @return False when no sample has been stored.
+ */
+bool PumpPoller::pumpCycle(uint8_t moduleSlot, PumpCycle* sample) const
+{
+  if (sample == nullptr || moduleSlot >= module_protocol::kSlotCount ||
+      !_runtime[moduleSlot].cycleKnown)
+  {
+    return false;
+  }
+  *sample = _runtime[moduleSlot].cycle;
+  return true;
+}
+
+/**
+ * Reads how many cycle samples have been stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Generation, or 0 when none has been stored.
+ */
+uint32_t PumpPoller::cycleRevision(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return 0;
+  }
+  return _runtime[moduleSlot].cycleRevision;
+}
+
+/**
+ * Reports whether a totals sample is stored for the current identity.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True after a successful GET_PUMP_TOTALS.
+ */
+bool PumpPoller::totalsKnown(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return false;
+  }
+  return _runtime[moduleSlot].totalsKnown;
+}
+
+/**
+ * Reads the cached totals sample.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sample Set when a sample has been stored.
+ * @return False when no sample has been stored.
+ */
+bool PumpPoller::pumpTotals(uint8_t moduleSlot, PumpTotals* sample) const
+{
+  if (sample == nullptr || moduleSlot >= module_protocol::kSlotCount ||
+      !_runtime[moduleSlot].totalsKnown)
+  {
+    return false;
+  }
+  *sample = _runtime[moduleSlot].totals;
+  return true;
+}
+
+/**
+ * Reads how many totals samples have been stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Generation, or 0 when none has been stored.
+ */
+uint32_t PumpPoller::totalsRevision(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return 0;
+  }
+  return _runtime[moduleSlot].totalsRevision;
+}
+
+/**
+ * Reports whether a fault reason is stored for the current episode.
+ * A cleared fault stores reason 0 without a read.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True when a reason can be published.
+ */
+bool PumpPoller::faultReportKnown(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return false;
+  }
+  return _runtime[moduleSlot].faultKnown;
+}
+
+/**
+ * Reads the cached fault reason.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param report Set when a reason has been stored.
+ * @return False when no reason has been stored.
+ */
+bool PumpPoller::pumpFaultReport(uint8_t moduleSlot,
+                                 PumpFaultReport* report) const
+{
+  if (report == nullptr || moduleSlot >= module_protocol::kSlotCount ||
+      !_runtime[moduleSlot].faultKnown)
+  {
+    return false;
+  }
+  *report = _runtime[moduleSlot].fault;
+  return true;
+}
+
+/**
+ * Reads how many fault reasons have been stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Generation, or 0 when none has been stored.
+ */
+uint32_t PumpPoller::faultRevision(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return 0;
+  }
+  return _runtime[moduleSlot].faultRevision;
+}
+
+/**
+ * Reports whether the slot is an online pump.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True when pump queries are allowed.
+ */
+bool PumpPoller::moduleOnline(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return false;
+  }
+  return _isActivePump(moduleSlot);
+}
+
 
 // ========== Session Sync ==========
 
@@ -242,6 +472,26 @@ void PumpPoller::_clearCache(uint8_t moduleSlot)
   runtime.readAttempts = 0;
   runtime.readRetryAt = 0;
   runtime.nextPollAt = 0;
+  runtime.nowKnown = false;
+  runtime.now = PumpNow();
+  runtime.nowRevision = 0;
+  runtime.nowAttempts = 0;
+  runtime.nextNowAt = 0;
+  runtime.cycleKnown = false;
+  runtime.cycle = PumpCycle();
+  runtime.cycleRevision = 0;
+  runtime.cycleAttempts = 0;
+  runtime.nextCycleAt = 0;
+  runtime.totalsKnown = false;
+  runtime.totals = PumpTotals();
+  runtime.totalsRevision = 0;
+  runtime.totalsAttempts = 0;
+  runtime.nextTotalsAt = 0;
+  runtime.faultKnown = false;
+  runtime.fault = PumpFaultReport();
+  runtime.faultRevision = 0;
+  runtime.faultAttempts = 0;
+  runtime.faultRetryAt = 0;
 }
 
 /**
@@ -635,12 +885,23 @@ void PumpPoller::_rememberState(uint8_t moduleSlot, PumpState state,
                                 bool fromPoll)
 {
   SlotRuntime& runtime = _runtime[moduleSlot];
+  const bool wasFault =
+      runtime.stateKnown && runtime.state == PumpState::Fault;
   runtime.stateKnown = true;
   runtime.state = state;
-  runtime.revision += 1;
-  if (runtime.revision == 0)
+  runtime.revision = _bumpRevision(runtime.revision);
+  if (state == PumpState::Fault)
   {
-    runtime.revision = 1;
+    if (!wasFault)
+    {
+      runtime.faultKnown = false;
+      runtime.faultAttempts = 0;
+      runtime.faultRetryAt = 0;
+    }
+  }
+  else if (wasFault)
+  {
+    _storeFaultNone(moduleSlot);
   }
   if (!fromPoll || !_intent[moduleSlot].desiredValid ||
       state == PumpState::Fault)
@@ -721,4 +982,161 @@ bool PumpPoller::_isDue(uint32_t due) const
     return true;
   }
   return static_cast<uint32_t>(_clock.millis() - due) < 0x80000000u;
+}
+
+
+// ========== Info ==========
+
+/**
+ * Sends GET_FAULT once for a fault whose reason is not stored yet.
+ *
+ * @return True when a fault read was issued.
+ */
+bool PumpPoller::_serviceFault()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    SlotRuntime& runtime = _runtime[slot];
+    if (!_isActivePump(slot) || !runtime.stateKnown ||
+        runtime.state != PumpState::Fault || runtime.faultKnown ||
+        !_isDue(runtime.faultRetryAt))
+    {
+      continue;
+    }
+    const PumpFaultResult reading = queryPumpFault(_moduleHost, slot);
+    if (reading.status == PumpQueryStatus::Ok)
+    {
+      runtime.fault = reading.report;
+      runtime.faultKnown = true;
+      runtime.faultAttempts = 0;
+      runtime.faultRevision = _bumpRevision(runtime.faultRevision);
+      return true;
+    }
+    _failInfo(&runtime.faultAttempts, &runtime.faultRetryAt);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Reads one due now, cycle, or totals sample. Now is first, then
+ * cycle, then totals. An earlier slot is served before a later one.
+ *
+ * @return True when an info read was issued.
+ */
+bool PumpPoller::_serviceInfo()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    SlotRuntime& runtime = _runtime[slot];
+    if (!_isActivePump(slot) || !runtime.stateKnown)
+    {
+      continue;
+    }
+    if (_isDue(runtime.nextNowAt))
+    {
+      const PumpNowResult reading = queryPumpNow(_moduleHost, slot);
+      if (reading.status == PumpQueryStatus::Ok)
+      {
+        runtime.now = reading.sample;
+        runtime.nowKnown = true;
+        runtime.nowAttempts = 0;
+        runtime.nextNowAt = _clock.millis() + _infoIntervalMs;
+        runtime.nowRevision = _bumpRevision(runtime.nowRevision);
+      }
+      else
+      {
+        _failInfo(&runtime.nowAttempts, &runtime.nextNowAt);
+      }
+      return true;
+    }
+    if (_isDue(runtime.nextCycleAt))
+    {
+      const PumpCycleResult reading = queryPumpCycle(_moduleHost, slot);
+      if (reading.status == PumpQueryStatus::Ok)
+      {
+        runtime.cycle = reading.sample;
+        runtime.cycleKnown = true;
+        runtime.cycleAttempts = 0;
+        runtime.nextCycleAt = _clock.millis() + _infoIntervalMs;
+        runtime.cycleRevision = _bumpRevision(runtime.cycleRevision);
+      }
+      else
+      {
+        _failInfo(&runtime.cycleAttempts, &runtime.nextCycleAt);
+      }
+      return true;
+    }
+    if (_isDue(runtime.nextTotalsAt))
+    {
+      const PumpTotalsResult reading = queryPumpTotals(_moduleHost, slot);
+      if (reading.status == PumpQueryStatus::Ok)
+      {
+        runtime.totals = reading.sample;
+        runtime.totalsKnown = true;
+        runtime.totalsAttempts = 0;
+        runtime.nextTotalsAt = _clock.millis() + _infoIntervalMs;
+        runtime.totalsRevision = _bumpRevision(runtime.totalsRevision);
+      }
+      else
+      {
+        _failInfo(&runtime.totalsAttempts, &runtime.nextTotalsAt);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Counts a failed info or fault read. Three failures wait out the
+ * info interval.
+ *
+ * @param attempts Attempt counter. Reset when the wait starts.
+ * @param nextAt Due time. Moved out by the info interval after
+ *        three failures.
+ * @return Nothing.
+ */
+void PumpPoller::_failInfo(uint8_t* attempts, uint32_t* nextAt)
+{
+  *attempts = static_cast<uint8_t>(*attempts + 1);
+  if (*attempts >= kPumpQueryAttempts)
+  {
+    *attempts = 0;
+    *nextAt = _clock.millis() + _infoIntervalMs;
+  }
+}
+
+/**
+ * Stores reason 0 after a faulted pump reports off or on.
+ * Does not send GET_FAULT.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Nothing.
+ */
+void PumpPoller::_storeFaultNone(uint8_t moduleSlot)
+{
+  SlotRuntime& runtime = _runtime[moduleSlot];
+  runtime.fault.reason = module_protocol::kFaultNone;
+  runtime.fault.index = 0;
+  runtime.faultKnown = true;
+  runtime.faultAttempts = 0;
+  runtime.faultRevision = _bumpRevision(runtime.faultRevision);
+}
+
+/**
+ * Increases a sample generation. Zero is reserved for "none stored",
+ * so the counter skips from the maximum back to 1.
+ *
+ * @param revision Current generation.
+ * @return The next generation.
+ */
+uint32_t PumpPoller::_bumpRevision(uint32_t revision) const
+{
+  revision += 1;
+  if (revision == 0)
+  {
+    revision = 1;
+  }
+  return revision;
 }

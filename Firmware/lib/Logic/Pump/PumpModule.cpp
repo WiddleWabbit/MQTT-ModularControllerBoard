@@ -6,8 +6,10 @@
 // ========== Construction ==========
 
 PumpModule::PumpModule(ModuleBus& bus, Network& network, IClock& clock,
-                       uint32_t pollIntervalMs, uint32_t commandTimeoutMs)
-  : _poller(bus.host(), clock, pollIntervalMs, commandTimeoutMs),
+                       uint32_t pollIntervalMs, uint32_t commandTimeoutMs,
+                       uint32_t infoIntervalMs)
+  : _poller(bus.host(), clock, pollIntervalMs, commandTimeoutMs,
+            infoIntervalMs),
     _bridge(_poller, network.mqtt(), network.topics())
 {
   network.addMessageHandler(&PumpMqttBridge::onMqttMessage, &_bridge);

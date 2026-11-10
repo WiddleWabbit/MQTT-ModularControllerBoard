@@ -17,6 +17,12 @@ PumpMqttBridge::PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
     _publishedOk[slot] = false;
     _publishedRevision[slot] = 0;
     _published[slot][0] = '\0';
+    for (uint8_t record = 0; record < kRecordCount; ++record)
+    {
+      _recordOk[slot][record] = false;
+      _recordRevision[slot][record] = 0;
+      _recordUnavailable[slot][record] = false;
+    }
   }
 }
 
@@ -54,6 +60,7 @@ void PumpMqttBridge::update()
 {
   _syncTopicGeneration();
   _publishSnapshots();
+  _publishRecords();
 }
 
 
@@ -74,6 +81,12 @@ void PumpMqttBridge::_syncTopicGeneration()
     _publishedOk[slot] = false;
     _publishedRevision[slot] = 0;
     _published[slot][0] = '\0';
+    for (uint8_t record = 0; record < kRecordCount; ++record)
+    {
+      _recordOk[slot][record] = false;
+      _recordRevision[slot][record] = 0;
+      _recordUnavailable[slot][record] = false;
+    }
   }
   _seenGeneration = generation;
 }
@@ -313,4 +326,299 @@ bool PumpMqttBridge::_formatState(uint8_t moduleSlot, char* out,
   }
   std::snprintf(out, outCap, "%s", text);
   return true;
+}
+
+
+// ========== Records ==========
+
+namespace
+{
+/**
+ * One published info topic.
+ */
+enum RecordKind : uint8_t
+{
+  RecordNow = 0,
+  RecordCycle = 1,
+  RecordTotals = 2,
+  RecordFault = 3
+};
+
+/**
+ * Names a pump phase for the now payload.
+ *
+ * @param phase Phase byte.
+ * @return off, held, running, or fault. Null when the byte is unknown.
+ */
+const char* phaseName(uint8_t phase)
+{
+  if (phase == module_protocol::kPumpPhaseOff)
+  {
+    return "off";
+  }
+  if (phase == module_protocol::kPumpPhaseHeld)
+  {
+    return "held";
+  }
+  if (phase == module_protocol::kPumpPhaseRunning)
+  {
+    return "running";
+  }
+  if (phase == module_protocol::kPumpPhaseFault)
+  {
+    return "fault";
+  }
+  return nullptr;
+}
+
+/**
+ * Names a known fault reason. An unknown reason has no word.
+ *
+ * @param reason Reason byte.
+ * @return The word, or null when the reason is not one of the four.
+ */
+const char* faultName(uint8_t reason)
+{
+  if (reason == module_protocol::kFaultNone)
+  {
+    return "none";
+  }
+  if (reason == module_protocol::kPumpFaultSlowStart)
+  {
+    return "slow-start";
+  }
+  if (reason == module_protocol::kPumpFaultOvercurrent)
+  {
+    return "overcurrent";
+  }
+  if (reason == module_protocol::kPumpFaultUndercurrent)
+  {
+    return "undercurrent";
+  }
+  if (reason == module_protocol::kPumpFaultStuckOn)
+  {
+    return "stuck-on";
+  }
+  return nullptr;
+}
+
+/**
+ * Topic suffix for one info record.
+ *
+ * @param record Record index.
+ * @return Suffix including the leading slash.
+ */
+const char* recordSuffix(uint8_t record)
+{
+  if (record == RecordNow)
+  {
+    return "/now";
+  }
+  if (record == RecordCycle)
+  {
+    return "/cycle";
+  }
+  if (record == RecordTotals)
+  {
+    return "/totals";
+  }
+  return "/fault";
+}
+}
+
+/**
+ * Publishes each stored info sample and fault reason that has not
+ * been published yet.
+ *
+ * @return Nothing.
+ */
+void PumpMqttBridge::_publishRecords()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    for (uint8_t record = 0; record < kRecordCount; ++record)
+    {
+      char payload[96];
+      if (!_recordKnown(slot, record) ||
+          !_formatRecord(slot, record, payload, sizeof(payload)))
+      {
+        _recordRevision[slot][record] = 0;
+        if (!_poller.moduleOnline(slot) && _recordOk[slot][record] &&
+            !_recordUnavailable[slot][record])
+        {
+          if (_publishRecord(slot, record, "unavailable"))
+          {
+            _recordUnavailable[slot][record] = true;
+          }
+        }
+        continue;
+      }
+      const uint32_t revision = _recordRevisionOf(slot, record);
+      if (revision == 0 || revision == _recordRevision[slot][record])
+      {
+        continue;
+      }
+      if (!_publishRecord(slot, record, payload))
+      {
+        continue;
+      }
+      _recordOk[slot][record] = true;
+      _recordUnavailable[slot][record] = false;
+      _recordRevision[slot][record] = revision;
+    }
+  }
+}
+
+/**
+ * Publishes one info topic with retain off.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param record Index into the now, cycle, totals, and fault set.
+ * @param payload Text payload.
+ * @return True when publication was accepted.
+ */
+bool PumpMqttBridge::_publishRecord(uint8_t moduleSlot, uint8_t record,
+                                    const char* payload)
+{
+  char topic[96];
+  const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
+  std::snprintf(topic, sizeof(topic), "%s/%u/pump%s", _topics.slotPrefix(),
+                moduleNumber, recordSuffix(record));
+  return _mqttService.publish(topic, payload, false);
+}
+
+/**
+ * Formats one cached info sample or fault reason.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param record Index into the now, cycle, totals, and fault set.
+ * @param out Destination buffer.
+ * @param outCap Destination capacity.
+ * @return False when that sample has not been stored.
+ */
+bool PumpMqttBridge::_formatRecord(uint8_t moduleSlot, uint8_t record,
+                                   char* out, size_t outCap) const
+{
+  if (record == RecordNow)
+  {
+    PumpNow sample;
+    if (!_poller.pumpNow(moduleSlot, &sample))
+    {
+      return false;
+    }
+    const char* phase = phaseName(sample.phase);
+    if (phase == nullptr)
+    {
+      return false;
+    }
+    const unsigned npgd =
+        (sample.flags & module_protocol::kPumpFlagNpgdLow) != 0 ? 1U : 0U;
+    const unsigned enable =
+        (sample.flags & module_protocol::kPumpFlagEnableHigh) != 0 ? 1U : 0U;
+    const unsigned cycled =
+        (sample.flags & module_protocol::kPumpFlagCycled) != 0 ? 1U : 0U;
+    std::snprintf(out, outCap, "%s %u %u %u %u %u %u", phase, npgd, enable,
+                  cycled, static_cast<unsigned>(sample.millivolts),
+                  static_cast<unsigned>(sample.milliamps),
+                  static_cast<unsigned>(sample.runSeconds));
+    return true;
+  }
+  if (record == RecordCycle)
+  {
+    PumpCycle sample;
+    if (!_poller.pumpCycle(moduleSlot, &sample))
+    {
+      return false;
+    }
+    std::snprintf(out, outCap, "%u %u %u %u %u %u %u %u",
+                  static_cast<unsigned>(sample.peakMillivolts),
+                  static_cast<unsigned>(sample.minimumMillivolts),
+                  static_cast<unsigned>(sample.peakMilliamps),
+                  static_cast<unsigned>(sample.averageMillivolts),
+                  static_cast<unsigned>(sample.averageMilliamps),
+                  static_cast<unsigned>(sample.softStartMs),
+                  static_cast<unsigned>(sample.powerGoodMs),
+                  static_cast<unsigned>(sample.runSeconds));
+    return true;
+  }
+  if (record == RecordTotals)
+  {
+    PumpTotals sample;
+    if (!_poller.pumpTotals(moduleSlot, &sample))
+    {
+      return false;
+    }
+    std::snprintf(out, outCap, "%u %u %u %u %u %u",
+                  static_cast<unsigned>(sample.completedCycles),
+                  static_cast<unsigned>(sample.totalSeconds),
+                  static_cast<unsigned>(sample.peakMillivolts),
+                  static_cast<unsigned>(sample.peakMilliamps),
+                  static_cast<unsigned>(sample.failedStarts),
+                  static_cast<unsigned>(sample.lastRunSeconds));
+    return true;
+  }
+  PumpFaultReport report;
+  if (!_poller.pumpFaultReport(moduleSlot, &report))
+  {
+    return false;
+  }
+  const char* name = faultName(report.reason);
+  if (name == nullptr)
+  {
+    std::snprintf(out, outCap, "%u %u", static_cast<unsigned>(report.reason),
+                  static_cast<unsigned>(report.index));
+    return true;
+  }
+  std::snprintf(out, outCap, "%s %u", name,
+                static_cast<unsigned>(report.index));
+  return true;
+}
+
+/**
+ * Reports whether one info sample is stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param record Index into the now, cycle, totals, and fault set.
+ * @return True when a sample can be published.
+ */
+bool PumpMqttBridge::_recordKnown(uint8_t moduleSlot, uint8_t record) const
+{
+  if (record == RecordNow)
+  {
+    return _poller.nowKnown(moduleSlot);
+  }
+  if (record == RecordCycle)
+  {
+    return _poller.cycleKnown(moduleSlot);
+  }
+  if (record == RecordTotals)
+  {
+    return _poller.totalsKnown(moduleSlot);
+  }
+  return _poller.faultReportKnown(moduleSlot);
+}
+
+/**
+ * Reads the generation of one info sample.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param record Index into the now, cycle, totals, and fault set.
+ * @return Generation, or 0 when none has been stored.
+ */
+uint32_t PumpMqttBridge::_recordRevisionOf(uint8_t moduleSlot,
+                                           uint8_t record) const
+{
+  if (record == RecordNow)
+  {
+    return _poller.nowRevision(moduleSlot);
+  }
+  if (record == RecordCycle)
+  {
+    return _poller.cycleRevision(moduleSlot);
+  }
+  if (record == RecordTotals)
+  {
+    return _poller.totalsRevision(moduleSlot);
+  }
+  return _poller.faultRevision(moduleSlot);
 }

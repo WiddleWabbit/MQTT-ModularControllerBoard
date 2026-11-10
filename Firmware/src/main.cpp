@@ -45,6 +45,11 @@ const uint32_t kPumpPollIntervalMs = 60UL * 1000UL;
 // A reset command does not refresh this window.
 const uint32_t kPumpCommandTimeoutMs = 3UL * 60UL * 1000UL;
 
+// Now, cycle, and totals for each pump repeat on this period.
+// The first sample of each is sent once the state is known.
+// GET_FAULT is not on this period: it follows a fault state.
+const uint32_t kPumpInfoIntervalMs = 15UL * 1000UL;
+
 // USB serial status snapshot. Reboot restores this; it is not stored.
 const uint32_t kSerialStatusIntervalMs = 10UL * 1000UL;
 
@@ -141,7 +146,7 @@ SolenoidModule solenoidModule(moduleBus, network, systemClock,
                               kSolenoidPollIntervalMs,
                               kSolenoidCommandTimeoutMs);
 PumpModule pumpModule(moduleBus, network, systemClock, kPumpPollIntervalMs,
-                      kPumpCommandTimeoutMs);
+                      kPumpCommandTimeoutMs, kPumpInfoIntervalMs);
 
 
 // ========== Serial console and programming ==========

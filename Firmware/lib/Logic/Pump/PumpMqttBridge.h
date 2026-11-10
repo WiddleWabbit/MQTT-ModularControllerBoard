@@ -16,9 +16,11 @@
 static const char kPumpCommandTopic[] = "watering/pump";
 
 /**
- * Publishes pump state and turns the command topic into a poller
- * request. The command handler only records the request; it does
- * not touch I2C. State is published at "{prefix}/{moduleSlot}/pump".
+ * Publishes pump state and the info samples, and turns the command
+ * topic into a poller request. The command handler only records the
+ * request; it does not touch I2C. State is published at
+ * "{prefix}/{moduleSlot}/pump". Now, cycle, totals, and the fault
+ * reason use the same stem with /now, /cycle, /totals, and /fault.
  */
 class PumpMqttBridge
 {
@@ -49,16 +51,18 @@ public:
                             size_t length, void* context);
 
   /**
-   * Publishes each new state, including a repeated value, with
-   * retain off. A pump that disappears publishes unavailable with
-   * retain off. A rejected publish stays pending. A new device id
-   * sends the current state once on the new topics.
+   * Publishes each new state and info sample, including a repeated
+   * value, with retain off. A pump that disappears publishes
+   * unavailable with retain off. A rejected publish stays pending.
+   * A new device id sends the current values once on the new topics.
    *
    * @return Nothing.
    */
   void update();
 
 private:
+  static const uint8_t kRecordCount = 4;
+
   PumpPoller& _poller;
   MqttService& _mqttService;
   MqttTopicLayout& _topics;
@@ -66,6 +70,9 @@ private:
   bool _publishedOk[module_protocol::kSlotCount];
   uint32_t _publishedRevision[module_protocol::kSlotCount];
   char _published[module_protocol::kSlotCount][16];
+  bool _recordOk[module_protocol::kSlotCount][kRecordCount];
+  uint32_t _recordRevision[module_protocol::kSlotCount][kRecordCount];
+  bool _recordUnavailable[module_protocol::kSlotCount][kRecordCount];
 
   /**
    * Parses a pump command and records it.
@@ -93,6 +100,14 @@ private:
   void _publishSnapshots();
 
   /**
+   * Publishes each stored info sample and fault reason that has not
+   * been published yet.
+   *
+   * @return Nothing.
+   */
+  void _publishRecords();
+
+  /**
    * Publishes one pump topic with retain off.
    *
    * @param moduleSlot Firmware slot 0..3.
@@ -100,6 +115,17 @@ private:
    * @return True when publication was accepted.
    */
   bool _publish(uint8_t moduleSlot, const char* payload);
+
+  /**
+   * Publishes one info topic with retain off.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param record Index into the now, cycle, totals, and fault set.
+   * @param payload Text payload.
+   * @return True when publication was accepted.
+   */
+  bool _publishRecord(uint8_t moduleSlot, uint8_t record,
+                      const char* payload);
 
   /**
    * Formats the text for a cached state.
@@ -110,4 +136,34 @@ private:
    * @return False when no state has been stored.
    */
   bool _formatState(uint8_t moduleSlot, char* out, size_t outCap) const;
+
+  /**
+   * Formats one cached info sample or fault reason.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param record Index into the now, cycle, totals, and fault set.
+   * @param out Destination buffer.
+   * @param outCap Destination capacity.
+   * @return False when that sample has not been stored.
+   */
+  bool _formatRecord(uint8_t moduleSlot, uint8_t record, char* out,
+                     size_t outCap) const;
+
+  /**
+   * Reports whether one info sample is stored.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param record Index into the now, cycle, totals, and fault set.
+   * @return True when a sample can be published.
+   */
+  bool _recordKnown(uint8_t moduleSlot, uint8_t record) const;
+
+  /**
+   * Reads the generation of one info sample.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param record Index into the now, cycle, totals, and fault set.
+   * @return Generation, or 0 when none has been stored.
+   */
+  uint32_t _recordRevisionOf(uint8_t moduleSlot, uint8_t record) const;
 };

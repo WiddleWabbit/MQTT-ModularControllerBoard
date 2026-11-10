@@ -305,16 +305,18 @@ struct Board
    * @param solenoidSilenceMs Solenoid command-absence cutoff.
    * @param pumpPollMs Pump state period.
    * @param pumpSilenceMs Pump command-absence cutoff.
+   * @param pumpInfoMs Pump now, cycle, and totals period. Zero
+   *        selects the poller's default.
    */
   Board(uint32_t sensorPollMs, uint32_t solenoidPollMs,
         uint32_t solenoidSilenceMs, uint32_t pumpPollMs,
-        uint32_t pumpSilenceMs)
+        uint32_t pumpSilenceMs, uint32_t pumpInfoMs = 0)
     : network(wifi, ntp, mqtt, clock, preferences, "watering", kNtp, kTiming),
       slots(clock),
       bus(slots.i2c, clock, slots.pins, ModuleHostConfig{}, network),
       sensor(bus, network, clock, sensorPollMs),
       solenoid(bus, network, clock, solenoidPollMs, solenoidSilenceMs),
-      pump(bus, network, clock, pumpPollMs, pumpSilenceMs)
+      pump(bus, network, clock, pumpPollMs, pumpSilenceMs, pumpInfoMs)
   {
   }
 
@@ -1123,7 +1125,7 @@ void testSolenoidModuleClearsOnUnplug()
 
 void testPumpModuleTurnsOnAndPublishes()
 {
-  Board board(kPollMs, kPollMs, kSolenoidSilenceMs, 0, 0);
+  Board board(kPollMs, kPollMs, kSolenoidSilenceMs, 0, 0, 1000000);
   board.start();
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypePumpModule;
@@ -1134,6 +1136,18 @@ void testPumpModuleTurnsOnAndPublishes()
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "off", false));
+
+  board.pump.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(board.slots.i2c));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump/now",
+                             "off 0 0 0 0 0 0", false));
+  board.pump.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpCycle,
+                    lastCommand(board.slots.i2c));
+  board.pump.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpTotals,
+                    lastCommand(board.slots.i2c));
 
   const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/pump", "1");
@@ -1180,10 +1194,9 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "fault",
                              false));
 
-  const size_t learned = board.slots.i2c.protocolOpCount();
   board.mqtt.deliver("watering/pump", "1 on");
   board.pump.update();
-  TEST_ASSERT_EQUAL(learned, board.slots.i2c.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, device.pumpState);
 
   board.mqtt.deliver("watering/pump", "1 reset");
@@ -1222,9 +1235,9 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   TEST_ASSERT_EQUAL(module_protocol::kCmdResetPump,
                     lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, device.pumpState);
-  const size_t afterReset = board.slots.i2c.protocolOpCount();
   board.pump.update();
-  TEST_ASSERT_EQUAL(afterReset, board.slots.i2c.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetFault, lastCommand(board.slots.i2c));
+  TEST_ASSERT_EQUAL(module_protocol::kPumpStateFault, device.pumpState);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "fault",
                              false));
 }
@@ -1276,6 +1289,13 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetPump, lastCommand(board.slots.i2c));
   TEST_ASSERT_EQUAL(0x11, board.slots.i2c.ops.back().address);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump", "on", false));
+
+  board.pump.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpNow,
+                    lastCommand(board.slots.i2c));
+  TEST_ASSERT_EQUAL(0x11, board.slots.i2c.ops.back().address);
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump/now",
+                             "off 0 0 0 0 0 0", false));
 
   board.slots.sense(1).setPresent(false);
   for (uint32_t i = 0; i < 80; ++i)

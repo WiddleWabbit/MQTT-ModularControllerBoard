@@ -65,6 +65,12 @@ inline uint8_t crc8Smbus(const uint8_t* data, size_t length)
 constexpr uint8_t kCmdPing = 0x01;
 constexpr uint8_t kCmdGetIdentity = 0x02;
 constexpr uint8_t kCmdSetAddress = 0x03;
+// Empty request. Reply is the reason byte, then the 0-based index.
+// Reason 0 is no fault on every module type. A module defines its
+// own non-zero reasons.
+constexpr uint8_t kCmdGetFault = 0x04;
+constexpr uint8_t kFaultPayloadLen = 2;
+constexpr uint8_t kFaultNone = 0;
 constexpr uint8_t kCmdEcho = 0x40;
 
 // Sensor module (type 0x0200) commands. Other types are not required
@@ -109,14 +115,35 @@ constexpr uint8_t kSolenoidStateDisconnected = 2;
 // implement these. One pump per module. State bytes are
 // kPumpStateOff, kPumpStateOn, and kPumpStateFault.
 // SET_PUMP accepts only off or on. RESET_PUMP is a separate command.
+// GET_PUMP_NOW, GET_PUMP_CYCLE, and GET_PUMP_TOTALS are empty
+// requests. Payloads are big-endian. Phase bytes are the kPumpPhase
+// values. NOW flags are kPumpFlagNpgdLow, kPumpFlagEnableHigh, and
+// kPumpFlagCycled.
 constexpr uint8_t kCmdGetPumpState = 0x60;
 constexpr uint8_t kCmdSetPump = 0x61;
 constexpr uint8_t kCmdResetPump = 0x62;
+constexpr uint8_t kCmdGetPumpNow = 0x63;
+constexpr uint8_t kCmdGetPumpCycle = 0x64;
+constexpr uint8_t kCmdGetPumpTotals = 0x65;
 constexpr uint8_t kPumpStatePayloadLen = 1;
 constexpr uint8_t kPumpSetPayloadLen = 1;
+constexpr uint8_t kPumpNowPayloadLen = 8;
+constexpr uint8_t kPumpCyclePayloadLen = 16;
+constexpr uint8_t kPumpTotalsPayloadLen = 16;
 constexpr uint8_t kPumpStateOff = 0;
 constexpr uint8_t kPumpStateOn = 1;
 constexpr uint8_t kPumpStateFault = 2;
+constexpr uint8_t kPumpPhaseOff = 0;
+constexpr uint8_t kPumpPhaseHeld = 1;
+constexpr uint8_t kPumpPhaseRunning = 2;
+constexpr uint8_t kPumpPhaseFault = 3;
+constexpr uint8_t kPumpFlagNpgdLow = 0x01;
+constexpr uint8_t kPumpFlagEnableHigh = 0x02;
+constexpr uint8_t kPumpFlagCycled = 0x04;
+constexpr uint8_t kPumpFaultSlowStart = 1;
+constexpr uint8_t kPumpFaultOvercurrent = 2;
+constexpr uint8_t kPumpFaultUndercurrent = 3;
+constexpr uint8_t kPumpFaultStuckOn = 4;
 
 // SET_ADDRESS on-wire size. length field = 3 (2 + 1-byte payload);
 // total frame = 4. Do not count the I2C 7-bit address as a frame byte.

@@ -26,6 +26,7 @@ Publish a command with retain off. A retained command is delivered again each ti
 | Desired state of every solenoid output     | `{id}/solenoids`           | `1 on on off off`             | `{id}/slot/1/solenoid/1` and the other outputs |
 | Which solenoid outputs are connected       | `{id}/solenoids/connected` | `1`                           | `{id}/slot/1/solenoids`                        |
 | Pump on, off, or reset                     | `{id}/pump`                | `1 on`                        | `{id}/slot/1/pump`                             |
+| Pump live sample, cycle, totals, or fault  | —                          | the controller publishes this | `{id}/slot/1/pump/now` and cycle, totals, fault |
 | Whether a slot has a board, and which type | —                          | the controller publishes this | `{id}/slot/1` through `{id}/slot/4`            |
 
 Slot numbers in every payload are 1..4. Slot 1 is I2C `0x10`, slot 2 is `0x11`, slot 3 is `0x12`, slot 4 is `0x13`. Sensor and solenoid indexes in topics and in connected-list results are 1-based.
@@ -161,9 +162,20 @@ mosquitto_pub -h <broker> -t watering/pump -q 1 -m "1 off"
 mosquitto_pub -h <broker> -t watering/pump -q 1 -m "1 reset"
 ```
 
-The result is published on `{id}/slot/N/pump` with retain off, as `on`, `off`, or `fault`.
+The result is published on `{id}/slot/N/pump` with retain off, as `on`, `off`, or `fault`. Held and running are both `on` there.
 
-`on` and `off` restart the absence window. `reset` does not. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on. While the absence window stays open, that on command is sent again every `kPumpPollIntervalMs` (60 seconds), and the reply publishes the same word again. Off is sent when the known state differs. `RESET_PUMP` is sent only for `reset`. A faulted pump is left alone until `reset`.
+The controller also publishes, with retain off, and does not subscribe to:
+
+```text
+{id}/slot/N/pump/now      held 0 1 0 12000 4000 0
+{id}/slot/N/pump/cycle    12000 0 4000 0 0 0 0 0
+{id}/slot/N/pump/totals   0 0 12000 4000 0 0
+{id}/slot/N/pump/fault    slow-start 0
+```
+
+`now` is the phase (`off`, `held`, `running`, or `fault`), then nPGD-low, enable-high, and cycled as `0` or `1`, then millivolts, milliamps, and open-cycle seconds. `cycle` is peak mV, minimum mV, peak mA, average mV, average mA, soft-start ms, power-good ms, and run seconds. `totals` is cycles, seconds, peak mV, peak mA, failed starts, and last run seconds. `fault` is `none`, `slow-start`, `overcurrent`, `undercurrent`, `stuck-on`, or a decimal reason, then the index. These four topics are not subscriptions. `kSubscriptionCount` stays 6.
+
+`on` and `off` restart the absence window. `reset` does not. The info reads do not. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on. While the absence window stays open, that on command is sent again every `kPumpPollIntervalMs` (60 seconds), and the reply publishes the same word again. Off is sent when the known state differs. `RESET_PUMP` is sent only for `reset`. `SET_PUMP` is not sent while the pump is faulted. `GET_FAULT` is sent once for that fault and the reason is published. Now, cycle, and totals repeat every `kPumpInfoIntervalMs` (15 seconds).
 
 If no accepted on/off command arrives for `kPumpCommandTimeoutMs` (3 minutes), a pump that is on is turned off. A faulted pump stays faulted until `reset`.
 
@@ -173,7 +185,7 @@ Behaviour: [pump reference](pump-module.md).
 
 The controller publishes these. Subscribe to read them. QoS is 0.
 
-Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, solenoid states, the connected-output list, and pump state are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
+Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, solenoid states, the connected-output list, pump state, and the pump now, cycle, totals, and fault topics are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
 
 A publish with retain off does not replace a message the broker already stored. This firmware does not publish an empty payload, and it does not delete those copies. Messages already on the broker, including ones under a previous device id, stay until they are removed there. A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines, and any result the broker is still holding. The next sample arrives on the next poll, or when a command asks again.
 
@@ -185,6 +197,10 @@ A publish with retain off does not replace a message the broker already stored. 
 | `{id}/slot/N/solenoid/M` | no | `on`, `off`, `disconnected`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/solenoids` | no | `<count> <connected indexes...>`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/pump` | no | `on`, `off`, `fault`, or `unavailable` | Pump bridge |
+| `{id}/slot/N/pump/now` | no | phase, three flags, mV, mA, run seconds, or `unavailable` | Pump bridge |
+| `{id}/slot/N/pump/cycle` | no | eight numbers, or `unavailable` | Pump bridge |
+| `{id}/slot/N/pump/totals` | no | six numbers, or `unavailable` | Pump bridge |
+| `{id}/slot/N/pump/fault` | no | reason and index, or `unavailable` | Pump bridge |
 
 `N` is 1..4. `M` is 1..16. Firmware slot 0 is topic 1.
 
@@ -207,7 +223,7 @@ Fault Busy
 
 `addr` is two uppercase hex digits. `type` is four uppercase hex digits. The name is `Sensor`, `Solenoid`, or `Pump`. An online type with no name is `Unknown`. An unchanged body is not sent again. A failed publish is retried. After a reconnect, a body the broker already accepted stays unpublished until the text changes. A new subscriber still receives it, because the broker kept the retained copy.
 
-A reading or a solenoid or pump state is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point.
+A reading, a solenoid state, a pump state, or a pump info sample is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point. `unavailable` on a pump info topic is sent only when that topic had already been published and the slot is no longer an online pump. A topic that was never published is left alone. A new identity that is still online publishes the next samples and does not publish `unavailable` on those info topics.
 
 `unavailable` is published with retain off when that point disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
 
