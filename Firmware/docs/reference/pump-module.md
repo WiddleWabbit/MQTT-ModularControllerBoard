@@ -121,7 +121,7 @@ The window is one timer for the whole controller. Any accepted on/off command, f
 
 ### More than one module
 
-Each pump slot has its own state and poll timer. The poller still runs one query per pass. Unplugging one module publishes `unavailable` on that module's pump topic only.
+Each pump slot has its own state and poll timer. The poller still runs one query per pass. Unplugging one module publishes `unavailable` on `{id}/slot/N/pump` only. The slot line is updated by the bus. Now, cycle, totals, and the fault reason are left as last published.
 
 ## Publication
 
@@ -153,12 +153,13 @@ Each stored state is published, including a repeat of the same text, on the brid
 | `GET_PUMP_CYCLE` succeeds | `{id}/slot/N/pump/cycle` | `12000 0 4000 0 0 0 0 0` | no |
 | `GET_PUMP_TOTALS` succeeds | `{id}/slot/N/pump/totals` | `0 0 12000 4000 0 0` is cycles, seconds, peak mV, peak mA, failed starts, last run seconds | no |
 | `GET_FAULT` succeeds, or a fault clears | `{id}/slot/N/pump/fault` | `none 0`, `slow-start 0`, `overcurrent 0`, `undercurrent 0`, `stuck-on 0`, or `9 0` | no |
-| Slot is no longer an online pump | each pump topic that had been published | `unavailable` | no, once |
+| Slot is no longer an online pump | `{id}/slot/N/pump` | `unavailable` | no, once |
+| Slot is no longer an online pump | `{id}/slot/N/pump/now`, `/cycle`, `/totals`, `/fault` | the last sample stays; nothing new is published | — |
 | State query, malformed command, or a command still waiting for the state | — | nothing | — |
 | Bridge pass with no new sample | — | that sample is not repeated | — |
-| A new identity while the slot is still an online pump | the info topics | the next samples, not `unavailable` | no |
+| A new identity while the slot is still an online pump | the info topics | the next samples | no |
 
-A topic that was never published is not given `unavailable`. While a record is unknown, the bridge forgets the generation it last published, so a new identity whose counters start again at 1 is published. `{id}/slot/N/pump` still publishes `unavailable` when the state is no longer known.
+While a record is unknown, the bridge forgets the generation it last published, so a new identity whose counters start again at 1 is published. `{id}/slot/N` is the retained notice that the board has left.
 
 Pump state is not retained. A retained `on` or `fault` survived after the board was unplugged, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
 
@@ -206,4 +207,4 @@ A zero argument selects the poller's own default for that argument, including 15
 
 ## Tests
 
-`test/test_desktop/test_pump.cpp` covers the command frames, host rejection unless the slot is an online pump, a short payload and a phase of 4, the worked held sample, the state read and its 60 second repeat, the info burst and its own 15 second repeat, slot 0's three info reads before slot 1, a module reset that reads the state again, busy retries, off sent only when the state differs, on sent again when it is already on and again at the poll interval, a busy on refresh that waits and tries again, on and off with no `GET_FAULT`, one `GET_FAULT` per fault episode, `slow-start 0`, `none 0`, and `9 0`, a reset that publishes `none 0` without `GET_FAULT`, three busy now reads that move on to cycle, three busy fault reads that wait the info interval, control before a due info read, a fault left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, `unavailable` once on a published info topic, no `unavailable` on a topic that was never published, and a new identity that publishes the next samples instead of `unavailable`. The tests use one pump module, plus one command addressed to slot 2 and one two-slot info order. `test_deep_modules.cpp` drives `PumpModule::update()`.
+`test/test_desktop/test_pump.cpp` covers the command frames, host rejection unless the slot is an online pump, a short payload and a phase of 4, the worked held sample, the state read and its 60 second repeat, the info burst and its own 15 second repeat, slot 0's three info reads before slot 1, a module reset that reads the state again, busy retries, off sent only when the state differs, on sent again when it is already on and again at the poll interval, a busy on refresh that waits and tries again, on and off with no `GET_FAULT`, one `GET_FAULT` per fault episode, `slow-start 0`, `none 0`, and `9 0`, a reset that publishes `none 0` without `GET_FAULT`, three busy now reads that move on to cycle, three busy fault reads that wait the info interval, control before a due info read, a fault left alone, reset followed by on when that is still desired, the 3 minute default, a configured absence cutoff, reset not extending that cutoff, an unplug that leaves now, cycle, totals, and fault unpublished, and a new identity that publishes the next samples. The tests use one pump module, plus one command addressed to slot 2 and one two-slot info order. `test_deep_modules.cpp` drives `PumpModule::update()`.

@@ -197,10 +197,10 @@ A publish with retain off does not replace a message the broker already stored. 
 | `{id}/slot/N/solenoid/M` | no | `on`, `off`, `disconnected`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/solenoids` | no | `<count> <connected indexes...>`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/pump` | no | `on`, `off`, `fault`, or `unavailable` | Pump bridge |
-| `{id}/slot/N/pump/now` | no | phase, three flags, mV, mA, run seconds, or `unavailable` | Pump bridge |
-| `{id}/slot/N/pump/cycle` | no | eight numbers, or `unavailable` | Pump bridge |
-| `{id}/slot/N/pump/totals` | no | six numbers, or `unavailable` | Pump bridge |
-| `{id}/slot/N/pump/fault` | no | reason and index, or `unavailable` | Pump bridge |
+| `{id}/slot/N/pump/now` | no | phase, three flags, mV, mA, run seconds | Pump bridge |
+| `{id}/slot/N/pump/cycle` | no | eight numbers | Pump bridge |
+| `{id}/slot/N/pump/totals` | no | six numbers | Pump bridge |
+| `{id}/slot/N/pump/fault` | no | reason and index | Pump bridge |
 
 `N` is 1..4. `M` is 1..16. Firmware slot 0 is topic 1.
 
@@ -223,9 +223,9 @@ Fault Busy
 
 `addr` is two uppercase hex digits. `type` is four uppercase hex digits. The name is `Sensor`, `Solenoid`, or `Pump`. An online type with no name is `Unknown`. An unchanged body is not sent again. A failed publish is retried. After a reconnect, a body the broker already accepted stays unpublished until the text changes. A new subscriber still receives it, because the broker kept the retained copy.
 
-A reading, a solenoid state, a pump state, or a pump info sample is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point. `unavailable` on a pump info topic is sent only when that topic had already been published and the slot is no longer an online pump. A topic that was never published is left alone. A new identity that is still online publishes the next samples and does not publish `unavailable` on those info topics.
+A reading, a solenoid state, a pump state, or a pump info sample is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point. When a pump board leaves, `{id}/slot/N` becomes `Empty`. The now, cycle, totals, and fault topics are not published again until a new sample is stored.
 
-`unavailable` is published with retain off when that point disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
+`unavailable` is published with retain off when a sensor point, a solenoid point, or the pump state disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
 
 A count query publishes nothing by itself. A sensor state query can publish `off`, `fault`, or `disconnected` on `{id}/slot/N/sensor/M`, and it can publish `{id}/slot/N/sensors` when the list becomes complete or the set of inputs that are on changes. On does not publish a reading until the value is stored.
 
@@ -257,7 +257,7 @@ An ignored command publishes no result. It does not change the retained slot lin
 | Fifth sensor read while four are still waiting | Dropped |
 | Publish while MQTT is disconnected | Rejected. The publisher retries on a later pass |
 | Immediate sensor read that fails, or a sensor number outside the reported count | `unavailable` with retain off |
-| Slot unplugged after a result was published | `unavailable` with retain off, once, on that slot's result topics. `{id}/slot/N` becomes `Empty` and stays retained |
+| Slot unplugged after a sensor, solenoid, or pump state was published | `unavailable` with retain off, once, on that topic. `{id}/slot/N` becomes `Empty` and stays retained. Pump now, cycle, totals, and fault stay as last published |
 
 While an ISP session is active, `Network` still delivers commands, and the handlers still record them. Slot status and sensor, solenoid, and pump results are published when those modules run again after the session. [Programming reference](programming.md).
 

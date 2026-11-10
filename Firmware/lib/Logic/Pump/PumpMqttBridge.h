@@ -53,8 +53,10 @@ public:
   /**
    * Publishes each new state and info sample, including a repeated
    * value, with retain off. A pump that disappears publishes
-   * unavailable with retain off. A rejected publish stays pending.
-   * A new device id sends the current values once on the new topics.
+   * unavailable on the state topic only. Now, cycle, totals, and
+   * the fault reason are left as last published. A rejected publish
+   * stays pending. A new device id sends the current values once
+   * on the new topics.
    *
    * @return Nothing.
    */
@@ -70,9 +72,7 @@ private:
   bool _publishedOk[module_protocol::kSlotCount];
   uint32_t _publishedRevision[module_protocol::kSlotCount];
   char _published[module_protocol::kSlotCount][16];
-  bool _recordOk[module_protocol::kSlotCount][kRecordCount];
   uint32_t _recordRevision[module_protocol::kSlotCount][kRecordCount];
-  bool _recordUnavailable[module_protocol::kSlotCount][kRecordCount];
 
   /**
    * Parses a pump command and records it.

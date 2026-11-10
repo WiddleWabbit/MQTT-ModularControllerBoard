@@ -1306,6 +1306,8 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
   board.pump.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump",
                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/2/pump/now",
+                              "unavailable", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
 }
 

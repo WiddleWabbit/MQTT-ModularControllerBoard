@@ -19,9 +19,7 @@ PumpMqttBridge::PumpMqttBridge(PumpPoller& poller, MqttService& mqttService,
     _published[slot][0] = '\0';
     for (uint8_t record = 0; record < kRecordCount; ++record)
     {
-      _recordOk[slot][record] = false;
       _recordRevision[slot][record] = 0;
-      _recordUnavailable[slot][record] = false;
     }
   }
 }
@@ -83,9 +81,7 @@ void PumpMqttBridge::_syncTopicGeneration()
     _published[slot][0] = '\0';
     for (uint8_t record = 0; record < kRecordCount; ++record)
     {
-      _recordOk[slot][record] = false;
       _recordRevision[slot][record] = 0;
-      _recordUnavailable[slot][record] = false;
     }
   }
   _seenGeneration = generation;
@@ -428,7 +424,8 @@ const char* recordSuffix(uint8_t record)
 
 /**
  * Publishes each stored info sample and fault reason that has not
- * been published yet.
+ * been published yet. A missing sample publishes nothing. The slot
+ * line is the notice that the board has left.
  *
  * @return Nothing.
  */
@@ -443,14 +440,6 @@ void PumpMqttBridge::_publishRecords()
           !_formatRecord(slot, record, payload, sizeof(payload)))
       {
         _recordRevision[slot][record] = 0;
-        if (!_poller.moduleOnline(slot) && _recordOk[slot][record] &&
-            !_recordUnavailable[slot][record])
-        {
-          if (_publishRecord(slot, record, "unavailable"))
-          {
-            _recordUnavailable[slot][record] = true;
-          }
-        }
         continue;
       }
       const uint32_t revision = _recordRevisionOf(slot, record);
@@ -462,8 +451,6 @@ void PumpMqttBridge::_publishRecords()
       {
         continue;
       }
-      _recordOk[slot][record] = true;
-      _recordUnavailable[slot][record] = false;
       _recordRevision[slot][record] = revision;
     }
   }

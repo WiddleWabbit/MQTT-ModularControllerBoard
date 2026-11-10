@@ -1384,7 +1384,7 @@ void testPumpFaultBusyWaitsThenRetries()
                              "stuck-on 0", false));
 }
 
-void testPumpRecordsClearOnceOnUnplug()
+void testPumpInfoTopicsStayQuietOnUnplug()
 {
   PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateOff;
@@ -1394,25 +1394,23 @@ void testPumpRecordsClearOnceOnUnplug()
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
                              "off 0 0 0 0 0 0", false));
-  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/fault"));
-
-  harness.modules.sense(0).setPresent(false);
-  pumpMs(harness.modules, 80);
-  harness.poller.update();
-  harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/now",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/cycle",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/totals",
-                             "unavailable", false));
-  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/fault",
-                              "unavailable", false));
   const int nowOnce = countTopic(harness.client, "watering/slot/1/pump/now");
   const int cycleOnce =
       countTopic(harness.client, "watering/slot/1/pump/cycle");
   const int totalsOnce =
       countTopic(harness.client, "watering/slot/1/pump/totals");
+
+  harness.modules.sense(0).setPresent(false);
+  pumpMs(harness.modules, 80);
+  harness.poller.update();
+  harness.bridge.update();
+  TEST_ASSERT_EQUAL(nowOnce, countTopic(harness.client,
+                                        "watering/slot/1/pump/now"));
+  TEST_ASSERT_EQUAL(cycleOnce, countTopic(harness.client,
+                                          "watering/slot/1/pump/cycle"));
+  TEST_ASSERT_EQUAL(totalsOnce, countTopic(harness.client,
+                                           "watering/slot/1/pump/totals"));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/fault"));
   harness.bridge.update();
   TEST_ASSERT_EQUAL(nowOnce, countTopic(harness.client,
                                         "watering/slot/1/pump/now"));
@@ -1422,7 +1420,7 @@ void testPumpRecordsClearOnceOnUnplug()
                                            "watering/slot/1/pump/totals"));
 }
 
-void testPumpFaultRecordClearsOnlyAfterPublish()
+void testPumpFaultTopicStaysQuietOnUnplug()
 {
   PumpHarness harness(60000, 3UL * 60UL * 1000UL, kQuietInfoMs);
   harness.device.pumpState = module_protocol::kPumpStateFault;
@@ -1433,16 +1431,15 @@ void testPumpFaultRecordClearsOnlyAfterPublish()
   harness.bridge.update();
   TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
                              "undercurrent 0", false));
+  const int once = countTopic(harness.client, "watering/slot/1/pump/fault");
 
   harness.modules.sense(0).setPresent(false);
   pumpMs(harness.modules, 80);
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump/fault",
-                             "unavailable", false));
-  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump/now",
-                              "unavailable", false));
-  const int once = countTopic(harness.client, "watering/slot/1/pump/fault");
+  TEST_ASSERT_EQUAL(once, countTopic(harness.client,
+                                     "watering/slot/1/pump/fault"));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/pump/now"));
   harness.bridge.update();
   TEST_ASSERT_EQUAL(once, countTopic(harness.client,
                                      "watering/slot/1/pump/fault"));
@@ -1538,7 +1535,7 @@ void runPumpTests()
   RUN_TEST(testPumpControlPreemptsInfo);
   RUN_TEST(testPumpNowBusySkipsToCycleThenRetries);
   RUN_TEST(testPumpFaultBusyWaitsThenRetries);
-  RUN_TEST(testPumpRecordsClearOnceOnUnplug);
-  RUN_TEST(testPumpFaultRecordClearsOnlyAfterPublish);
+  RUN_TEST(testPumpInfoTopicsStayQuietOnUnplug);
+  RUN_TEST(testPumpFaultTopicStaysQuietOnUnplug);
   RUN_TEST(testPumpReidentifyKeepsRecordsUntilOffline);
 }
