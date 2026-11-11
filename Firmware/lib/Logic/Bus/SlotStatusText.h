@@ -11,8 +11,10 @@ constexpr size_t kSlotStatusBodyBytes = 80;
 /**
  * Writes one slot's public snapshot body, without a "Slot N:" prefix.
  * The words match serial status: Empty, Debouncing, Enumerating,
- * "Online IdentityEcho addr=0x10", "Unsupported type=0x02AA addr=0x12",
- * and "Fault Nack".
+ * "Online IdentityEcho addr=0x10 board 0 firmware 1",
+ * "Unsupported type=0x02AA addr=0x12 board 1 firmware 2", and "Fault Nack".
+ * Online and Unsupported append the identity word: high byte board,
+ * low byte firmware. Empty, Debouncing, Enumerating, and Fault do not.
  *
  * @param host Module host to read.
  * @param slotIndex Firmware slot 0..3.

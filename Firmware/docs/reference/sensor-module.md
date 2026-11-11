@@ -142,7 +142,7 @@ An input whose state is on is listed before its reading has been stored.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10 board 2 firmware 1` |
 | `{id}/slot/N/sensor/M` | publish, QoS 0, retain off | `off`, `fault`, `disconnected`, `connected <int32>`, or `unavailable` |
 | `{id}/slot/N/sensors` | publish, QoS 0, retain off | count, then indexes whose state is on, such as `2 1` |
 | `{id}/slot/N/sensors/fault` | publish, QoS 0, retain off | count, then one reason per input, such as `3 none overcurrent none` |

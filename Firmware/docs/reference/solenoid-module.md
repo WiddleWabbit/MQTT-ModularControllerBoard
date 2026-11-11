@@ -92,7 +92,7 @@ Each solenoid slot has its own count, states, and poll timer. The poller still r
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10 board 1 firmware 3` |
 | `{id}/slot/N/solenoid/M` | publish, QoS 0, retain off | `on`, `off`, `disconnected`, or `unavailable` |
 | `{id}/solenoids` | subscribe, QoS 1 | `N on off ...` |
 | `{id}/solenoids/connected` | subscribe, QoS 1 | `N` |

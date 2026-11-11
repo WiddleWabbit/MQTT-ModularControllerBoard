@@ -5,9 +5,11 @@
 // ========== Construction ==========
 
 ModuleBus::ModuleBus(I2cMaster& bus, IClock& clock, SlotPins slots[4],
-                     const ModuleHostConfig& config, Network& network)
+                     const ModuleHostConfig& config, Network& network,
+                     ControllerIdentity identity)
   : _host(bus, clock, slots, config),
-    _publisher(_host, network.mqtt(), network.topics())
+    _publisher(_host, network.mqtt(), network.topics()),
+    _info(network.mqtt(), network.topics(), identity)
 {
 }
 
@@ -25,7 +27,8 @@ void ModuleBus::begin()
 }
 
 /**
- * Advances the host, then publishes changed slot text.
+ * Advances the host, then publishes changed slot text and the
+ * controller identity until the broker accepts it.
  *
  * @return Nothing.
  */
@@ -33,6 +36,7 @@ void ModuleBus::update()
 {
   _host.update();
   _publisher.update();
+  _info.update();
 }
 
 /**

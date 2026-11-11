@@ -24,16 +24,17 @@ The reporter reads `IClock` for uptime, and `WifiManager`, `NtpService`, `MqttSe
 
 ## Snapshot
 
-Eight lines. The first is uptime. Connected Wi-Fi with an address other than `0.0.0.0` includes the address and RSSI. Address `0.0.0.0` keeps the RSSI-only line. Other Wi-Fi states omit both. MQTT labels are the `MqttServiceState` names. Unsynchronized NTP omits the time.
+Nine lines. The first is uptime. Connected Wi-Fi with an address other than `0.0.0.0` includes the address and RSSI. Address `0.0.0.0` keeps the RSSI-only line. Other Wi-Fi states omit both. MQTT labels are the `MqttServiceState` names. Unsynchronized NTP omits the time. The controller line follows MQTT and uses `kBoardRevision` and `kFirmwareRevision` from `src/main.cpp`.
 
 ```text
 Uptime: 0d 01:02:03
 WiFi Status: Connected (192.168.1.42, -62 dBm)
 NTP Status: Synchronized (2026-09-21 16:04:00)
 MQTT Status: Connected
+Controller: board 1 firmware 8
 Slot 1: Empty
-Slot 2: Online IdentityEcho addr=0x11
-Slot 3: Unsupported type=0x02AA addr=0x12
+Slot 2: Online IdentityEcho addr=0x11 board 1 firmware 1
+Slot 3: Unsupported type=0x02AA addr=0x12 board 1 firmware 2
 Slot 4: Fault Nack
 ```
 
@@ -58,7 +59,7 @@ Local time is the UTC epoch plus `NtpConfig` `utcOffsetSeconds` and `daylightOff
 
 `Connecting` is a real MQTT state and is usually not visible after `MqttService::update()` returns. The other labels are `Idle`, `Unconfigured`, `WaitingForNetwork`, `Connected`, and `Backoff`.
 
-Firmware slot 1 is index 0 and address `0x10`. Slot text is the same body `ModuleSlotPublisher` uses, with a `Slot N:` prefix. The body itself is in the [module bus reference](module-bus.md).
+Firmware slot 1 is index 0 and address `0x10`. Slot text is the same body `ModuleSlotPublisher` uses, with a `Slot N:` prefix. Online and unsupported bodies append `board N firmware N`. Empty, debouncing, enumerating, and fault bodies do not. The body itself is in the [module bus reference](module-bus.md). The controller line is the same words `ControllerInfoPublisher` puts on `{id}/controller`, with a `Controller:` prefix. The reporter receives those two numbers from `main.cpp`. It does not read them from the publisher.
 
 Heap and PSRAM lines are printed from `loop()` in `main.cpp` every `kMemoryReportIntervalMs` (30 seconds) when USB is plugged in. They are not part of this snapshot, and they are not printed while a programming session is active.
 
@@ -87,6 +88,6 @@ A slot in `Fault Nack` prints `Slot N: Nack` once from `updateStatus()`, includi
 
 ## Tests
 
-`test/test_desktop/test_status.cpp` pins the epoch and offsets and covers plug gating, interval spacing, `begin`, `reconfigure`, MQTT state labels, slot lines, and time advancing after sync. `testStatusReporterPrintsUptimeFromTheMonotonicClock` covers zero, one second, a truncated millisecond, one minute, one hour, and one day. `testStatusReporterUptimeWrapsWithTheClock` covers the last `uint32` millisecond and the wrap to zero. `testStatusReporterUptimeIgnoresNtp` keeps uptime on the monotonic clock while NTP shows a wall time. `testStatusReporterUptimePrintsWhileReportingIsOff` prints uptime from `status` while periodic reporting is off. `test_configuration.cpp` covers `set`, `apply`, `status`, and `program`. `test_deep_modules.cpp` drives the console through `SerialConsole`.
+`test/test_desktop/test_status.cpp` pins the epoch and offsets and covers plug gating, interval spacing, `begin`, `reconfigure`, MQTT state labels, the controller line, slot lines, and time advancing after sync. `testStatusReporterPrintsSuppliedControllerRevision` prints `Controller: board 2 firmware 3` when that identity is supplied. `testStatusReporterPrintsUptimeFromTheMonotonicClock` covers zero, one second, a truncated millisecond, one minute, one hour, and one day. `testStatusReporterUptimeWrapsWithTheClock` covers the last `uint32` millisecond and the wrap to zero. `testStatusReporterUptimeIgnoresNtp` keeps uptime on the monotonic clock while NTP shows a wall time. `testStatusReporterUptimePrintsWhileReportingIsOff` prints uptime from `status` while periodic reporting is off. `test_configuration.cpp` covers `set`, `apply`, `status`, and `program`. `test_deep_modules.cpp` drives the console through `SerialConsole`.
 
-Snapshots in tests are eight lines. The reporter is constructed with an empty module host when the test has no bus of its own.
+Snapshots in tests are nine lines. The reporter is constructed with an empty module host when the test has no bus of its own. The default test identity is board 1, firmware 8.

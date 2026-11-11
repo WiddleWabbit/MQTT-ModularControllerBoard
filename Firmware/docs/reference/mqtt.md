@@ -2,7 +2,7 @@
 
 [Home](../home.md) · Guide: [Network](../networking.md)
 
-Source: `lib/Logic/Network/MqttTopicLayout.h`, `MqttService.h`. Payloads are built in `ModuleSlotPublisher`, `SlotStatusText`, `SensorMqttBridge`, `SolenoidMqttBridge`, and `PumpMqttBridge`.
+Source: `lib/Logic/Network/MqttTopicLayout.h`, `MqttService.h`. Payloads are built in `ModuleSlotPublisher`, `ControllerInfoPublisher`, `SlotStatusText`, `SensorMqttBridge`, `SolenoidMqttBridge`, and `PumpMqttBridge`.
 
 This page is the command catalog. It lists every subscription and every publication, the payload text, and a line you can publish to test. When a command is applied, the poll order, and the absence windows stay on the module reference. If a page and the firmware disagree, the firmware wins. Update this page and that module page together.
 
@@ -28,6 +28,7 @@ Publish a command with retain off. A retained command is delivered again each ti
 | Pump on, off, or reset                     | `{id}/pump`                | `1 on`                        | `{id}/slot/1/pump`                             |
 | Pump live sample, cycle, totals, or fault  | —                          | the controller publishes this | `{id}/slot/1/pump/now` and cycle, totals, fault |
 | Whether a slot has a board, and which type | —                          | the controller publishes this | `{id}/slot/1` through `{id}/slot/4`            |
+| Controller board and firmware revision     | —                          | the controller publishes this | `{id}/controller`                              |
 
 Slot numbers in every payload are 1..4. Slot 1 is I2C `0x10`, slot 2 is `0x11`, slot 3 is `0x12`, slot 4 is `0x13`. Sensor and solenoid indexes in topics and in connected-list results are 1-based.
 
@@ -42,7 +43,7 @@ mosquitto_pub -h <broker> -t watering/sensor/read -q 1 -m "1 2"
 
 `<broker>` is `mqtt.host`. The port default is `1883`. `mosquitto_pub` leaves retain off unless `-r` is passed. `-q 1` matches the subscription. The controller does not read the inbound QoS.
 
-A new subscriber receives the last retained slot line from the broker. Sensor, solenoid, and pump results are not retained, so that subscriber does not receive a stale reading. The controller sends a result again when a new sample is stored, or when the text changes, or when the command asks for the list again. Why only the slot lines are retained is in [Publications](#publications).
+A new subscriber receives the last retained slot lines and the controller identity from the broker. Sensor, solenoid, and pump results are not retained, so that subscriber does not receive a stale reading. The controller sends a result again when a new sample is stored, or when the text changes, or when the command asks for the list again. Why the slot lines and `{id}/controller` are retained is in [Publications](#publications).
 
 ## Subscriptions
 
@@ -187,13 +188,14 @@ Behaviour: [pump reference](pump-module.md).
 
 The controller publishes these. Subscribe to read them. QoS is 0.
 
-Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, the sensor fault list, solenoid states, the connected-output list, pump state, and the pump now, cycle, totals, and fault topics are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
+`{id}/slot/N` and `{id}/controller` are retained. `ModuleSlotPublisher` sends a slot line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10 board 2 firmware 1`. `ControllerInfoPublisher` sends `board 1 firmware 8` once the broker accepts it. A rejected publish is retried. A reconnect does not send that identity again, because the broker kept the retained copy. Sensor readings, the connected-input list, the sensor fault list, solenoid states, the connected-output list, pump state, and the pump now, cycle, totals, and fault topics are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
 
-A publish with retain off does not replace a message the broker already stored. This firmware does not publish an empty payload, and it does not delete those copies. Messages already on the broker, including ones under a previous device id, stay until they are removed there. A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines, and any result the broker is still holding. The next sample arrives on the next poll, or when a command asks again.
+A publish with retain off does not replace a message the broker already stored. This firmware does not publish an empty payload, and it does not delete those copies. Messages already on the broker, including ones under a previous device id, stay until they are removed there. A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines, the controller identity, and any result the broker is still holding. The next sample arrives on the next poll, or when a command asks again.
 
 | Topic | Retained | Payload | Who publishes |
 | --- | --- | --- | --- |
 | `{id}/slot/N` | yes | Slot snapshot. See below. | `ModuleSlotPublisher` |
+| `{id}/controller` | yes | `board 1 firmware 8` | `ControllerInfoPublisher` |
 | `{id}/slot/N/sensor/M` | no | `connected <int32>`, `disconnected`, or `unavailable` | Sensor bridge |
 | `{id}/slot/N/sensors` | no | `<count> <connected indexes...>`, or `unavailable` | Sensor bridge |
 | `{id}/slot/N/sensors/fault` | no | `<count> <reason...>`, or `unavailable` | Sensor bridge |
@@ -213,10 +215,10 @@ A publish with retain off does not replace a message the broker already stored. 
 Empty
 Debouncing
 Enumerating
-Online Sensor addr=0x10
-Online Solenoid addr=0x11
-Online Pump addr=0x12
-Unsupported type=0x02AA addr=0x13
+Online Sensor addr=0x10 board 2 firmware 1
+Online Solenoid addr=0x11 board 1 firmware 3
+Online Pump addr=0x12 board 1 firmware 4
+Unsupported type=0x02AA addr=0x13 board 1 firmware 2
 Fault Nack
 Fault BadCrc
 Fault BadFrame
@@ -224,7 +226,9 @@ Fault Timeout
 Fault Busy
 ```
 
-`addr` is two uppercase hex digits. `type` is four uppercase hex digits. The name is `Sensor`, `Solenoid`, or `Pump`. An online type with no name is `Unknown`. An unchanged body is not sent again. A failed publish is retried. After a reconnect, a body the broker already accepted stays unpublished until the text changes. A new subscriber still receives it, because the broker kept the retained copy.
+`addr` is two uppercase hex digits. `type` is four uppercase hex digits. The name is `Sensor`, `Solenoid`, or `Pump`. An online type with no name is `Unknown`. Online and unsupported lines append `board N firmware N` from the identity word: the high byte is the board revision and the low byte is the firmware revision. Both numbers are unsigned decimals, 0..255, with no leading zeros. Empty, debouncing, enumerating, and fault lines omit that suffix. An unchanged body is not sent again. A failed publish is retried. After a reconnect, a body the broker already accepted stays unpublished until the text changes. A new subscriber still receives it, because the broker kept the retained copy.
+
+`{id}/controller` is the controller itself, not a slot. `src/main.cpp` sets `kBoardRevision` to 1 and `kFirmwareRevision` to 8, so the payload is `board 1 firmware 8`. There is no subscription for it. `kSubscriptionCount` stays 6. A programming session skips `moduleBus.update()`, so this line waits with the slot lines.
 
 A reading, a solenoid state, a pump state, or a pump info sample is published again each time a new sample is stored, including when the text is the same. The next pass, with no new sample, publishes nothing for that point. When a pump board leaves, `{id}/slot/N` becomes `Empty`. The now, cycle, totals, and fault topics are not published again until a new sample is stored.
 

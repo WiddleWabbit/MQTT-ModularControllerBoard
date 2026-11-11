@@ -65,6 +65,16 @@ const char* MqttTopicLayout::slotPrefix() const
 }
 
 /**
+ * Returns the controller identity topic.
+ *
+ * @return "{id}/controller".
+ */
+const char* MqttTopicLayout::controller() const
+{
+  return _controller.c_str();
+}
+
+/**
  * Returns the solenoid desired-state topic.
  *
  * @return "{id}/solenoids".
@@ -159,6 +169,7 @@ size_t MqttTopicLayout::subscriptionCount() const
 void MqttTopicLayout::_rebuild()
 {
   _slotPrefix = _deviceId + "/slot";
+  _controller = _deviceId + "/controller";
   _solenoidCommand = _deviceId + "/solenoids";
   _solenoidConnected = _deviceId + "/solenoids/connected";
   _pumpCommand = _deviceId + "/pump";

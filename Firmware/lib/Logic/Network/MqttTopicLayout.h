@@ -66,6 +66,13 @@ public:
   const char* slotPrefix() const;
 
   /**
+   * Returns the controller identity topic.
+   *
+   * @return "{id}/controller".
+   */
+  const char* controller() const;
+
+  /**
    * Returns the solenoid desired-state topic.
    *
    * @return "{id}/solenoids".
@@ -128,6 +135,7 @@ public:
 private:
   std::string _deviceId;
   std::string _slotPrefix;
+  std::string _controller;
   std::string _solenoidCommand;
   std::string _solenoidConnected;
   std::string _pumpCommand;

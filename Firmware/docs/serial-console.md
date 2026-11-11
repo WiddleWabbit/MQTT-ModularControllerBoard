@@ -10,7 +10,7 @@ USB plug state gates input and both kinds of print. Heap and PSRAM lines stay in
 
 ## Where it sits
 
-`main.cpp` constructs it with the serial port, the clock, `Network`, `ModuleBus`, `kSerialStatusIntervalMs` (10 seconds), and `kProgrammingPins`. `startController()` calls `serialConsole.begin()` after `network.begin()`. `loop()` calls `update()` before the bus, and `updateStatus()` after the pump module.
+`main.cpp` constructs it with the serial port, the clock, `Network`, `ModuleBus`, `kSerialStatusIntervalMs` (10 seconds), `kProgrammingPins`, and `kControllerIdentity` (`kBoardRevision` 1, `kFirmwareRevision` 8). `startController()` calls `serialConsole.begin()` after `network.begin()`. `loop()` calls `update()` before the bus, and `updateStatus()` after the pump module.
 
 ## What it creates
 
@@ -18,10 +18,10 @@ USB plug state gates input and both kinds of print. Heap and PSRAM lines stay in
 main.cpp
   SerialConsole
     SerialConfigController     set, apply, status, program
-    SerialStatusReporter       uptime, Wi-Fi, NTP, MQTT, and four slot lines
+    SerialStatusReporter       uptime, Wi-Fi, NTP, MQTT, the controller, and four slot lines
 ```
 
-The reporter is constructed with the Wi-Fi, NTP, and MQTT services from `Network`, and with `ModuleHost` from `ModuleBus`. `main.cpp` does not construct it. It reads snapshots only. It does not call `ping()` or `echo()`.
+The reporter is constructed with the Wi-Fi, NTP, and MQTT services from `Network`, with `ModuleHost` from `ModuleBus`, and with the controller identity from `main.cpp`. `main.cpp` does not construct the reporter. It reads snapshots only. It does not call `ping()` or `echo()`, and it does not read the identity from the publisher.
 
 ## One pass
 
@@ -47,11 +47,11 @@ A slot that reaches `Fault Nack` also prints one line, `Slot N: Nack`, on the ne
 
 Staged fields live in `NetworkRuntime` until `apply`. The on/off flag is the NVS key `status_report`. The snapshot interval is session RAM from `main.cpp`. No command stores it. Reboot restores 10 seconds.
 
-Uptime is whole seconds from `IClock::millis()`. It wraps when that counter does, after about 49.7 days. The four slot lines come from `ModuleHost` public snapshots. Wi-Fi, NTP, and MQTT lines come from those services.
+Uptime is whole seconds from `IClock::millis()`. It wraps when that counter does, after about 49.7 days. The controller line is the identity from `main.cpp`. The four slot lines come from `ModuleHost` public snapshots. Wi-Fi, NTP, and MQTT lines come from those services.
 
 ## See also
 
-- [Serial console reference](reference/serial-console.md) — the eight lines, plug gating, tests.
+- [Serial console reference](reference/serial-console.md) — the nine lines, plug gating, tests.
 - [Configuration](configuration.md)
 - [Programming](programming.md)
 - [Architecture](architecture.md)

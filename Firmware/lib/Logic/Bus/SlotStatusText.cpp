@@ -2,6 +2,8 @@
 
 #include <cstdio>
 
+#include "ControllerIdentity.h"
+
 namespace
 {
 
@@ -82,15 +84,28 @@ void writeSlotStatusBody(const ModuleHost& host, uint8_t slotIndex,
   const SlotState state = host.state(slotIndex);
   if (state == SlotState::Online)
   {
+    char identity[32];
+    const uint16_t packed = host.firmwareVersion(slotIndex);
+    writeControllerIdentity(
+      {static_cast<uint8_t>(packed >> 8),
+       static_cast<uint8_t>(packed & 0xFF)},
+      identity, sizeof(identity));
     const char* name = host.typeName(slotIndex);
-    std::snprintf(buffer, bufferSize, "Online %s addr=0x%02X",
+    std::snprintf(buffer, bufferSize, "Online %s addr=0x%02X %s",
                   name == nullptr ? "Unknown" : name,
-                  host.address(slotIndex));
+                  host.address(slotIndex), identity);
   }
   else if (state == SlotState::Unsupported)
   {
-    std::snprintf(buffer, bufferSize, "Unsupported type=0x%04X addr=0x%02X",
-                  host.typeId(slotIndex), host.address(slotIndex));
+    char identity[32];
+    const uint16_t packed = host.firmwareVersion(slotIndex);
+    writeControllerIdentity(
+      {static_cast<uint8_t>(packed >> 8),
+       static_cast<uint8_t>(packed & 0xFF)},
+      identity, sizeof(identity));
+    std::snprintf(buffer, bufferSize,
+                  "Unsupported type=0x%04X addr=0x%02X %s",
+                  host.typeId(slotIndex), host.address(slotIndex), identity);
   }
   else if (state == SlotState::Fault)
   {

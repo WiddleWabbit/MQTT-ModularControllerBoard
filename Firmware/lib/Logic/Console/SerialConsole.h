@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "ControllerIdentity.h"
 #include "IClock.h"
 #include "ISerialPort.h"
 #include "ProgrammingTarget.h"
@@ -29,10 +30,11 @@ public:
    * @param modules Slot snapshots.
    * @param statusIntervalMs Periodic snapshot period. It is not stored.
    * @param pins GPIO numbers for the programming pin line.
+   * @param identity Controller board and firmware revisions.
    */
   SerialConsole(ISerialPort& serial, IClock& clock, Network& network,
                 ModuleBus& modules, uint32_t statusIntervalMs,
-                const ProgrammingPins& pins);
+                const ProgrammingPins& pins, ControllerIdentity identity);
 
   /**
    * Starts periodic snapshots from the active status-reporting flag.
@@ -50,7 +52,7 @@ public:
   void update();
 
   /**
-   * Prints the Wi-Fi, NTP, MQTT, and slot snapshot when the interval
+   * Prints the Wi-Fi, NTP, MQTT, controller, and slot snapshot when the interval
    * has elapsed and periodic reporting is enabled.
    *
    * @return Nothing.

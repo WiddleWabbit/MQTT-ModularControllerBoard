@@ -44,7 +44,7 @@ Each slot keeps its own count, the desired on or off for each input, a pending r
 
 There is no silence timer. An input that was turned on stays on until an off command, a fault, or the slot is cleared. On and off are ignored while the input is faulted. `reset` is the only command that clears a fault, and the module leaves that input off. If it is still desired on, a later pass sends `SET_SENSOR` on.
 
-Serial status prints the slot line (`Online Sensor addr=0x10`). It does not print individual inputs.
+Serial status prints the slot line (`Online Sensor addr=0x10 board 2 firmware 1`). It does not print individual inputs.
 
 ## See also
 

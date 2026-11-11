@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <ctime>
 
+#include "ControllerIdentity.h"
 #include "IClock.h"
 #include "ISerialPort.h"
 #include "ModuleHost.h"
@@ -18,8 +19,9 @@ struct SerialStatusReporterConfig
 };
 
 /**
- * Writes USB-gated uptime, WiFi, NTP, MQTT, and slot status snapshots
- * on a configured interval for the current power-on session.
+ * Writes USB-gated uptime, WiFi, NTP, MQTT, controller identity, and
+ * slot status snapshots on a configured interval for the current
+ * power-on session.
  */
 class SerialStatusReporter
 {
@@ -33,10 +35,12 @@ public:
    * @param ntpService NTP synchronization service.
    * @param mqttService MQTT connection manager.
    * @param moduleHost Four-slot module host.
+   * @param identity Controller board and firmware revisions.
    */
   SerialStatusReporter(ISerialPort& serial, IClock& clock,
                        WifiManager& wifiManager, NtpService& ntpService,
-                       MqttService& mqttService, ModuleHost& moduleHost);
+                       MqttService& mqttService, ModuleHost& moduleHost,
+                       ControllerIdentity identity);
 
   /**
    * Starts status reporting with the supplied snapshot interval.
@@ -55,7 +59,8 @@ public:
   void reconfigure(const SerialStatusReporterConfig& config);
 
   /**
-   * Writes uptime, WiFi, NTP, MQTT, and slot status lines when started,
+   * Writes uptime, WiFi, NTP, MQTT, controller identity, and slot status
+   * lines when started,
    * periodic reporting is enabled, the USB link is plugged in, and the
    * snapshot interval has elapsed.
    *
@@ -81,7 +86,8 @@ public:
   bool reportingEnabled() const;
 
   /**
-   * Writes one uptime, WiFi, NTP, MQTT, and slot snapshot immediately.
+   * Writes one uptime, WiFi, NTP, MQTT, controller, and slot snapshot
+   * immediately.
    *
    * The USB link must be plugged in. Periodic reporting may be disabled.
    * A successful print restarts the snapshot interval.
@@ -104,6 +110,7 @@ private:
   NtpService& _ntpService;
   MqttService& _mqttService;
   ModuleHost& _moduleHost;
+  ControllerIdentity _identity;
   SerialStatusReporterConfig _config{};
   bool _started = false;
   bool _reportingEnabled = true;
@@ -120,7 +127,7 @@ private:
   void _reportSlotNack(bool snapshotDue);
 
   /**
-   * Writes the uptime, WiFi, NTP, MQTT, and slot lines.
+   * Writes the uptime, WiFi, NTP, MQTT, controller, and slot lines.
    *
    * @return Nothing.
    */
@@ -158,6 +165,13 @@ private:
    * @return Nothing.
    */
   void _writeMqttStatus();
+
+  /**
+   * Writes the controller board and firmware revisions.
+   *
+   * @return Nothing.
+   */
+  void _writeControllerIdentity();
 
   /**
    * Writes one slot's public snapshot line.

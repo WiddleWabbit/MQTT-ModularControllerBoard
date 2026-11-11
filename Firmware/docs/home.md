@@ -10,7 +10,7 @@ Start here. Three ways to read.
 Each of these is a short page: what the module creates, and what one `update()` does.
 
 1. [Architecture](architecture.md) — the loop, and who owns whom.
-2. [Module bus](module-bus.md) — `SlotController` holds each slot; the host does one I2C transaction; the publisher sends slot status.
+2. [Module bus](module-bus.md) — `SlotController` holds each slot; the host does one I2C transaction; the publishers send slot status and the controller identity.
 3. [Sensor](sensor-module.md), [Solenoid](solenoid-module.md), and [Pump](pump-module.md) — one daughter type each.
 4. [Network](networking.md) — Wi-Fi, then NTP, then MQTT.
 5. [Serial console](serial-console.md) — USB lines, then the snapshot.

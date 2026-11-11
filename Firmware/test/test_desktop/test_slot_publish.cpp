@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include "ControllerInfoPublisher.h"
 #include "ModuleSlotPublisher.h"
 #include "MqttService.h"
 #include "fakes/EmptyModuleHostFixture.h"
@@ -258,7 +259,7 @@ void testSlotPublisherPublishesOnlineIdentityEcho()
   harness.publisher.update();
 
   TEST_ASSERT_TRUE(publishedRetained(
-    harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10"));
+    harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10 board 0 firmware 1"));
   TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/4",
                                       "Empty"));
 }
@@ -279,7 +280,146 @@ void testSlotPublisherPublishesUnsupportedType()
 
   TEST_ASSERT_TRUE(publishedRetained(
     harness.client, "watering/slot/1",
-    "Unsupported type=0x02AA addr=0x10"));
+    "Unsupported type=0x02AA addr=0x10 board 0 firmware 1"));
+}
+
+void testSlotPublisherPublishesDaughterRevision()
+{
+  SlotPublishHarness harness;
+  FakeModuleDevice device(harness.clock, harness.modules.mod(0));
+  device.firmwareVersion = 0x0201;
+  harness.modules.bus.attach(device);
+  harness.modules.host.begin();
+  harness.modules.sense(0).setPresent(true);
+  pumpHost(harness, 800);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+
+  harness.connect();
+  harness.publisher.update();
+
+  TEST_ASSERT_TRUE(publishedRetained(
+    harness.client, "watering/slot/1",
+    "Online IdentityEcho addr=0x10 board 2 firmware 1"));
+}
+
+void testSlotPublisherPublishesUnsupportedRevision()
+{
+  SlotPublishHarness harness;
+  FakeModuleDevice device(harness.clock, harness.modules.mod(0));
+  device.typeId = 0x02AA;
+  device.firmwareVersion = 0x0102;
+  harness.modules.bus.attach(device);
+  harness.modules.host.begin();
+  harness.modules.sense(0).setPresent(true);
+  pumpHost(harness, 800);
+  TEST_ASSERT_EQUAL(SlotState::Unsupported, harness.modules.host.state(0));
+
+  harness.connect();
+  harness.publisher.update();
+
+  TEST_ASSERT_TRUE(publishedRetained(
+    harness.client, "watering/slot/1",
+    "Unsupported type=0x02AA addr=0x10 board 1 firmware 2"));
+}
+
+/**
+ * Broker, topics, and the controller-identity publisher.
+ */
+struct InfoHarness
+{
+  FakeClock clock;
+  FakeMqttClient client;
+  MqttService mqtt;
+  MqttTopicLayout topics;
+  ControllerInfoPublisher publisher;
+
+  /**
+   * Creates a publisher for the supplied revisions on watering.
+   *
+   * @param board Board revision.
+   * @param firmware Firmware revision.
+   */
+  InfoHarness(uint8_t board, uint8_t firmware)
+    : mqtt(client, clock, publisherMqttConfig()),
+      topics("watering"),
+      publisher(mqtt, topics, {board, firmware})
+  {
+  }
+
+  /**
+   * Connects the MQTT service to the fake broker.
+   *
+   * @return Nothing.
+   */
+  void connect()
+  {
+    mqtt.setBroker("broker.local", 1883);
+    mqtt.begin();
+    mqtt.update(true);
+  }
+};
+
+void testControllerInfoWaitsUntilMqttConnected()
+{
+  InfoHarness harness(1, 8);
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+}
+
+void testControllerInfoPublishesRetainedOnce()
+{
+  InfoHarness harness(1, 8);
+  harness.connect();
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+                                      "board 1 firmware 8"));
+
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+}
+
+void testControllerInfoUsesConstructorRevisions()
+{
+  InfoHarness harness(2, 3);
+  harness.connect();
+  harness.publisher.update();
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+                                      "board 2 firmware 3"));
+}
+
+void testControllerInfoRetriesRejectedPublish()
+{
+  InfoHarness harness(1, 8);
+  harness.connect();
+  harness.client.publishResults.push_back(false);
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+
+  harness.client.publishedMessages.clear();
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+                                      "board 1 firmware 8"));
+
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+}
+
+void testControllerInfoRepublishesWhenDeviceIdChanges()
+{
+  InfoHarness harness(1, 8);
+  harness.connect();
+  harness.publisher.update();
+  harness.client.publishedMessages.clear();
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
+
+  harness.topics.setDeviceId("shed");
+  harness.publisher.update();
+  TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
+  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/controller",
+                                      "board 1 firmware 8"));
 }
 
 void testSlotPublisherPublishesFaultNack()
@@ -339,7 +479,7 @@ void testSlotPublisherDoesNotTouchTheBus()
   harness.publisher.update();
   TEST_ASSERT_EQUAL(beforeOnline, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_TRUE(publishedRetained(
-    harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10"));
+    harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10 board 0 firmware 1"));
 }
 
 void testSlotPublisherRepublishesWhenDeviceIdChanges()
@@ -385,8 +525,15 @@ void runSlotPublishTests()
   RUN_TEST(testSlotPublisherRetriesRejectedSlotOnly);
   RUN_TEST(testSlotPublisherPublishesOnlyTheChangedSlot);
   RUN_TEST(testSlotPublisherPublishesOnlineIdentityEcho);
+  RUN_TEST(testSlotPublisherPublishesDaughterRevision);
   RUN_TEST(testSlotPublisherPublishesUnsupportedType);
+  RUN_TEST(testSlotPublisherPublishesUnsupportedRevision);
   RUN_TEST(testSlotPublisherPublishesFaultNack);
+  RUN_TEST(testControllerInfoWaitsUntilMqttConnected);
+  RUN_TEST(testControllerInfoPublishesRetainedOnce);
+  RUN_TEST(testControllerInfoUsesConstructorRevisions);
+  RUN_TEST(testControllerInfoRetriesRejectedPublish);
+  RUN_TEST(testControllerInfoRepublishesWhenDeviceIdChanges);
   RUN_TEST(testSlotPublisherRepublishesEmptyAfterUnplug);
   RUN_TEST(testSlotPublisherDoesNotTouchTheBus);
   RUN_TEST(testSlotPublisherRepublishesWhenDeviceIdChanges);

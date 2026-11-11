@@ -10,6 +10,7 @@ void testMqttTopicLayoutBuildsPlantRoomTopics()
   TEST_ASSERT_EQUAL_STRING("plant-room", topics.deviceId());
   TEST_ASSERT_EQUAL(1, topics.generation());
   TEST_ASSERT_EQUAL_STRING("plant-room/slot", topics.slotPrefix());
+  TEST_ASSERT_EQUAL_STRING("plant-room/controller", topics.controller());
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids", topics.solenoidCommand());
   TEST_ASSERT_EQUAL_STRING("plant-room/solenoids/connected",
                            topics.solenoidConnected());
@@ -54,6 +55,7 @@ void testMqttTopicLayoutSetDeviceIdBumpsGenerationOnce()
   TEST_ASSERT_EQUAL(2, topics.generation());
   TEST_ASSERT_EQUAL_STRING("shed", topics.deviceId());
   TEST_ASSERT_EQUAL_STRING("shed/slot", topics.slotPrefix());
+  TEST_ASSERT_EQUAL_STRING("shed/controller", topics.controller());
   TEST_ASSERT_EQUAL_STRING("shed/solenoids", topics.solenoidCommand());
   TEST_ASSERT_EQUAL_STRING("shed/solenoids/connected",
                            topics.solenoidConnected());

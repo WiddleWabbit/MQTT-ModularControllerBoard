@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <ctime>
 
+#include "ControllerIdentity.h"
 #include "ModuleProtocol.h"
 #include "SlotStatusText.h"
 
@@ -42,13 +43,15 @@ SerialStatusReporter::SerialStatusReporter(ISerialPort& serial, IClock& clock,
                                            WifiManager& wifiManager,
                                            NtpService& ntpService,
                                            MqttService& mqttService,
-                                           ModuleHost& moduleHost)
+                                           ModuleHost& moduleHost,
+                                           ControllerIdentity identity)
   : _serial(serial),
     _clock(clock),
     _wifiManager(wifiManager),
     _ntpService(ntpService),
     _mqttService(mqttService),
-    _moduleHost(moduleHost)
+    _moduleHost(moduleHost),
+    _identity(identity)
 {
 }
 
@@ -202,7 +205,7 @@ void SerialStatusReporter::_reportSlotNack(bool snapshotDue)
 }
 
 /**
- * Writes the uptime, WiFi, NTP, MQTT, and slot lines.
+ * Writes the uptime, WiFi, NTP, MQTT, controller, and slot lines.
  *
  * @return Nothing.
  */
@@ -212,6 +215,7 @@ void SerialStatusReporter::_writeSnapshot()
   _writeWifiStatus();
   _writeNtpStatus();
   _writeMqttStatus();
+  _writeControllerIdentity();
   for (uint8_t i = 0; i < module_protocol::kSlotCount; ++i)
   {
     _writeSlotStatus(i);
@@ -311,6 +315,20 @@ void SerialStatusReporter::_writeMqttStatus()
   char line[64];
   std::snprintf(line, sizeof(line), "MQTT Status: %s",
                 _mqttStateName(_mqttService.state()));
+  _serial.writeLine(line);
+}
+
+/**
+ * Writes the controller board and firmware revisions.
+ *
+ * @return Nothing.
+ */
+void SerialStatusReporter::_writeControllerIdentity()
+{
+  char identity[32];
+  char line[64];
+  writeControllerIdentity(_identity, identity, sizeof(identity));
+  std::snprintf(line, sizeof(line), "Controller: %s", identity);
   _serial.writeLine(line);
 }
 

@@ -131,7 +131,7 @@ Module numbers in MQTT are 1-based.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Pump addr=0x10` |
+| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Pump addr=0x10 board 1 firmware 4` |
 | `{id}/slot/N/pump` | publish, QoS 0, retain off | `on`, `off`, `fault`, or `unavailable` |
 | `{id}/slot/N/pump/now` | publish, QoS 0, retain off | phase, three flags, millivolts, milliamps, run seconds |
 | `{id}/slot/N/pump/cycle` | publish, QoS 0, retain off | eight numbers, below |

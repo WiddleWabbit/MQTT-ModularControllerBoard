@@ -7,6 +7,7 @@
 #include "NtpService.h"
 #include "ProgrammingTarget.h"
 #include "SerialConfigController.h"
+#include "ControllerIdentity.h"
 #include "SerialStatusReporter.h"
 #include "fakes/EmptyModuleHostFixture.h"
 #include "fakes/FakeClock.h"
@@ -64,7 +65,7 @@ struct CommandStack
       topics("watering"),
       runtime(store, wifiManager, mqttService, topics),
       reporter(serial, clock, wifiManager, ntpService, mqttService,
-               modules.host),
+               modules.host, ControllerIdentity{1, 8}),
       controller(serial, runtime, reporter, kProgrammingPins)
   {
     const NetworkConfig defaults = {
@@ -111,7 +112,7 @@ void testSerialStagesUntilApplyAndGatesOnPlugState()
   NtpService ntpService(ntpAdapter, clock,
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("set wifi.ssid new-network\n");
@@ -172,7 +173,7 @@ void testAppliedConfigurationIsOwnedFromLaterStagedEdits()
   NtpService ntpService(ntpAdapter, clock,
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("set wifi.ssid applied-network\napply\n");
@@ -202,7 +203,7 @@ void testApplyWithNoChangesDoesNotSave()
   NtpService ntpService(ntpAdapter, clock,
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
 
   serial.feed("apply\n");
@@ -231,7 +232,7 @@ void testApplyUpdatesOnlyPasswordAndKeepsStoredSsid()
   NtpService ntpService(ntpAdapter, clock,
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
   runtime.begin(config());
   const int disconnectsAfterBegin = client.disconnectCallCount;
@@ -288,7 +289,7 @@ void testApplyRetriesDirtyFieldsAfterSaveFailure()
   NtpService ntpService(ntpAdapter, clock,
                         {"pool.ntp.org", nullptr, nullptr, 0, 0, 60000});
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   SerialConfigController controller(serial, runtime, reporter, kProgrammingPins);
   runtime.begin(config());
   store.saveResult = false;
@@ -435,7 +436,7 @@ void testSetStatusOffRemainsEnabledUntilApply()
   const size_t before = stack.serial.output.size();
   stack.clock.advance(1000);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(before + 8, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(before + 9, stack.serial.output.size());
   TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:01",
                            stack.serial.output[before].c_str());
   TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
@@ -479,7 +480,7 @@ void testApplyStatusOnResumesAfterInterval()
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterApply + 8, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterApply + 9, stack.serial.output.size());
 }
 
 void testStatusCommandPrintsWhileReportingIsOff()
@@ -496,14 +497,14 @@ void testStatusCommandPrintsWhileReportingIsOff()
   stack.serial.feed("apply\nstatus\n");
   stack.controller.update();
   TEST_ASSERT_FALSE(stack.reporter.reportingEnabled());
-  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[9].c_str());
+  TEST_ASSERT_EQUAL_STRING("OK applied", stack.serial.output[10].c_str());
   TEST_ASSERT_EQUAL_STRING("Uptime: 0d 00:00:00",
-                           stack.serial.output[10].c_str());
-  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
                            stack.serial.output[11].c_str());
-  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[12].c_str());
+  TEST_ASSERT_EQUAL_STRING("WiFi Status: Connecting",
+                           stack.serial.output[12].c_str());
+  TEST_ASSERT_EQUAL_STRING("NTP Status: Idle", stack.serial.output[13].c_str());
   TEST_ASSERT_EQUAL_STRING("MQTT Status: WaitingForNetwork",
-                           stack.serial.output[13].c_str());
+                           stack.serial.output[14].c_str());
 }
 
 void testStatusCommandPrintsNothingWhenUnplugged()
@@ -522,20 +523,20 @@ void testStatusCommandRestartsSnapshotInterval()
   stack.clock.advance(1000);
   stack.reporter.update();
   const size_t afterPeriodic = stack.serial.output.size();
-  TEST_ASSERT_EQUAL(8, afterPeriodic);
+  TEST_ASSERT_EQUAL(9, afterPeriodic);
 
   stack.clock.advance(400);
   stack.serial.feed("status\n");
   stack.controller.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 8, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 9, stack.serial.output.size());
 
   stack.clock.advance(999);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 8, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 9, stack.serial.output.size());
 
   stack.clock.advance(1);
   stack.reporter.update();
-  TEST_ASSERT_EQUAL(afterPeriodic + 16, stack.serial.output.size());
+  TEST_ASSERT_EQUAL(afterPeriodic + 18, stack.serial.output.size());
 }
 
 void testSetStatusRejectsUnknownValue()
@@ -755,7 +756,7 @@ void testStoredStatusOffLoadsDisabled()
   MqttTopicLayout topics("watering");
   NetworkRuntime runtime(store, wifiManager, mqtt, topics);
   SerialStatusReporter reporter(serial, clock, wifiManager, ntpService, mqtt,
-                                modules.host);
+                                modules.host, ControllerIdentity{1, 8});
   const NetworkConfig defaults = {
     "", "", "", 1883, "watering-controller", nullptr, nullptr,
     "watering-controller", true};

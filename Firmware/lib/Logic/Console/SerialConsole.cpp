@@ -8,11 +8,12 @@
 SerialConsole::SerialConsole(ISerialPort& serial, IClock& clock,
                              Network& network, ModuleBus& modules,
                              uint32_t statusIntervalMs,
-                             const ProgrammingPins& pins)
+                             const ProgrammingPins& pins,
+                             ControllerIdentity identity)
   : _network(network),
     _statusIntervalMs(statusIntervalMs),
     _reporter(serial, clock, network.wifi(), network.ntp(), network.mqtt(),
-              modules.host()),
+              modules.host(), identity),
     _controller(serial, network.runtime(), _reporter, pins)
 {
 }

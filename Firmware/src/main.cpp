@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <Wire.h>
 
+#include "ControllerIdentity.h"
 #include "Esp32Clock.h"
 #include "Esp32DigitalPin.h"
 #include "Esp32HalfDuplexUart.h"
@@ -83,6 +84,13 @@ const NtpConfig kNtpConfig = {
 // Topic root used when mqtt_prefix is not stored. One path segment.
 const char kMqttDeviceId[] = "watering";
 
+// Published on {id}/controller and printed on the USB snapshot.
+// A daughter packs the same two bytes into its identity word.
+const uint8_t kBoardRevision = 1;
+const uint8_t kFirmwareRevision = 8;
+const ControllerIdentity kControllerIdentity = {
+  kBoardRevision, kFirmwareRevision};
+
 Esp32Clock systemClock;
 Esp32Wifi wifiDriver;
 Esp32NtpAdapter ntpDriver;
@@ -139,7 +147,7 @@ SlotPins slotPins[4] = {
   {sns4, mod4, cs4},
 };
 ModuleBus moduleBus(i2cMaster, systemClock, slotPins, ModuleHostConfig{},
-                    network);
+                    network, kControllerIdentity);
 SensorModule sensorModule(moduleBus, network, systemClock,
                           kSensorPollIntervalMs);
 SolenoidModule solenoidModule(moduleBus, network, systemClock,
@@ -156,7 +164,8 @@ const ProgrammingPins kProgrammingPins = {
   MOSI_PIN, MISO_PIN, SCK_PIN,
   {CS1_PIN, CS2_PIN, CS3_PIN, CS4_PIN}};
 SerialConsole serialConsole(serialPort, systemClock, network, moduleBus,
-                            kSerialStatusIntervalMs, kProgrammingPins);
+                            kSerialStatusIntervalMs, kProgrammingPins,
+                            kControllerIdentity);
 Esp32SpiMaster ispSpi(SCK_PIN, MISO_PIN, MOSI_PIN);
 Esp32HalfDuplexUart updiUart;
 Esp32ProgrammingLatch programmingLatch;

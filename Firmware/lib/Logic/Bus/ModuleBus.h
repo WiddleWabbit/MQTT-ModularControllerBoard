@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ControllerIdentity.h"
+#include "ControllerInfoPublisher.h"
 #include "ModuleHost.h"
 #include "ModuleSlotPublisher.h"
 
@@ -11,10 +13,11 @@ class SerialConsole;
 class Programming;
 
 /**
- * Four-slot module bus and its retained slot-status publication.
- * update() runs at most one host transaction, then publishes any
- * slot text that changed. Typed module commands use ModuleHost::exchange
- * through the type modules.
+ * Four-slot module bus, its retained slot-status publication, and the
+ * retained controller identity. update() runs at most one host
+ * transaction, then publishes any slot text that changed and the
+ * controller revisions until the broker accepts them. Typed module
+ * commands use ModuleHost::exchange through the type modules.
  */
 class ModuleBus
 {
@@ -34,9 +37,11 @@ public:
    * @param slots Sense, MOD, and CS pins for slots 0..3.
    * @param config Timing and bus configuration.
    * @param network MQTT publication path and topic tree.
+   * @param identity Controller board and firmware revisions.
    */
   ModuleBus(I2cMaster& bus, IClock& clock, SlotPins slots[4],
-            const ModuleHostConfig& config, Network& network);
+            const ModuleHostConfig& config, Network& network,
+            ControllerIdentity identity);
 
   /**
    * Configures slot pins and starts I2C.
@@ -47,7 +52,8 @@ public:
 
   /**
    * Advances enumeration or health by at most one transaction, then
-   * publishes slot status text that changed.
+   * publishes slot status text that changed and the controller identity
+   * until the broker has accepted it.
    *
    * @return Nothing.
    */
@@ -71,6 +77,7 @@ public:
 private:
   ModuleHost _host;
   ModuleSlotPublisher _publisher;
+  ControllerInfoPublisher _info;
 
   /**
    * Returns the host used by sibling modules.

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "ControllerIdentity.h"
 #include "ModuleBus.h"
 #include "ModuleProtocol.h"
 #include "Network.h"
@@ -38,6 +39,7 @@ const uint32_t kPollMs = 60000;
 const uint32_t kSolenoidSilenceMs = 15UL * 60UL * 1000UL;
 const uint32_t kPumpSilenceMs = 3UL * 60UL * 1000UL;
 const uint8_t kStkEop = 0x20;
+const ControllerIdentity kControllerIdentity = {1, 8};
 const uint8_t kStkInsync = 0x14;
 const uint8_t kStkOk = 0x10;
 const ProgrammingPins kProgrammingPins = {
@@ -313,7 +315,8 @@ struct Board
         uint32_t pumpSilenceMs, uint32_t pumpInfoMs = 0)
     : network(wifi, ntp, mqtt, clock, preferences, "watering", kNtp, kTiming),
       slots(clock),
-      bus(slots.i2c, clock, slots.pins, ModuleHostConfig{}, network),
+      bus(slots.i2c, clock, slots.pins, ModuleHostConfig{}, network,
+          kControllerIdentity),
       sensor(bus, network, clock, sensorPollMs),
       solenoid(bus, network, clock, solenoidPollMs, solenoidSilenceMs),
       pump(bus, network, clock, pumpPollMs, pumpSilenceMs, pumpInfoMs)
@@ -702,10 +705,14 @@ void testModuleBusPublishesEmptySlotsOnceWhenMqttConnects()
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/3", "Empty", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/4", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/controller",
+                             "board 1 firmware 8", true));
   TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/slot/1"));
+  TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/controller"));
 
   board.bus.update();
   TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/slot/1"));
+  TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/controller"));
   TEST_ASSERT_EQUAL(0, board.slots.i2c.protocolOpCount());
 }
 
@@ -716,7 +723,7 @@ void testModuleBusEnumeratesWithOneTransactionPerUpdate()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeSensorModule;
   const SeatResult seated =
-    seat(board, device, 0, "Online Sensor addr=0x10");
+    seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1");
   TEST_ASSERT_TRUE(seated.online);
   TEST_ASSERT_TRUE(seated.oneTransactionPerUpdate);
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
@@ -742,6 +749,9 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
   board.bus.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/1", "Empty", true));
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/4", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "shed/controller",
+                             "board 1 firmware 8", true));
+  TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "shed/controller"));
 
   const size_t ops = board.slots.i2c.protocolOpCount();
   board.bus.quiesce();
@@ -755,7 +765,7 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeIdentityEcho;
   const SeatResult seated =
-    seat(board, device, 0, "Online IdentityEcho addr=0x10", "shed");
+    seat(board, device, 0, "Online IdentityEcho addr=0x10 board 0 firmware 1", "shed");
   TEST_ASSERT_TRUE(seated.online);
   TEST_ASSERT_TRUE(seated.oneTransactionPerUpdate);
 }
@@ -774,7 +784,7 @@ void testSensorModulePublishesReadingOnTheSameUpdate()
   device.sensorConnected[0] = true;
   device.sensorValue[0] = 10;
   const SeatResult seated =
-    seat(board, device, 0, "Online Sensor addr=0x10");
+    seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1");
   TEST_ASSERT_TRUE(seated.online);
 
   const size_t plugged = board.slots.i2c.protocolOpCount();
@@ -812,7 +822,7 @@ void testSensorModuleReadCommandAndMalformedPayload()
   device.sensorState[0] = module_protocol::kSensorStateOn;
   device.sensorConnected[0] = true;
   device.sensorValue[0] = 10;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1").online);
   board.sensor.update();
   board.sensor.update();
   board.sensor.update();
@@ -863,7 +873,7 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
   device.sensorState[0] = module_protocol::kSensorStateDisconnected;
   device.sensorConnected[0] = false;
   device.sensorValue[0] = 0;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1").online);
   board.sensor.update();
   board.sensor.update();
   board.sensor.update();
@@ -921,7 +931,7 @@ void testSensorModulePublishesConnectedList()
   device.sensorValue[1] = 2;
   device.sensorValue[2] = 0;
   device.sensorValue[3] = 4;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1").online);
 
   for (int step = 0; step < 9; ++step)
   {
@@ -958,7 +968,7 @@ void testSensorModuleDoesNotExchangeWhileProgramming()
   device.sensorCount = 1;
   device.sensorConnected[0] = true;
   device.sensorValue[0] = 10;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1").online);
 
   ProgrammingRig rig(board, 60000, 1000);
   const size_t ops = board.slots.i2c.protocolOpCount();
@@ -995,7 +1005,7 @@ void testSolenoidModuleCommandPublishesAndTimesOut()
   device.solenoidCount = 1;
   device.solenoidState[0] = module_protocol::kSolenoidStateOff;
   TEST_ASSERT_TRUE(
-    seat(board, device, 0, "Online Solenoid addr=0x10").online);
+    seat(board, device, 0, "Online Solenoid addr=0x10 board 0 firmware 1").online);
 
   board.solenoid.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidCount,
@@ -1049,7 +1059,7 @@ void testSolenoidModuleSkipsDisconnectedAndPublishesInventory()
   device.solenoidState[0] = module_protocol::kSolenoidStateOn;
   device.solenoidState[1] = module_protocol::kSolenoidStateDisconnected;
   TEST_ASSERT_TRUE(
-    seat(board, device, 0, "Online Solenoid addr=0x10").online);
+    seat(board, device, 0, "Online Solenoid addr=0x10 board 0 firmware 1").online);
   board.solenoid.update();
   board.solenoid.update();
   board.solenoid.update();
@@ -1090,7 +1100,7 @@ void testSolenoidModuleClearsOnUnplug()
   device.solenoidCount = 1;
   device.solenoidState[0] = module_protocol::kSolenoidStateOff;
   TEST_ASSERT_TRUE(
-    seat(board, device, 1, "Online Solenoid addr=0x11").online);
+    seat(board, device, 1, "Online Solenoid addr=0x11 board 0 firmware 1").online);
   board.mqtt.deliver("watering/solenoids", "2 on");
   bool setOutput = false;
   for (int i = 0; i < 4; ++i)
@@ -1130,7 +1140,7 @@ void testPumpModuleTurnsOnAndPublishes()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypePumpModule;
   device.pumpState = module_protocol::kPumpStateOff;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10 board 0 firmware 1").online);
 
   board.pump.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetPumpState,
@@ -1189,7 +1199,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypePumpModule;
   device.pumpState = module_protocol::kPumpStateFault;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10 board 0 firmware 1").online);
   board.pump.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "fault",
                              false));
@@ -1218,7 +1228,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
   {
     board.clock.advance(1);
     board.bus.update();
-    if (published(board.mqtt, "watering/slot/1", "Online Pump addr=0x10",
+    if (published(board.mqtt, "watering/slot/1", "Online Pump addr=0x10 board 0 firmware 1",
                   true))
     {
       onlineAgain = true;
@@ -1249,7 +1259,7 @@ void testPumpModuleResetDoesNotRefreshAbsenceTimeout()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypePumpModule;
   device.pumpState = module_protocol::kPumpStateOn;
-  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10").online);
+  TEST_ASSERT_TRUE(seat(board, device, 0, "Online Pump addr=0x10 board 0 firmware 1").online);
   board.pump.update();
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/pump", "on", false));
   board.mqtt.deliver("watering/pump", "1 on");
@@ -1282,7 +1292,7 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
   FakeModuleDevice device(board.clock, board.slots.mod(1));
   device.typeId = module_protocol::kTypePumpModule;
   device.pumpState = module_protocol::kPumpStateOff;
-  TEST_ASSERT_TRUE(seat(board, device, 1, "Online Pump addr=0x11").online);
+  TEST_ASSERT_TRUE(seat(board, device, 1, "Online Pump addr=0x11 board 0 firmware 1").online);
   board.mqtt.deliver("watering/pump", "2 on");
   board.pump.update();
   board.pump.update();
@@ -1337,7 +1347,7 @@ void testProgrammingBeginQuiescesUntilIdleTimeout()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeIdentityEcho;
   const SeatResult seated =
-    seat(board, device, 0, "Online IdentityEcho addr=0x10");
+    seat(board, device, 0, "Online IdentityEcho addr=0x10 board 0 firmware 1");
   TEST_ASSERT_TRUE(seated.online);
   TEST_ASSERT_TRUE(seated.oneTransactionPerUpdate);
 }
@@ -1349,7 +1359,7 @@ void testProgrammingSyncRefreshesIdleAndUnplugEndsSession()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeIdentityEcho;
   TEST_ASSERT_TRUE(
-    seat(board, device, 0, "Online IdentityEcho addr=0x10").online);
+    seat(board, device, 0, "Online IdentityEcho addr=0x10 board 0 firmware 1").online);
   const size_t ops = board.slots.i2c.protocolOpCount();
 
   ProgrammingRig rig(board, 60000, 1000);
@@ -1711,7 +1721,7 @@ void testProgrammingUpdiCheckLeavesTheSessionIdle()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeIdentityEcho;
   TEST_ASSERT_TRUE(
-    seat(board, device, 0, "Online IdentityEcho addr=0x10").online);
+    seat(board, device, 0, "Online IdentityEcho addr=0x10 board 0 firmware 1").online);
   ProgrammingRig rig(board, 60000, 1000);
   const size_t ops = board.slots.i2c.protocolOpCount();
   const int spiBegins = rig.spi.beginCount;
@@ -1877,7 +1887,7 @@ void testProgrammingRejectsSlotOutsideOneToFour()
   FakeModuleDevice device(board.clock, board.slots.mod1);
   device.typeId = module_protocol::kTypeIdentityEcho;
   TEST_ASSERT_TRUE(
-    seat(board, device, 0, "Online IdentityEcho addr=0x10").online);
+    seat(board, device, 0, "Online IdentityEcho addr=0x10 board 0 firmware 1").online);
   const size_t ops = board.slots.i2c.protocolOpCount();
 
   ProgrammingRig rig(board, 60000, 1000);
@@ -1912,7 +1922,7 @@ void testSerialConsoleApplyPersistsAndStatusPrintsImmediately()
   board.bus.begin();
   FakeSerialPort serial;
   SerialConsole console(serial, board.clock, board.network, board.bus, 10000,
-                      kProgrammingPins);
+                      kProgrammingPins, kControllerIdentity);
   console.begin();
   serial.output.clear();
 
@@ -1966,7 +1976,7 @@ void testSerialConsolePeriodicStatusAndProgramRequest()
   board.bus.begin();
   FakeSerialPort serial;
   SerialConsole console(serial, board.clock, board.network, board.bus, 10000,
-                      kProgrammingPins);
+                      kProgrammingPins, kControllerIdentity);
   console.begin();
   serial.output.clear();
 
@@ -2039,7 +2049,7 @@ void testSerialConsoleRejectsBadHostnameWhileUnplugged()
   board.bus.begin();
   FakeSerialPort serial;
   SerialConsole console(serial, board.clock, board.network, board.bus, 10000,
-                      kProgrammingPins);
+                      kProgrammingPins, kControllerIdentity);
   console.begin();
 
   serial.plugged = false;

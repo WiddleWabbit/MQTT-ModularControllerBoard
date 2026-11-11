@@ -2,18 +2,18 @@
 
 [Home](../home.md) · Guide: [Module bus](../module-bus.md)
 
-Source: `lib/Logic/Bus/ModuleBus.h`, `ModuleHost.h`, `SlotController.h`, `ModuleSlotPublisher.h`. The bytes a daughter board answers are in [the daughter contract](../daughter/contract.md) and `lib/Interfaces/ModuleProtocol.h`.
+Source: `lib/Logic/Bus/ModuleBus.h`, `ModuleHost.h`, `SlotController.h`, `ModuleSlotPublisher.h`, `ControllerInfoPublisher.h`, `ControllerIdentity.h`, `SlotStatusText.cpp`. The bytes a daughter board answers are in [the daughter contract](../daughter/contract.md) and `lib/Interfaces/ModuleProtocol.h`.
 
 ## Purpose
 
-`ModuleBus::update()` runs the host, then the slot publisher. `SlotController` holds one slot. `ModuleHost` owns the four controllers and is the Logic class that calls `I2cMaster`. `ModuleSlotPublisher` turns the public snapshot into retained MQTT text.
+`ModuleBus::update()` runs the host, then the slot publisher, then the controller-identity publisher. `SlotController` holds one slot. `ModuleHost` owns the four controllers and is the Logic class that calls `I2cMaster`. `ModuleSlotPublisher` turns the public snapshot into retained MQTT text. `ControllerInfoPublisher` publishes `board N firmware N` on `{id}/controller`.
 
 ## Who holds what
 
 ```text
 ModuleBus
-  owns ModuleHost and ModuleSlotPublisher
-  update() = host.update(), then publisher.update()
+  owns ModuleHost, ModuleSlotPublisher, and ControllerInfoPublisher
+  update() = host.update(), then publisher.update(), then info.update()
   begin(), quiesce(), and resume() forward to the host
 
 ModuleHost
@@ -113,12 +113,12 @@ Callers see `SlotState`: `Empty`, `Debouncing`, `Enumerating`, `Online`, `Unsupp
 
 | Identity | Public state | Action for that slot |
 | --- | --- | --- |
-| `0x0001` IdentityEcho, protocol 1 | `Online` | Health `PING` about once a second. Status text `Online IdentityEcho addr=0x1N`. `ECHO` exists for a caller. `loop()` does not poll it. |
-| `0x0100` Solenoid, protocol 1 | `Online` | Health `PING`, plus the commands in the [solenoid reference](solenoid-module.md). Status text `Online Solenoid addr=0x1N`. |
-| `0x0200` Sensor, protocol 1 | `Online` | Health `PING`, plus the commands in the [sensor reference](sensor-module.md). Status text `Online Sensor addr=0x1N`. |
-| `0x0300` Pump, protocol 1 | `Online` | Health `PING`, plus the commands in the [pump reference](pump-module.md). Status text `Online Pump addr=0x1N`. |
-| Any other type id, or a protocol version other than 1 | `Unsupported` | Health `PING` about once a second. Status text `Unsupported type=0xTTTT addr=0x1N`. No type-specific commands. |
-| Address assignment or identify keeps failing | `Fault` | No health ping and no type-specific commands. Enumeration is tried again after 1 s. Status text `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy`. |
+| `0x0001` IdentityEcho, protocol 1 | `Online` | Health `PING` about once a second. Status text `Online IdentityEcho addr=0x1N board B firmware F`. `ECHO` exists for a caller. `loop()` does not poll it. |
+| `0x0100` Solenoid, protocol 1 | `Online` | Health `PING`, plus the commands in the [solenoid reference](solenoid-module.md). Status text `Online Solenoid addr=0x1N board B firmware F`. |
+| `0x0200` Sensor, protocol 1 | `Online` | Health `PING`, plus the commands in the [sensor reference](sensor-module.md). Status text `Online Sensor addr=0x1N board B firmware F`. |
+| `0x0300` Pump, protocol 1 | `Online` | Health `PING`, plus the commands in the [pump reference](pump-module.md). Status text `Online Pump addr=0x1N board B firmware F`. |
+| Any other type id, or a protocol version other than 1 | `Unsupported` | Health `PING` about once a second. Status text `Unsupported type=0xTTTT addr=0x1N board B firmware F`. No type-specific commands. |
+| Address assignment or identify keeps failing | `Fault` | No health ping and no type-specific commands. Enumeration is tried again after 1 s. Status text `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy`. The identity word may still be in RAM. The public line omits the address and the revisions. |
 
 `exchange` returns `Ok` with the payload, `Busy` when the module asks for the same command again, `Failed` on a bad frame or a bus error, or `Rejected` when the slot cannot take that command. A `Busy` type-command does not, by itself, move the slot to `Fault`.
 
@@ -153,11 +153,11 @@ A sensor in slot 1 and an IdentityEcho in slot 2:
 ```text
 both slots   Debouncing, then Enumerating, over the same time
 slot 1       holds the lock: PING 0x0A, SET_ADDRESS 0x10, PING 0x10, GET_IDENTITY
-             Online Sensor addr=0x10
+             Online Sensor addr=0x10 board 2 firmware 1
              sensor count, then presence and a reading for each input
 slot 2       waits in Enumerating while slot 1 holds the lock
              then the same steps to address 0x11
-             Online IdentityEcho addr=0x11
+             Online IdentityEcho addr=0x11 board B firmware F
              health pings only
 ```
 
@@ -167,11 +167,12 @@ Unplugging slot 2 returns slot 2 to `Empty`. That slot line is retained, because
 
 ### Slot publication
 
-`{id}` is the device id from [configuration.md](../configuration.md). It is `watering` until `set mqtt.prefix` is applied. The full command catalog is the [MQTT reference](mqtt.md). This publisher sends the four slot topics and nothing else.
+`{id}` is the device id from [configuration.md](../configuration.md). It is `watering` until `set mqtt.prefix` is applied. The full command catalog is the [MQTT reference](mqtt.md). The slot publisher sends the four slot topics. The identity publisher sends `{id}/controller` and nothing else.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/1` through `{id}/slot/4` | publish, retained, QoS 0 | `writeSlotStatusBody`, for example `Empty` or `Online Sensor addr=0x10` |
+| `{id}/slot/1` through `{id}/slot/4` | publish, retained, QoS 0 | `writeSlotStatusBody`, for example `Empty` or `Online Sensor addr=0x10 board 2 firmware 1` |
+| `{id}/controller` | publish, retained, QoS 0 | `board 1 firmware 8`, from `kBoardRevision` and `kFirmwareRevision` in `src/main.cpp` |
 
 `ModuleSlotPublisher` sends those topics after the host has applied this pass's result. It reads the snapshot with `writeSlotStatusBody`. The phase and the identity stay on the slot controller. Each `update()`:
 
@@ -185,10 +186,12 @@ Unplugging slot 2 returns slot 2 to `Empty`. That slot line is retained, because
 
 | Public state | Payload |
 | --- | --- |
-| `Online` | `Online {name} addr=0xNN`. `{name}` is `typeName()`, or `Unknown` when that is null. |
-| `Unsupported` | `Unsupported type=0xTTTT addr=0xNN` |
+| `Online` | `Online {name} addr=0xNN board B firmware F`. `{name}` is `typeName()`, or `Unknown` when that is null. `B` and `F` are the high and low bytes of `firmwareVersion()`. |
+| `Unsupported` | `Unsupported type=0xTTTT addr=0xNN board B firmware F` |
 | `Fault` | `Fault Nack`, `Fault BadCrc`, `Fault BadFrame`, `Fault Timeout`, or `Fault Busy` |
 | `Empty`, `Debouncing`, `Enumerating` | That word alone |
+
+`B` and `F` are unsigned decimals, 0..255, with no leading zeros. `ControllerInfoPublisher` uses the same words for the controller, from the `ControllerIdentity` passed to `ModuleBus`. It publishes once after MQTT is connected. A rejected publish is retried. After the broker accepts it, a reconnect does not send it again. A new `MqttTopicLayout` generation clears that note and publishes once under the new root.
 
 Serial status prints one line per slot from the same function, with a `Slot N:` prefix. Each slot has its own topic. After a reconnect, an accepted body stays unpublished until the text changes.
 
@@ -214,5 +217,5 @@ Defaults in `ModuleHostConfig`:
 ## Tests
 
 - `test/test_desktop/test_modules.cpp` — frames, enumeration, a module that kept its slot address, the lock, faults, `begin` pin modes.
-- `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, prefix generation.
-- `test/test_desktop/test_deep_modules.cpp` — `ModuleBus::update()` through the public module, including quiesce.
+- `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, prefix generation, `testSlotPublisherPublishesDaughterRevision`, `testSlotPublisherPublishesUnsupportedRevision`, and the `testControllerInfo*` cases.
+- `test/test_desktop/test_deep_modules.cpp` — `ModuleBus::update()` through the public module, including quiesce, the first `{id}/controller` publish, and the republish after a prefix change.

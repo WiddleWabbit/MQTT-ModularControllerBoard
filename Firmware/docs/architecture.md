@@ -47,7 +47,7 @@ main.cpp
     UpdiProgrammer
 ```
 
-The ESP32 adapters (clock, Wi-Fi, NTP, MQTT, preferences, I2C, GPIO, USB serial, SPI, the half-duplex UART, and the programming latch) are also constructed in `main.cpp` and passed in. Sibling modules reach inside `Network` or `ModuleBus` through a private accessor. `main.cpp` does not call those accessors. On the bus, each `SlotController` holds one slot. `ModuleHost` calls I2C. `ModuleSlotPublisher` publishes that slot's public snapshot. The handoff is on the [module bus](module-bus.md) page.
+The ESP32 adapters (clock, Wi-Fi, NTP, MQTT, preferences, I2C, GPIO, USB serial, SPI, the half-duplex UART, and the programming latch) are also constructed in `main.cpp` and passed in. Sibling modules reach inside `Network` or `ModuleBus` through a private accessor. `main.cpp` does not call those accessors. On the bus, each `SlotController` holds one slot. `ModuleHost` calls I2C. `ModuleSlotPublisher` publishes that slot's public snapshot, and `ControllerInfoPublisher` publishes the controller identity. The handoff is on the [module bus](module-bus.md) page.
 
 ## One pass
 
@@ -84,7 +84,7 @@ While a session is active, Wi-Fi, NTP, and MQTT keep running. The console, the b
 | --- | --- | --- | --- |
 | `Network` | `begin`, `update`, `publish`, `addMessageHandler`, `apply`, `config` | Wi-Fi, then NTP, then MQTT | [Network](networking.md) |
 | `SerialConsole` | `begin`, `update`, `updateStatus` | `update` reads USB lines. `updateStatus` prints the snapshot after the modules | [Serial console](serial-console.md) |
-| `ModuleBus` | `begin`, `update`, `quiesce`, `resume` | At most one I2C transaction, then slot status if the text changed | [Module bus](module-bus.md) |
+| `ModuleBus` | `begin`, `update`, `quiesce`, `resume` | At most one I2C transaction, then slot status and the controller identity if that text changed | [Module bus](module-bus.md) |
 | `SensorModule` | `update` | At most one sensor exchange, then publish what it stored | [Sensor](sensor-module.md) |
 | `SolenoidModule` | `update` | At most one solenoid exchange, then publish what it stored | [Solenoid](solenoid-module.md) |
 | `PumpModule` | `update` | At most one pump exchange, then publish what it stored | [Pump](pump-module.md) |
