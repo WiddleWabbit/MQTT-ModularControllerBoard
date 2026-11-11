@@ -31,6 +31,13 @@ public:
   uint8_t sensorState[module_protocol::kMaxSensorsPerModule] = {};
   bool sensorAwaitingSample[module_protocol::kMaxSensorsPerModule] = {};
   uint8_t sensorStateBusyReads[module_protocol::kMaxSensorsPerModule] = {};
+  uint8_t sensorFaultBusyReads = 0;
+  uint8_t sensorFaultStatus = module_protocol::kStatusOk;
+  bool sensorFaultRaw = false;
+  uint8_t sensorFaultRawLen = 0;
+  uint8_t sensorFaultRawBody[module_protocol::kMaxPayload] = {};
+  bool sensorFaultReasonSet[module_protocol::kMaxSensorsPerModule] = {};
+  uint8_t sensorFaultReason[module_protocol::kMaxSensorsPerModule] = {};
   bool shortSolenoidPayload = false;
   uint8_t solenoidCount = 0;
   uint8_t solenoidState[module_protocol::kMaxSolenoidsPerModule] = {};
@@ -239,7 +246,9 @@ public:
         cmd == module_protocol::kCmdGetSensorReading ||
         cmd == module_protocol::kCmdGetSensorState ||
         cmd == module_protocol::kCmdSetSensor ||
-        cmd == module_protocol::kCmdResetSensor)
+        cmd == module_protocol::kCmdResetSensor ||
+        (cmd == module_protocol::kCmdGetFault &&
+         typeId == module_protocol::kTypeSensorModule))
     {
       if (shortSensorPayload)
       {
@@ -249,6 +258,11 @@ public:
       if (cmd == module_protocol::kCmdGetSensorCount)
       {
         _writeStatus(rx, module_protocol::kStatusOk, &sensorCount, 1);
+        return I2cTxnStatus::Ok;
+      }
+      if (cmd == module_protocol::kCmdGetFault)
+      {
+        _replySensorFault(rx);
         return I2cTxnStatus::Ok;
       }
       if (tx[0] < 3)
@@ -533,6 +547,62 @@ private:
     }
     return static_cast<uint32_t>(clock.millis() - _modLowSince) >=
            modAckDelayMs;
+  }
+
+  /**
+   * Replies to GET_FAULT with one record per input. A faulted input
+   * is overcurrent unless a test stored another reason. A list that
+   * does not fit is Unsupported.
+   *
+   * @param rx Destination frame.
+   * @return Nothing.
+   */
+  void _replySensorFault(uint8_t* rx)
+  {
+    if (sensorFaultBusyReads > 0)
+    {
+      sensorFaultBusyReads =
+          static_cast<uint8_t>(sensorFaultBusyReads - 1);
+      _writeStatus(rx, module_protocol::kStatusBusy, nullptr, 0);
+      return;
+    }
+    if (sensorFaultStatus != module_protocol::kStatusOk)
+    {
+      _writeStatus(rx, sensorFaultStatus, nullptr, 0);
+      return;
+    }
+    if (sensorFaultRaw)
+    {
+      _writeStatus(rx, module_protocol::kStatusOk, sensorFaultRawBody,
+                   sensorFaultRawLen);
+      return;
+    }
+    if (sensorCount > module_protocol::kMaxPayload /
+                          module_protocol::kFaultRecordLen)
+    {
+      _writeStatus(rx, module_protocol::kStatusUnsupported, nullptr, 0);
+      return;
+    }
+    uint8_t body[module_protocol::kMaxPayload] = {};
+    for (uint8_t index = 0; index < sensorCount; ++index)
+    {
+      const uint8_t offset = static_cast<uint8_t>(
+          index * module_protocol::kFaultRecordLen);
+      uint8_t reason = module_protocol::kFaultNone;
+      if (sensorFaultReasonSet[index])
+      {
+        reason = sensorFaultReason[index];
+      }
+      else if (sensorState[index] == module_protocol::kSensorStateFault)
+      {
+        reason = module_protocol::kSensorFaultOvercurrent;
+      }
+      body[offset] = reason;
+      body[static_cast<uint8_t>(offset + 1U)] = index;
+    }
+    const uint8_t length = static_cast<uint8_t>(
+        sensorCount * module_protocol::kFaultRecordLen);
+    _writeStatus(rx, module_protocol::kStatusOk, body, length);
   }
 
   /**

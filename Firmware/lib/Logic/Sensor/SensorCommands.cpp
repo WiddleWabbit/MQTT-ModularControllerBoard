@@ -81,6 +81,52 @@ void applySensorState(const ModuleExchange& exchange, uint8_t sensorIndex,
     result->status = SensorQueryStatus::Failed;
   }
 }
+
+/**
+ * Decodes a GET_FAULT list. Records must match expectedCount, and
+ * each index byte must be that record's position.
+ *
+ * @param exchange Bus exchange.
+ * @param expectedCount Records required. 0 accepts an empty payload.
+ * @param result Destination. Status is set from the exchange.
+ * @return Nothing.
+ */
+void applySensorFault(const ModuleExchange& exchange, uint8_t expectedCount,
+                      SensorFaultResult* result)
+{
+  result->status = sensorStatus(exchange.status);
+  result->report.count = 0;
+  for (uint8_t index = 0; index < module_protocol::kMaxSensorsPerModule;
+       ++index)
+  {
+    result->report.reason[index] = module_protocol::kFaultNone;
+  }
+  if (result->status != SensorQueryStatus::Ok)
+  {
+    return;
+  }
+  const uint16_t needed = static_cast<uint16_t>(
+      expectedCount * module_protocol::kFaultRecordLen);
+  if (needed > module_protocol::kMaxPayload ||
+      exchange.payloadLen != needed)
+  {
+    result->status = SensorQueryStatus::Failed;
+    return;
+  }
+  for (uint8_t index = 0; index < expectedCount; ++index)
+  {
+    const uint8_t offset = static_cast<uint8_t>(
+        index * module_protocol::kFaultRecordLen);
+    if (exchange.payload[offset + 1] != index)
+    {
+      result->status = SensorQueryStatus::Failed;
+      result->report.count = 0;
+      return;
+    }
+    result->report.reason[index] = exchange.payload[offset];
+  }
+  result->report.count = expectedCount;
+}
 }
 
 
@@ -273,5 +319,34 @@ SensorStateResult resetSensor(ModuleHost& host, uint8_t slotIndex,
                                  module_protocol::kCmdResetSensor, request,
                                  sizeof(request)),
                    sensorIndex, &result);
+  return result;
+}
+
+/**
+ * Reads the fault list.
+ *
+ * @param host Module bus.
+ * @param slotIndex Firmware slot 0..3.
+ * @param expectedCount Records the reply must contain, 0..16.
+ * @return Ok and one reason per input, or Busy, Failed, or Rejected.
+ */
+SensorFaultResult querySensorFault(ModuleHost& host, uint8_t slotIndex,
+                                   uint8_t expectedCount)
+{
+  SensorFaultResult result;
+  result.status = SensorQueryStatus::Rejected;
+  result.report.count = 0;
+  for (uint8_t index = 0; index < module_protocol::kMaxSensorsPerModule;
+       ++index)
+  {
+    result.report.reason[index] = module_protocol::kFaultNone;
+  }
+  if (expectedCount > module_protocol::kMaxSensorsPerModule)
+  {
+    return result;
+  }
+  applySensorFault(host.exchange(slotIndex, module_protocol::kTypeSensorModule,
+                                 module_protocol::kCmdGetFault, nullptr, 0),
+                   expectedCount, &result);
   return result;
 }

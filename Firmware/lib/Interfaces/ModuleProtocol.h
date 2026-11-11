@@ -65,10 +65,14 @@ inline uint8_t crc8Smbus(const uint8_t* data, size_t length)
 constexpr uint8_t kCmdPing = 0x01;
 constexpr uint8_t kCmdGetIdentity = 0x02;
 constexpr uint8_t kCmdSetAddress = 0x03;
-// Empty request. Reply is the reason byte, then the 0-based index.
-// Reason 0 is no fault on every module type. A module defines its
-// own non-zero reasons.
+// Empty request. Reply is one record per input, in index order.
+// Each record is the reason byte, then the 0-based index.
+// kFaultRecordLen is one record. kFaultPayloadLen is the one-record
+// reply the pump sends. Reason 0 is no fault on every module type.
+// A module defines its own non-zero reasons. A list longer than
+// kMaxPayload does not fit.
 constexpr uint8_t kCmdGetFault = 0x04;
+constexpr uint8_t kFaultRecordLen = 2;
 constexpr uint8_t kFaultPayloadLen = 2;
 constexpr uint8_t kFaultNone = 0;
 constexpr uint8_t kCmdEcho = 0x40;
@@ -95,6 +99,8 @@ constexpr uint8_t kSensorStateOff = 0;
 constexpr uint8_t kSensorStateOn = 1;
 constexpr uint8_t kSensorStateFault = 2;
 constexpr uint8_t kSensorStateDisconnected = 3;
+// GET_FAULT reason for type 0x0200. Two trip samples latch this.
+constexpr uint8_t kSensorFaultOvercurrent = 1;
 
 // Solenoid module (type 0x0100) commands. Other types are not required
 // to implement these. Indexes are 0-based. State bytes are

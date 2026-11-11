@@ -8,7 +8,7 @@ Source: `lib/Logic/Pump/PumpModule.h`, `PumpPoller.h`, `PumpMqttBridge.h`. Share
 
 Type `0x0300` drives one pump. The host reads the state when the module is identified, and publishes `on`, `off`, or `fault`. Held and running are both `on` on that topic. The now topic names the phase. `{id}/pump` names the desired state or asks for a reset. Each accepted `on` sends `SET_PUMP` on, including when the pump is already on, and that on is repeated at the poll interval while the absence window is open. The repeat's reply is the state sample, so a held pump is not also read with `GET_PUMP_STATE` on that pass. Off is sent when the known state differs. `SET_PUMP` is not sent while the pump is faulted. `RESET_PUMP` is sent only after an MQTT reset.
 
-Once the state is known, `GET_PUMP_NOW`, `GET_PUMP_CYCLE`, and `GET_PUMP_TOTALS` run on `kPumpInfoIntervalMs`. `GET_FAULT` runs once after a state result of fault, and only for this type. It is not on the info period, and other module types are not sent it.
+Once the state is known, `GET_PUMP_NOW`, `GET_PUMP_CYCLE`, and `GET_PUMP_TOTALS` run on `kPumpInfoIntervalMs`. `GET_FAULT` runs once after a state result of fault. The pump reply is one record. It is not on the info period. The sensor poller sends the same command for its own list.
 
 The host sends pump commands only while the slot is `Online`, the type is `0x0300`, and the protocol version is 1. There is no pump index on the state commands. `ECHO` is not part of this type.
 
@@ -28,7 +28,7 @@ The host sends pump commands only while the slot is `Online`, the type is `0x030
 | `0x65` | GET_PUMP_TOTALS | empty | 16 bytes, below |
 | `0x04` | GET_FAULT | empty | `reason` (`u8`), `index` (`u8`) |
 
-`GET_FAULT` is sent only by the pump poller, and only to type `0x0300` while the state is fault. It is not a command every daughter type must answer.
+The pump poller sends `GET_FAULT` only to type `0x0300`, and only while the state is fault. The reply is one record, a list of length 1. The sensor poller sends the same command for one record per input. A daughter type with no fault read does not have to answer it.
 
 | Value | Name | Meaning |
 | ---: | --- | --- |

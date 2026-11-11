@@ -97,6 +97,8 @@ mosquitto_pub -h <broker> -t watering/sensor -q 1 -m "1 2 reset"
 
 The words are lowercase `on`, `off`, and `reset`. The result is published on `{id}/slot/N/sensor/M` with retain off, using the same words as a reading. After `on` or `off`, the controller reads the state on the next passes, and it reads the value when that state is on, without waiting for the 60 second cycle. `reset` is the only command that clears a fault. The input is left off. If it is still desired on, a later pass turns it on. There is no silence timer.
 
+A fault state is followed by one `GET_FAULT`. The controller publishes the list on `{id}/slot/N/sensors/fault` with retain off. The text is the count, then one word per input. `3 none overcurrent none` is three inputs, and input 2 is overcurrent. Reason `0` is `none`. Reason `1` is `overcurrent`. Any other reason is a decimal, such as `1 9`. A fault that clears publishes `none` for that input. This topic is not a subscription. `kSubscriptionCount` stays 6.
+
 `ON`, a missing word, an extra token, a slot outside 1..4, and a sensor outside 1..16 are ignored and publish nothing.
 
 Behaviour: [sensor reference](sensor-module.md).
@@ -185,7 +187,7 @@ Behaviour: [pump reference](pump-module.md).
 
 The controller publishes these. Subscribe to read them. QoS is 0.
 
-Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, solenoid states, the connected-output list, pump state, and the pump now, cycle, totals, and fault topics are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
+Only `{id}/slot/N` is retained. `ModuleSlotPublisher` sends that line when its text changes, not on a timer, so a subscriber who connects later still needs the broker to remember `Empty` or `Online Sensor addr=0x10`. Sensor readings, the connected-input list, the sensor fault list, solenoid states, the connected-output list, pump state, and the pump now, cycle, totals, and fault topics are published with retain off. Those results used to be retained. After the board was unplugged, or replaced, the broker kept the last payload and delivered it as if the point were still there.
 
 A publish with retain off does not replace a message the broker already stored. This firmware does not publish an empty payload, and it does not delete those copies. Messages already on the broker, including ones under a previous device id, stay until they are removed there. A subscriber who is already connected receives each new sample, and `unavailable` when that point disappears. A subscriber who connects later receives the four slot lines, and any result the broker is still holding. The next sample arrives on the next poll, or when a command asks again.
 
@@ -194,6 +196,7 @@ A publish with retain off does not replace a message the broker already stored. 
 | `{id}/slot/N` | yes | Slot snapshot. See below. | `ModuleSlotPublisher` |
 | `{id}/slot/N/sensor/M` | no | `connected <int32>`, `disconnected`, or `unavailable` | Sensor bridge |
 | `{id}/slot/N/sensors` | no | `<count> <connected indexes...>`, or `unavailable` | Sensor bridge |
+| `{id}/slot/N/sensors/fault` | no | `<count> <reason...>`, or `unavailable` | Sensor bridge |
 | `{id}/slot/N/solenoid/M` | no | `on`, `off`, `disconnected`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/solenoids` | no | `<count> <connected indexes...>`, or `unavailable` | Solenoid bridge |
 | `{id}/slot/N/pump` | no | `on`, `off`, `fault`, or `unavailable` | Pump bridge |
@@ -227,7 +230,7 @@ A reading, a solenoid state, a pump state, or a pump info sample is published ag
 
 `unavailable` is published with retain off when a sensor point, a solenoid point, or the pump state disappears (unplug, a count that drops an index, or a slot that is no longer that type). A failed immediate sensor read publishes the same non-retained `unavailable`. A subscriber who connects after either event does not receive that `unavailable`. The slot line, which is retained, shows `Empty` or the board that is there now.
 
-A count query publishes nothing by itself. A sensor state query can publish `off`, `fault`, or `disconnected` on `{id}/slot/N/sensor/M`, and it can publish `{id}/slot/N/sensors` when the list becomes complete or the set of inputs that are on changes. On does not publish a reading until the value is stored.
+A count query publishes nothing by itself. A sensor state query can publish `off`, `fault`, or `disconnected` on `{id}/slot/N/sensor/M`, and it can publish `{id}/slot/N/sensors` when the list becomes complete or the set of inputs that are on changes. On does not publish a reading until the value is stored. `GET_FAULT`, or a fault that clears, publishes `{id}/slot/N/sensors/fault`.
 
 Slot text and the retry rule: [module bus reference](module-bus.md).
 

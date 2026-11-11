@@ -69,6 +69,7 @@ The id used when `mqtt_prefix` is missing is `kMqttDeviceId` in `src/main.cpp`. 
 watering/slot/N
 watering/slot/N/sensor/M
 watering/slot/N/sensors
+watering/slot/N/sensors/fault
 watering/slot/N/solenoid/M
 watering/slot/N/solenoids
 watering/slot/N/pump

@@ -10,9 +10,9 @@ class ModuleBus;
 class Network;
 
 /**
- * Sensor daughter behaviour: count, on/off, fault, readings, the
- * immediate read command, the connected-input list, and publication
- * with retain off.
+ * Sensor daughter behaviour: count, on/off, fault, the fault-reason
+ * list, readings, the immediate read command, the connected-input
+ * list, and publication with retain off.
  * update() issues at most one bus exchange and then publishes what
  * that exchange stored.
  */
@@ -32,8 +32,8 @@ public:
                uint32_t pollIntervalMs);
 
   /**
-   * Issues at most one sensor exchange, then publishes stored readings
-   * and the connected-input list.
+   * Issues at most one sensor exchange, then publishes stored readings,
+   * the connected-input list, and the fault list.
    *
    * @return Nothing.
    */

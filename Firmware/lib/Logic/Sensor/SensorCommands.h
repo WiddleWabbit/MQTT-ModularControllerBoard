@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "ModuleHost.h"
+#include "ModuleProtocol.h"
 
 /**
  * Outcome of one sensor-module command.
@@ -62,6 +63,26 @@ struct SensorStateResult
 {
   SensorQueryStatus status;
   SensorState state;
+};
+
+/**
+ * GET_FAULT list. count is the number of records. reason[i] is the
+ * reason for wire index i. Reason 0 is not latched. Valid when the
+ * query status is Ok.
+ */
+struct SensorFaultReport
+{
+  uint8_t count;
+  uint8_t reason[module_protocol::kMaxSensorsPerModule];
+};
+
+/**
+ * Result of GET_FAULT. report is valid when status is Ok.
+ */
+struct SensorFaultResult
+{
+  SensorQueryStatus status;
+  SensorFaultReport report;
 };
 
 /**
@@ -136,3 +157,16 @@ SensorStateResult setSensor(ModuleHost& host, uint8_t slotIndex,
  */
 SensorStateResult resetSensor(ModuleHost& host, uint8_t slotIndex,
                               uint8_t sensorIndex);
+
+/**
+ * Reads the fault list. The payload is one record per input, in
+ * index order. expectedCount is the count the poller already stored.
+ * An empty payload is accepted only when that count is 0.
+ *
+ * @param host Module bus.
+ * @param slotIndex Firmware slot 0..3.
+ * @param expectedCount Records the reply must contain, 0..16.
+ * @return Ok and one reason per input, or Busy, Failed, or Rejected.
+ */
+SensorFaultResult querySensorFault(ModuleHost& host, uint8_t slotIndex,
+                                   uint8_t expectedCount);

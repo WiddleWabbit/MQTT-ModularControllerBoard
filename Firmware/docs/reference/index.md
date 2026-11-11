@@ -11,7 +11,7 @@ These pages are the technical wiki: states, bytes, errors, timing, and the deskt
 
 ## Daughter types
 
-- [Sensor](sensor-module.md) — type `0x0200`. Count, presence, readings, immediate read.
+- [Sensor](sensor-module.md) — type `0x0200`. Count, presence, readings, immediate read, fault list.
 - [Solenoid](solenoid-module.md) — type `0x0100`. Count, state, desired on/off, absence cutoff.
 - [Pump](pump-module.md) — type `0x0300`. State, on/off, reset, now, cycle, totals, fault reason, absence cutoff.
 

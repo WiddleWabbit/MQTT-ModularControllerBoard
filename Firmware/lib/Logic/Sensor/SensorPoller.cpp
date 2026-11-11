@@ -36,6 +36,10 @@ void SensorPoller::update()
   {
     return;
   }
+  if (_serviceFault())
+  {
+    return;
+  }
   if (_serviceReset())
   {
     return;
@@ -242,6 +246,78 @@ uint32_t SensorPoller::sampleRevision(uint8_t moduleSlot,
 }
 
 /**
+ * Reports whether the fault list can be published.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True when every current fault has a stored reason.
+ */
+bool SensorPoller::faultReportKnown(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount ||
+      !_isActiveSensor(moduleSlot))
+  {
+    return false;
+  }
+  const SlotRuntime& runtime = _runtime[moduleSlot];
+  if (runtime.faultRevision == 0 || !runtime.countKnown)
+  {
+    return false;
+  }
+  for (uint8_t index = 0; index < runtime.count; ++index)
+  {
+    const Sample& sample = runtime.samples[index];
+    if (sample.stateKnown && sample.state == SensorState::Fault &&
+        !runtime.faultKnown[index])
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Reads the fault-list generation.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Generation, or 0 when the list has not been stored.
+ */
+uint32_t SensorPoller::faultRevision(uint8_t moduleSlot) const
+{
+  if (moduleSlot >= module_protocol::kSlotCount)
+  {
+    return 0;
+  }
+  return _runtime[moduleSlot].faultRevision;
+}
+
+/**
+ * Reads one stored fault reason.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sensorIndex Zero-based input.
+ * @param reason Set when the list has been stored.
+ * @return False when the list is not stored or the index is
+ *         outside the count.
+ */
+bool SensorPoller::faultReason(uint8_t moduleSlot, uint8_t sensorIndex,
+                               uint8_t* reason) const
+{
+  if (reason == nullptr || moduleSlot >= module_protocol::kSlotCount ||
+      !_isActiveSensor(moduleSlot))
+  {
+    return false;
+  }
+  const SlotRuntime& runtime = _runtime[moduleSlot];
+  if (runtime.faultRevision == 0 || !runtime.countKnown ||
+      sensorIndex >= runtime.count)
+  {
+    return false;
+  }
+  *reason = runtime.faultReason[sensorIndex];
+  return true;
+}
+
+/**
  * Removes the next on-demand result.
  *
  * @param out Destination. Unchanged when the queue is empty.
@@ -333,9 +409,14 @@ void SensorPoller::_clearCache(uint8_t moduleSlot)
   runtime.readingStep = false;
   runtime.stepAttempts = 0;
   runtime.nextPollAt = 0;
+  runtime.faultAttempts = 0;
+  runtime.faultRetryAt = 0;
+  runtime.faultRevision = 0;
   for (uint8_t index = 0; index < module_protocol::kMaxSensorsPerModule;
        ++index)
   {
+    runtime.faultKnown[index] = false;
+    runtime.faultReason[index] = module_protocol::kFaultNone;
     Sample& sample = runtime.samples[index];
     sample.stateKnown = false;
     sample.state = SensorState::Off;
@@ -883,6 +964,149 @@ void SensorPoller::_popDemand()
 }
 
 
+// ========== Fault ==========
+
+/**
+ * Sends GET_FAULT once when a faulted input has no stored reason.
+ * Runs before a reset, a set, or a confirm.
+ *
+ * @return True when a fault read was issued.
+ */
+bool SensorPoller::_serviceFault()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    if (!_needsFaultRead(slot))
+    {
+      continue;
+    }
+    SlotRuntime& runtime = _runtime[slot];
+    const SensorFaultResult reading =
+        querySensorFault(_moduleHost, slot, runtime.count);
+    if (reading.status == SensorQueryStatus::Ok)
+    {
+      for (uint8_t index = 0; index < runtime.count; ++index)
+      {
+        runtime.faultReason[index] = reading.report.reason[index];
+        runtime.faultKnown[index] = true;
+      }
+      runtime.faultAttempts = 0;
+      runtime.faultRetryAt = 0;
+      _bumpFault(runtime);
+      return true;
+    }
+    _failFault(slot);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Stores reason 0 for one input. Does not send GET_FAULT.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sensorIndex Zero-based input.
+ * @return Nothing.
+ */
+void SensorPoller::_storeFaultNone(uint8_t moduleSlot, uint8_t sensorIndex)
+{
+  SlotRuntime& runtime = _runtime[moduleSlot];
+  runtime.faultReason[sensorIndex] = module_protocol::kFaultNone;
+  runtime.faultKnown[sensorIndex] = true;
+  runtime.faultAttempts = 0;
+  runtime.faultRetryAt = 0;
+  _bumpFault(runtime);
+}
+
+/**
+ * Notes a transition into or out of fault before the state is stored.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param sensorIndex Zero-based input.
+ * @param state State about to be stored.
+ * @return Nothing.
+ */
+void SensorPoller::_noteFaultTransition(uint8_t moduleSlot,
+                                        uint8_t sensorIndex, SensorState state)
+{
+  const Sample& sample = _runtime[moduleSlot].samples[sensorIndex];
+  const bool wasFault = sample.stateKnown &&
+                        sample.state == SensorState::Fault;
+  const bool nowFault = state == SensorState::Fault;
+  if (wasFault && !nowFault)
+  {
+    _storeFaultNone(moduleSlot, sensorIndex);
+    return;
+  }
+  if (nowFault && !wasFault)
+  {
+    SlotRuntime& runtime = _runtime[moduleSlot];
+    runtime.faultKnown[sensorIndex] = false;
+    runtime.faultAttempts = 0;
+    runtime.faultRetryAt = 0;
+  }
+}
+
+/**
+ * Counts a failed fault read. Three failures wait out the poll interval.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Nothing.
+ */
+void SensorPoller::_failFault(uint8_t moduleSlot)
+{
+  SlotRuntime& runtime = _runtime[moduleSlot];
+  runtime.faultAttempts = static_cast<uint8_t>(runtime.faultAttempts + 1);
+  if (runtime.faultAttempts >= kSensorQueryAttempts)
+  {
+    runtime.faultAttempts = 0;
+    runtime.faultRetryAt = _clock.millis() + _intervalMs;
+  }
+}
+
+/**
+ * Increases the fault-list generation, skipping 0.
+ *
+ * @param runtime Slot cache.
+ * @return Nothing.
+ */
+void SensorPoller::_bumpFault(SlotRuntime& runtime)
+{
+  runtime.faultRevision += 1;
+  if (runtime.faultRevision == 0)
+  {
+    runtime.faultRevision = 1;
+  }
+}
+
+/**
+ * Reports whether this slot should send GET_FAULT now.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return True when a faulted input has no stored reason and the
+ *         retry wait has elapsed.
+ */
+bool SensorPoller::_needsFaultRead(uint8_t moduleSlot) const
+{
+  if (!_isActiveSensor(moduleSlot) || !_runtime[moduleSlot].countKnown ||
+      !_isDue(_runtime[moduleSlot].faultRetryAt))
+  {
+    return false;
+  }
+  const SlotRuntime& runtime = _runtime[moduleSlot];
+  for (uint8_t index = 0; index < runtime.count; ++index)
+  {
+    const Sample& sample = runtime.samples[index];
+    if (sample.stateKnown && sample.state == SensorState::Fault &&
+        !runtime.faultKnown[index])
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+
 // ========== Count And Periodic ==========
 
 /**
@@ -1153,6 +1377,7 @@ void SensorPoller::_armConfirm(uint8_t moduleSlot, uint8_t sensorIndex,
 void SensorPoller::_rememberState(uint8_t moduleSlot, uint8_t sensorIndex,
                                   SensorState state, bool fromPoll)
 {
+  _noteFaultTransition(moduleSlot, sensorIndex, state);
   Sample& sample = _runtime[moduleSlot].samples[sensorIndex];
   sample.stateKnown = true;
   sample.state = state;

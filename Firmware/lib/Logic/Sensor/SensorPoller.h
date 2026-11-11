@@ -29,9 +29,12 @@ struct SensorDemandResult
  * taken only while that state is on. MQTT on and off are applied when
  * the known state differs and is not fault, then the state is read
  * again before the periodic cycle. A fault is left alone until an
- * MQTT reset. After that reset, a desired on is applied when the
- * input is no longer faulted. At most one I2C query per update().
- * Does not publish MQTT.
+ * MQTT reset. GET_FAULT is sent once while an input is fault and
+ * its reason is not stored yet. That read runs after the count and
+ * before a reset, a set, or a confirm. A read that is waiting out
+ * its retry does not hold those commands. After that reset, a
+ * desired on is applied when the input is no longer faulted. At
+ * most one I2C query per update(). Does not publish MQTT.
  */
 class SensorPoller
 {
@@ -150,6 +153,36 @@ public:
   uint32_t sampleRevision(uint8_t moduleSlot, uint8_t sensorIndex) const;
 
   /**
+   * Reports whether the fault list can be published.
+   * False until a fault has been read or has cleared, and while a
+   * faulted input still has no stored reason.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return True when every current fault has a stored reason.
+   */
+  bool faultReportKnown(uint8_t moduleSlot) const;
+
+  /**
+   * Reads the fault-list generation. Zero means nothing is ready.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return Generation, or 0 when the list has not been stored.
+   */
+  uint32_t faultRevision(uint8_t moduleSlot) const;
+
+  /**
+   * Reads one stored fault reason.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param sensorIndex Zero-based input.
+   * @param reason Set when the list has been stored.
+   * @return False when the list is not stored or the index is
+   *         outside the count.
+   */
+  bool faultReason(uint8_t moduleSlot, uint8_t sensorIndex,
+                   uint8_t* reason) const;
+
+  /**
    * Removes the next on-demand result.
    *
    * @param out Destination. Unchanged when the queue is empty.
@@ -197,6 +230,11 @@ private:
     bool readingStep;
     uint8_t stepAttempts;
     uint32_t nextPollAt;
+    bool faultKnown[module_protocol::kMaxSensorsPerModule];
+    uint8_t faultReason[module_protocol::kMaxSensorsPerModule];
+    uint8_t faultAttempts;
+    uint32_t faultRetryAt;
+    uint32_t faultRevision;
     Sample samples[module_protocol::kMaxSensorsPerModule];
   };
 
@@ -333,6 +371,14 @@ private:
   bool _serviceCount();
 
   /**
+   * Sends GET_FAULT once when a faulted input has no stored reason.
+   * The lowest such slot is served first.
+   *
+   * @return True when a fault read was issued.
+   */
+  bool _serviceFault();
+
+  /**
    * Queries the next due state, or the reading for an input whose
    * state this cycle is on.
    *
@@ -383,6 +429,52 @@ private:
    * @return Nothing.
    */
   void _armConfirm(uint8_t moduleSlot, uint8_t sensorIndex, bool readAfter);
+
+  /**
+   * Stores reason 0 for one input. Does not send GET_FAULT.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param sensorIndex Zero-based input.
+   * @return Nothing.
+   */
+  void _storeFaultNone(uint8_t moduleSlot, uint8_t sensorIndex);
+
+  /**
+   * Notes a transition into or out of fault before the state is stored.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param sensorIndex Zero-based input.
+   * @param state State about to be stored.
+   * @return Nothing.
+   */
+  void _noteFaultTransition(uint8_t moduleSlot, uint8_t sensorIndex,
+                            SensorState state);
+
+  /**
+   * Counts a failed fault read. Three failures wait out the poll
+   * interval.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return Nothing.
+   */
+  void _failFault(uint8_t moduleSlot);
+
+  /**
+   * Increases the fault-list generation, skipping 0.
+   *
+   * @param runtime Slot cache.
+   * @return Nothing.
+   */
+  void _bumpFault(SlotRuntime& runtime);
+
+  /**
+   * Reports whether this slot should send GET_FAULT now.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return True when a faulted input has no stored reason and the
+   *         retry wait has elapsed.
+   */
+  bool _needsFaultRead(uint8_t moduleSlot) const;
 
   /**
    * Stores a state result. A poll that disagrees with the desired

@@ -32,6 +32,8 @@ SensorMqttBridge::SensorMqttBridge(SensorPoller& poller,
     _inventoryPending[slot] = false;
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
+    _faultOk[slot] = false;
+    _faultRevision[slot] = 0;
   }
 }
 
@@ -73,6 +75,7 @@ void SensorMqttBridge::update()
   _publishDemand();
   _publishSnapshots();
   _publishInventories();
+  _publishFaultLists();
 }
 
 
@@ -99,6 +102,8 @@ void SensorMqttBridge::_syncTopicGeneration()
     }
     _inventoryOk[slot] = false;
     _inventoryPayload[slot][0] = '\0';
+    _faultOk[slot] = false;
+    _faultRevision[slot] = 0;
   }
   _seenGeneration = generation;
 }
@@ -540,6 +545,119 @@ bool SensorMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
     const int next = std::snprintf(out + used,
                                    outCap - static_cast<size_t>(used),
                                    " %u", static_cast<unsigned>(index) + 1U);
+    if (next < 0 ||
+        static_cast<size_t>(next) >= outCap - static_cast<size_t>(used))
+    {
+      return false;
+    }
+    used += next;
+  }
+  return true;
+}
+
+/**
+ * Publishes the fault list for each slot that has one stored.
+ * A forgotten list publishes unavailable. A list that is waiting
+ * for a new reason keeps the last payload.
+ *
+ * @return Nothing.
+ */
+void SensorMqttBridge::_publishFaultLists()
+{
+  for (uint8_t slot = 0; slot < module_protocol::kSlotCount; ++slot)
+  {
+    if (!_poller.countKnown(slot) || _poller.faultRevision(slot) == 0)
+    {
+      if (_faultOk[slot] && _publishFault(slot, "unavailable"))
+      {
+        _faultOk[slot] = false;
+        _faultRevision[slot] = 0;
+      }
+      continue;
+    }
+    char text[256];
+    if (!_formatFaultList(slot, text, sizeof(text)))
+    {
+      continue;
+    }
+    const uint32_t revision = _poller.faultRevision(slot);
+    if (revision == _faultRevision[slot])
+    {
+      continue;
+    }
+    if (!_publishFault(slot, text))
+    {
+      continue;
+    }
+    _faultOk[slot] = true;
+    _faultRevision[slot] = revision;
+  }
+}
+
+/**
+ * Publishes the fault-list topic for one slot with retain off.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param payload Text payload.
+ * @return True when publication was accepted.
+ */
+bool SensorMqttBridge::_publishFault(uint8_t moduleSlot, const char* payload)
+{
+  char topic[96];
+  const unsigned moduleNumber = static_cast<unsigned>(moduleSlot) + 1U;
+  std::snprintf(topic, sizeof(topic), "%s/%u/sensors/fault",
+                _topics.slotPrefix(), moduleNumber);
+  return _mqttService.publish(topic, payload, false);
+}
+
+/**
+ * Formats "<count> <reason>..." for one slot.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @param out Destination buffer.
+ * @param outCap Destination capacity.
+ * @return False until the fault list is ready to publish.
+ */
+bool SensorMqttBridge::_formatFaultList(uint8_t moduleSlot, char* out,
+                                        size_t outCap) const
+{
+  if (!_poller.faultReportKnown(moduleSlot) || out == nullptr || outCap < 2)
+  {
+    return false;
+  }
+  const uint8_t count = _poller.sensorCount(moduleSlot);
+  int used = std::snprintf(out, outCap, "%u", static_cast<unsigned>(count));
+  if (used < 0 || static_cast<size_t>(used) >= outCap)
+  {
+    return false;
+  }
+  for (uint8_t index = 0; index < count; ++index)
+  {
+    uint8_t reason = module_protocol::kFaultNone;
+    if (!_poller.faultReason(moduleSlot, index, &reason))
+    {
+      return false;
+    }
+    const char* word = nullptr;
+    if (reason == module_protocol::kFaultNone)
+    {
+      word = "none";
+    }
+    else if (reason == module_protocol::kSensorFaultOvercurrent)
+    {
+      word = "overcurrent";
+    }
+    int next = 0;
+    if (word != nullptr)
+    {
+      next = std::snprintf(out + used, outCap - static_cast<size_t>(used),
+                           " %s", word);
+    }
+    else
+    {
+      next = std::snprintf(out + used, outCap - static_cast<size_t>(used),
+                           " %u", static_cast<unsigned>(reason));
+    }
     if (next < 0 ||
         static_cast<size_t>(next) >= outCap - static_cast<size_t>(used))
     {

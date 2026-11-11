@@ -34,7 +34,8 @@ static const char kSensorConnectedTopic[] = "watering/sensor/connected";
  * request. The command handler only records a request; it does not
  * touch I2C. Readings are published at
  * "{prefix}/{moduleSlot}/sensor/{sensor}". The connected list is
- * published at "{prefix}/{moduleSlot}/sensors".
+ * published at "{prefix}/{moduleSlot}/sensors". The fault list is
+ * published at "{prefix}/{moduleSlot}/sensors/fault".
  */
 class SensorMqttBridge
 {
@@ -68,9 +69,10 @@ public:
    * Publishes each new reading, including a repeated value, with
    * retain off. An input that disappears publishes unavailable with
    * retain off. Publishes the connected-input list when that text
-   * changes or a request asked again. A rejected publish stays
+   * changes or a request asked again. Publishes the fault list when
+   * a reason is stored or a fault clears. A rejected publish stays
    * pending. A new device id sends the current readings and the
-   * list once on the new topics.
+   * lists once on the new topics.
    *
    * @return Nothing.
    */
@@ -92,6 +94,8 @@ private:
   bool _inventoryPending[module_protocol::kSlotCount];
   bool _inventoryOk[module_protocol::kSlotCount];
   char _inventoryPayload[module_protocol::kSlotCount][80];
+  bool _faultOk[module_protocol::kSlotCount];
+  uint32_t _faultRevision[module_protocol::kSlotCount];
 
   /**
    * Parses an on/off/reset, a read, or a connected-list request.
@@ -154,6 +158,15 @@ private:
   void _publishInventories();
 
   /**
+   * Publishes the fault list for each slot that has one stored.
+   * A slot that could answer and no longer can publishes unavailable.
+   * Neither payload is retained.
+   *
+   * @return Nothing.
+   */
+  void _publishFaultLists();
+
+  /**
    * Formats "<count> <connected indexes...>" for one slot.
    *
    * @param moduleSlot Firmware slot 0..3.
@@ -171,6 +184,25 @@ private:
    * @return True when publication was accepted.
    */
   bool _publishInventory(uint8_t moduleSlot, const char* payload);
+
+  /**
+   * Publishes the fault-list topic for one slot with retain off.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param payload Text payload.
+   * @return True when publication was accepted.
+   */
+  bool _publishFault(uint8_t moduleSlot, const char* payload);
+
+  /**
+   * Formats "<count> <reason>..." for one slot.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @param out Destination buffer.
+   * @param outCap Destination capacity.
+   * @return False until the fault list is ready to publish.
+   */
+  bool _formatFaultList(uint8_t moduleSlot, char* out, size_t outCap) const;
 
   /**
    * Publishes one sensor topic with retain off.
