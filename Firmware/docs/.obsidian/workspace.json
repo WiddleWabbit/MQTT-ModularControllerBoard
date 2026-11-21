@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "reference/pump-module.md",
+                "file": "reference/mqtt.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "pump-module"
+              "title": "mqtt"
             }
           }
         ]
@@ -55,7 +55,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "state",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -190,15 +190,15 @@
   },
   "active": "f51934d8476ef699",
   "lastOpenFiles": [
+    "sensor-module.md",
+    "home.md",
+    "reference/pump-module.md",
     "reference/serial-console.md",
     "reference/solenoid-module.md",
     "reference/sensor-module.md",
-    "sensor-module.md",
     "pump-module.md",
     "reference/mqtt.md",
-    "home.md",
     "reference/configuration.md",
-    "reference/pump-module.md",
     "architecture.md",
     "reference/programming.md",
     "programming.md",

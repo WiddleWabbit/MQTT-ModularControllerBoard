@@ -49,7 +49,7 @@ A state byte is off (`0`), on (`1`), fault (`2`), or disconnected (`3`). `SET_SE
 
 There is no payload word `on`. On is `connected` plus the raw value. Storing the on state does not publish until that reading is stored. Until then the previous payload stays, including across the `Busy` reply from `SET_SENSOR` on. That gap is not published as `unavailable`.
 
-Desired on matches on and disconnected. Desired off matches off. Fault matches neither, and `SET_SENSOR` is not sent. A second on while the loop is already closed does not send `SET_SENSOR`. It still reads the state, and then the value, so the reading is published on the next passes.
+Desired on is satisfied by on and disconnected for a later poll, so that poll does not send `SET_SENSOR` again. Desired off is satisfied by off. Fault matches neither, and `SET_SENSOR` is not sent while the input is faulted. Each accepted `on` still sends `SET_SENSOR` once the state is known, including when the stored state is already on or disconnected. The pass after that set reads the state, and reads the value when the confirm is on. An accepted `off` sends `SET_SENSOR` only when the stored state is not off.
 
 ## Sequences
 
@@ -58,8 +58,8 @@ One `update()` issues at most one exchange, in this order:
 1. `GET_SENSOR_COUNT` when the count is unknown.
 2. `GET_FAULT` when any input is fault and that input has no stored reason yet. One read covers the whole list. Three failures wait `kSensorPollIntervalMs`, then try again while a reason is still missing. That wait does not hold a reset, a set, or a confirm.
 3. `RESET_SENSOR` when a reset is pending and the state is already known.
-4. `SET_SENSOR` when the known state is not fault and does not match the desired on or off.
-5. `GET_SENSOR_STATE` for an input that was just switched, or whose on or off command did not need a set.
+4. `SET_SENSOR` when a command is pending, the state is known, and the input is not fault. An accepted `on` is sent even when the stored state is already on or disconnected. An accepted `off` is sent only when the stored state is not off.
+5. `GET_SENSOR_STATE` for an input that was just switched, or whose `off` was already off.
 6. `GET_SENSOR_READING` when that confirm reported on.
 7. `GET_SENSOR_STATE` for a commanded input, or the head of the read queue, whose state is still unknown.
 8. The head immediate read. A state other than on completes with that state and no reading. On sends `GET_SENSOR_READING`.
@@ -107,7 +107,7 @@ That commands sensor 2 on module slot 1. The words are `on`, `off`, and `reset`,
 
 `on` and `off` store the desired state. `reset` stores a reset and does not change the desired state. The callback does not touch I2C.
 
-After the state is known, the next poller pass sends `SET_SENSOR` when the state differs and is not fault. A missing fault reason is read first. The pass after the set is `GET_SENSOR_STATE`. When the confirm is on, the pass after that is `GET_SENSOR_READING`, and the bridge publishes `connected <value>`. When the confirm is disconnected, the bridge publishes `disconnected` and does not read. Off publishes `off`. None of these wait for the periodic cycle.
+After the state is known, the next poller pass sends `SET_SENSOR` for a pending `on`, including when the stored state is already on or disconnected. A pending `off` is sent only when the stored state is not off. Fault does not send either. A missing fault reason is read first. The pass after the set is `GET_SENSOR_STATE`. When the confirm is on, the pass after that is `GET_SENSOR_READING`, and the bridge publishes `connected <value>`. When the confirm is disconnected, the bridge publishes `disconnected` and does not read. Off publishes `off`. None of these wait for the periodic cycle. Two `on` payloads that arrive before that send become one `SET_SENSOR`. A later poll that is still on or disconnected does not send `on` again.
 
 `reset` sends `RESET_SENSOR` once the state is known. A missing fault reason is read first. The reply is published. If the input is still desired on, a later pass sends `SET_SENSOR` on. A reset that is still faulted is published and not followed by a set. A periodic state that shows fault does not send `RESET_SENSOR`.
 
@@ -228,7 +228,7 @@ An index outside the reported count is `BadLength` from the module. The host tre
 
 `kSensorPollIntervalMs` in `src/main.cpp` is `60UL * 1000UL`. It is the gap after a finished state cycle, the wait after three failed count queries, the backoff after three busy confirms, and the wait after three failed `GET_FAULT` reads. A zero argument to `SensorPoller` selects the poller's own 60 second default. It does not disable the poll.
 
-There is no command-absence cutoff. Sensors are not turned off because `{id}/sensor` has been quiet, and a repeated on is not sent on a timer. The daughter has no command-hold timer. A second on while the loop is closed is a no-op on the wire.
+There is no command-absence cutoff. Sensors are not turned off because `{id}/sensor` has been quiet, and a repeated on is not sent on a timer. Each accepted MQTT `on` is sent once. Two `on` payloads that arrive before that send become one `SET_SENSOR`. The daughter ignores a second on while the loop is already closed.
 
 ## Tests
 
@@ -237,7 +237,7 @@ There is no command-absence cutoff. Sensors are not turned off because `{id}/sen
 - Command frames, a bad state byte, a short payload, and rejection unless the slot is an online sensor: `testHostReadsSensorCountConnectedAndReading`, `testHostRejectsSensorQueryUnlessOnlineSensor`, `testHostRejectsShortSensorPayload`.
 - Count, then state, then a reading only when on, and the 60 second gap: `testPollerQueriesCountThenEachSensorAtInterval`. Three busy state replies skip that input: `testPollerRetriesBusyThenMovesOn`.
 - Boot publishes `off` and does not read: `testBootPublishesOffAndDoesNotRead`.
-- `1 1 on` sends `SET_SENSOR`, then `GET_SENSOR_STATE`, then `GET_SENSOR_READING`, and publishes `connected` without waiting out the interval: `testSensorOnConfirmsStateThenPublishesReading`. An open jack publishes `disconnected` and does not read: `testSensorOnWithOpenJackPublishesDisconnected`. A second off, or on while already on, confirms state and does not send `SET_SENSOR`: `testSensorOffConfirmsAndSecondOffSkipsSet`, `testSensorOnWhileAlreadyOnConfirmsWithoutSet`.
+- `1 1 on` sends `SET_SENSOR`, then `GET_SENSOR_STATE`, then `GET_SENSOR_READING`, and publishes `connected` without waiting out the interval: `testSensorOnConfirmsStateThenPublishesReading`. An open jack publishes `disconnected` and does not read: `testSensorOnWithOpenJackPublishesDisconnected`. A second `off` while already off confirms state and does not send `SET_SENSOR`: `testSensorOffConfirmsAndSecondOffSkipsSet`. An `on` while already on, and an `on` while disconnected, each send `SET_SENSOR` on: `testSensorOnWhileAlreadyOnSendsSet`, `testSensorOnWhileDisconnectedSendsSet`. A second `on` after that send does too. Two `on` payloads before the send become one `SET_SENSOR`: `testSensorOnsBeforeSendCollapseToOneSet`. The 60 second poll does not send it again: `testSensorDisconnectedOnIsNotRepeatedByPoll`. An `on` while the controller still says disconnected closes a loop the daughter has opened: `testSensorOnReclosesLoopThatDroppedOff`.
 - Fault ignores on and off. Only `reset` sends `RESET_SENSOR`, and a desired on is applied after the input is off: `testSensorFaultIgnoresOnAndOffUntilReset`. A periodic fault is not reset. The next pass reads `GET_FAULT` once: `testPeriodicFaultIsNotReset`.
 - The fault list is one record per input. Input 2 overcurrent publishes `3 none overcurrent none`, and a later fault reads the list once more: `testHostReadsSensorFaultList`, `testSensorFaultListPublishesReasons`. On and off do not send `GET_FAULT`: `testSensorOnAndOffDoNotReadFault`. Reset publishes `none` with no second read: `testSensorFaultClearPublishesNoneWithoutRead`. Three busy replies wait out the poll interval: `testSensorFaultReadWaitsAfterThreeBusyReplies`. The fault read runs before a confirm and before a reset: `testSensorFaultReadRunsBeforeConfirm`, `testSensorFaultReadRunsBeforeReset`. An odd payload and `Unsupported` store nothing: `testSensorFaultBadListIsNotStored`, `testSensorFaultUnsupportedIsNotStored`. Reason `9` publishes `1 9`, and unplug publishes `unavailable`: `testSensorFaultDecimalReasonAndUnplug`.
 - An immediate read of an off input publishes `off` and does not read: `testImmediateReadOfOffPublishesOff`. A fifth queued read is dropped: `testFifthSensorReadIsDropped`.

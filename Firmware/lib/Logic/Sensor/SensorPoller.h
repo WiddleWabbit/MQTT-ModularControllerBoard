@@ -26,11 +26,12 @@ struct SensorDemandResult
 /**
  * Schedules Sensor-module commands. Reads each input's state when a
  * module comes online, then again at pollIntervalMs. A reading is
- * taken only while that state is on. MQTT on and off are applied when
- * the known state differs and is not fault, then the state is read
- * again before the periodic cycle. A fault is left alone until an
- * MQTT reset. GET_FAULT is sent once while an input is fault and
- * its reason is not stored yet. That read runs after the count and
+ * taken only while that state is on. Each MQTT on is applied even
+ * when the stored state is already on or disconnected. An off is
+ * applied only when the stored state differs. Fault is not commanded.
+ * The state is read again before the periodic cycle. A fault is left
+ * alone until an MQTT reset. GET_FAULT is sent once while an input
+ * is fault and its reason is not stored yet. That read runs after the count and
  * before a reset, a set, or a confirm. A read that is waiting out
  * its retry does not hold those commands. After that reset, a
  * desired on is applied when the input is no longer faulted. At
@@ -65,8 +66,10 @@ public:
 
   /**
    * Records the desired on/off state for one input. Does not touch
-   * I2C. A later command for the same input replaces this one.
-   * The state is read again after the switch.
+   * I2C. On is sent on a later pass even when the stored state is
+   * already on or disconnected. Off is sent only when that state
+   * differs. A later command for the same input replaces one that
+   * has not been sent. The state is read again after the switch.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param sensorIndex Zero-based input on that module.
@@ -326,8 +329,9 @@ private:
   bool _serviceReset();
 
   /**
-   * Drives one input toward the desired state, or arms a state
-   * confirm when no SET is required. Skips a fault.
+   * Sends one pending SET. An on is sent even when the stored state
+   * is already on or disconnected. An off is sent only when the state
+   * differs. A fault arms a confirm and sends nothing.
    *
    * @return True when a SET was issued.
    */
@@ -412,10 +416,13 @@ private:
   /**
    * Reports whether a known state already satisfies the desired state.
    * On and disconnected both satisfy desired on. Fault does not match.
+   * A periodic poll uses this and does not arm another SET. An
+   * explicit on is still sent when the state is on or disconnected.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param sensorIndex Zero-based input.
-   * @return True when no SET is required.
+   * @return True when on or disconnected satisfies desired on, or off
+   *         satisfies desired off.
    */
   bool _matches(uint8_t moduleSlot, uint8_t sensorIndex) const;
 

@@ -69,6 +69,9 @@ void SensorPoller::update()
 
 /**
  * Records the desired on/off state for one input. Does not touch I2C.
+ * On is sent on a later pass even when the stored state is already
+ * on or disconnected. Off is sent only when that state differs. A
+ * later command for the same input replaces one that has not been sent.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param sensorIndex Zero-based input on that module.
@@ -574,8 +577,9 @@ bool SensorPoller::_serviceReset()
 }
 
 /**
- * Drives one input toward the desired state, or arms a state
- * confirm when no SET is required. Skips a fault.
+ * Sends one pending SET. An on is sent even when the stored state
+ * is already on or disconnected. An off is sent only when the state
+ * differs. A fault arms a confirm and sends nothing.
  *
  * @return True when a SET was issued.
  */
@@ -593,7 +597,11 @@ bool SensorPoller::_serviceApply()
       {
         continue;
       }
-      if (sample.state == SensorState::Fault || _matches(slot, index))
+      // A poll leaves applyPending clear while the state already
+      // matches. An explicit on still sends. Off sends only when
+      // the stored state is not off. Fault never sends.
+      if (sample.state == SensorState::Fault ||
+          (!intent.desiredOn && _matches(slot, index)))
       {
         intent.applyPending = false;
         intent.applyAttempts = 0;
@@ -1323,10 +1331,13 @@ bool SensorPoller::_isDue(uint32_t due) const
 
 /**
  * Reports whether a known state already satisfies the desired state.
+ * A periodic poll uses this and does not arm another SET. An
+ * explicit on is still sent when the state is on or disconnected.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param sensorIndex Zero-based input.
- * @return True when no SET is required.
+ * @return True when on or disconnected satisfies desired on, or off
+ *         satisfies desired off.
  */
 bool SensorPoller::_matches(uint8_t moduleSlot, uint8_t sensorIndex) const
 {

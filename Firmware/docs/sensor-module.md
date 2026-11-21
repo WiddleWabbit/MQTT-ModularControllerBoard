@@ -36,7 +36,7 @@ flowchart TD
   pub -->|no| quiet["Do not repeat them"]
 ```
 
-`{id}/sensor` with `N M on`, `N M off`, or `N M reset` only records the request. A missing fault reason is read before that reset, set, or confirm. The poller then sends `SET_SENSOR` or `RESET_SENSOR`, and reads `GET_SENSOR_STATE` on the next passes. An on result is followed by `GET_SENSOR_READING`, so the value is published without waiting out `kSensorPollIntervalMs`. `{id}/sensor/read` asks for one input and does not turn it on. `{id}/sensor/connected` only asks for the list of inputs whose state is on.
+`{id}/sensor` with `N M on`, `N M off`, or `N M reset` only records the request. A missing fault reason is read before that reset, set, or confirm. Each accepted `on` then sends `SET_SENSOR` on, including when the stored state is already on or disconnected. An `off` sends `SET_SENSOR` only when the stored state is not off. The poller reads `GET_SENSOR_STATE` on the next passes. An on result is followed by `GET_SENSOR_READING`, so the value is published without waiting out `kSensorPollIntervalMs`. A later poll that is still on or disconnected does not send `on` again. `{id}/sensor/read` asks for one input and does not turn it on. `{id}/sensor/connected` only asks for the list of inputs whose state is on.
 
 ## What is stored, and who reads it
 
