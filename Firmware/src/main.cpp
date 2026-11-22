@@ -29,6 +29,11 @@
 // Three failed count queries wait this long before the count is tried again.
 const uint32_t kSensorPollIntervalMs = 60UL * 1000UL;
 
+// After SET_SENSOR on, wait this long before GET_SENSOR_STATE.
+// The daughter keeps sampling, so the published state is the settled
+// sample. An off confirm does not wait.
+const uint32_t kSensorReadingDelayMs = 1000UL;
+
 // State of each solenoid output is read and published on this period.
 const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
 
@@ -149,7 +154,7 @@ SlotPins slotPins[4] = {
 ModuleBus moduleBus(i2cMaster, systemClock, slotPins, ModuleHostConfig{},
                     network, kControllerIdentity);
 SensorModule sensorModule(moduleBus, network, systemClock,
-                          kSensorPollIntervalMs);
+                          kSensorPollIntervalMs, kSensorReadingDelayMs);
 SolenoidModule solenoidModule(moduleBus, network, systemClock,
                               kSolenoidPollIntervalMs,
                               kSolenoidCommandTimeoutMs);

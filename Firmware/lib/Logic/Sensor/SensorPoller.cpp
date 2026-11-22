@@ -3,10 +3,11 @@
 // ========== Construction ==========
 
 SensorPoller::SensorPoller(ModuleHost& moduleHost, IClock& clock,
-                           uint32_t pollIntervalMs)
+                           uint32_t pollIntervalMs, uint32_t readingDelayMs)
   : _moduleHost(moduleHost),
     _clock(clock),
     _intervalMs(pollIntervalMs == 0 ? kDefaultPollIntervalMs : pollIntervalMs),
+    _readingDelayMs(readingDelayMs),
     _demandHead(0),
     _demandCount(0),
     _resultHead(0),
@@ -1182,6 +1183,18 @@ bool SensorPoller::_servicePeriodic()
     return false;
   }
 
+  while (runtime.inCycle &&
+         _intent[slot][runtime.index].confirmPending &&
+         !_isDue(_intent[slot][runtime.index].confirmRetryAt))
+  {
+    runtime.stepAttempts = 0;
+    _advancePeriodic(static_cast<uint8_t>(slot));
+  }
+  if (!runtime.inCycle)
+  {
+    return false;
+  }
+
   if (!runtime.readingStep)
   {
     const SensorStateResult result =
@@ -1358,6 +1371,9 @@ bool SensorPoller::_matches(uint8_t moduleSlot, uint8_t sensorIndex) const
 
 /**
  * Arms the state read that follows an on or off command.
+ * An on that will be followed by a reading waits out the reading
+ * delay. An off confirm, and a confirm that will not read, is due
+ * immediately.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param sensorIndex Zero-based input.
@@ -1372,6 +1388,11 @@ void SensorPoller::_armConfirm(uint8_t moduleSlot, uint8_t sensorIndex,
   intent.confirmPending = true;
   intent.confirmReads = readAfter;
   intent.confirmAttempts = 0;
+  if (readAfter && _readingDelayMs > 0)
+  {
+    intent.confirmRetryAt = _clock.millis() + _readingDelayMs;
+    return;
+  }
   intent.confirmRetryAt = 0;
 }
 

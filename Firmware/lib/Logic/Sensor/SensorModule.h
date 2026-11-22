@@ -27,9 +27,11 @@ public:
    * @param clock Monotonic clock.
    * @param pollIntervalMs Gap after a finished state cycle. Zero
    *        selects the poller's default.
+   * @param readingDelayMs Wait after SET_SENSOR on before the state
+   *        read. Zero confirms on the next pass.
    */
   SensorModule(ModuleBus& bus, Network& network, IClock& clock,
-               uint32_t pollIntervalMs);
+               uint32_t pollIntervalMs, uint32_t readingDelayMs = 0);
 
   /**
    * Issues at most one sensor exchange, then publishes stored readings,

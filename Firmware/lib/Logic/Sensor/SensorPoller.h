@@ -29,6 +29,9 @@ struct SensorDemandResult
  * taken only while that state is on. Each MQTT on is applied even
  * when the stored state is already on or disconnected. An off is
  * applied only when the stored state differs. Fault is not commanded.
+ * After an on, the state read waits readingDelayMs so the published
+ * state is the settled sample. An off confirm does not wait. A
+ * periodic step skips an input whose on-confirm is still waiting.
  * The state is read again before the periodic cycle. A fault is left
  * alone until an MQTT reset. GET_FAULT is sent once while an input
  * is fault and its reason is not stored yet. That read runs after the count and
@@ -52,9 +55,12 @@ public:
    * @param pollIntervalMs Gap after a finished state cycle, and the
    *        wait after three failed queries. Zero selects
    *        kDefaultPollIntervalMs.
+   * @param readingDelayMs Wait after SET_SENSOR on before
+   *        GET_SENSOR_STATE. Zero confirms on the next pass.
    */
   SensorPoller(ModuleHost& moduleHost, IClock& clock,
-               uint32_t pollIntervalMs = kDefaultPollIntervalMs);
+               uint32_t pollIntervalMs = kDefaultPollIntervalMs,
+               uint32_t readingDelayMs = 0);
 
   /**
    * Issues at most one sensor query. No-op when nothing is due.
@@ -252,6 +258,7 @@ private:
   ModuleHost& _moduleHost;
   IClock& _clock;
   uint32_t _intervalMs;
+  uint32_t _readingDelayMs;
   SlotRuntime _runtime[module_protocol::kSlotCount];
   Intent _intent[module_protocol::kSlotCount]
                 [module_protocol::kMaxSensorsPerModule];

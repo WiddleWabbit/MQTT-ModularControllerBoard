@@ -10,7 +10,7 @@ Wire indexes are 0-based. MQTT slot and sensor numbers are 1-based. The controll
 
 ## Where it sits
 
-`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, and `kSensorPollIntervalMs` (60 seconds). The constructor registers one handler for `{id}/sensor`, `{id}/sensor/read`, and `{id}/sensor/connected`, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
+`main.cpp` constructs it with `ModuleBus`, `Network`, the clock, `kSensorPollIntervalMs` (60 seconds), and `kSensorReadingDelayMs` (1 second). The constructor registers one handler for `{id}/sensor`, `{id}/sensor/read`, and `{id}/sensor/connected`, before `Network::begin()`. `loop()` calls `sensorModule.update()` after `moduleBus.update()` and before the solenoid module.
 
 ## What it creates
 
@@ -36,7 +36,7 @@ flowchart TD
   pub -->|no| quiet["Do not repeat them"]
 ```
 
-`{id}/sensor` with `N M on`, `N M off`, or `N M reset` only records the request. A missing fault reason is read before that reset, set, or confirm. Each accepted `on` then sends `SET_SENSOR` on, including when the stored state is already on or disconnected. An `off` sends `SET_SENSOR` only when the stored state is not off. The poller reads `GET_SENSOR_STATE` on the next passes. An on result is followed by `GET_SENSOR_READING`, so the value is published without waiting out `kSensorPollIntervalMs`. A later poll that is still on or disconnected does not send `on` again. `{id}/sensor/read` asks for one input and does not turn it on. `{id}/sensor/connected` only asks for the list of inputs whose state is on.
+`{id}/sensor` with `N M on`, `N M off`, or `N M reset` only records the request. A missing fault reason is read before that reset, set, or confirm. Each accepted `on` then sends `SET_SENSOR` on, including when the stored state is already on or disconnected. An `off` sends `SET_SENSOR` only when the stored state is not off. After an `on`, `GET_SENSOR_STATE` waits `kSensorReadingDelayMs` so the published state is the sample the daughter has by then. The previous payload stays during that wait. An `off` confirm runs on the next pass. An on result is followed by `GET_SENSOR_READING` on the pass after the state read. A periodic cycle that is due during the wait skips that input and reads the others. A later poll that is still on or disconnected does not send `on` again. `{id}/sensor/read` asks for one input and does not turn it on. `{id}/sensor/connected` only asks for the list of inputs whose state is on.
 
 ## What is stored, and who reads it
 

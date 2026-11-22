@@ -6,8 +6,8 @@
 // ========== Construction ==========
 
 SensorModule::SensorModule(ModuleBus& bus, Network& network, IClock& clock,
-                           uint32_t pollIntervalMs)
-  : _poller(bus.host(), clock, pollIntervalMs),
+                           uint32_t pollIntervalMs, uint32_t readingDelayMs)
+  : _poller(bus.host(), clock, pollIntervalMs, readingDelayMs),
     _bridge(_poller, network.mqtt(), network.topics())
 {
   network.addMessageHandler(&SensorMqttBridge::onMqttMessage, &_bridge);
