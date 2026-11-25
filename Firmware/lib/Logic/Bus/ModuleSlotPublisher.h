@@ -9,7 +9,7 @@
 #include "SlotStatusText.h"
 
 /**
- * Publishes retained MQTT snapshots of each slot's public status.
+ * Publishes MQTT snapshots of each slot's public status with retain off.
  * Reads ModuleHost only. Does not call update(), ping(), or echo(),
  * and ModuleHost does not depend on the MQTT client.
  */

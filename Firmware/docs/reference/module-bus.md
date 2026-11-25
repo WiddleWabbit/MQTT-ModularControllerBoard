@@ -6,7 +6,7 @@ Source: `lib/Logic/Bus/ModuleBus.h`, `ModuleHost.h`, `SlotController.h`, `Module
 
 ## Purpose
 
-`ModuleBus::update()` runs the host, then the slot publisher, then the controller-identity publisher. `SlotController` holds one slot. `ModuleHost` owns the four controllers and is the Logic class that calls `I2cMaster`. `ModuleSlotPublisher` turns the public snapshot into retained MQTT text. `ControllerInfoPublisher` publishes `board N firmware N` on `{id}/controller`.
+`ModuleBus::update()` runs the host, then the slot publisher, then the controller-identity publisher. `SlotController` holds one slot. `ModuleHost` owns the four controllers and is the Logic class that calls `I2cMaster`. `ModuleSlotPublisher` turns the public snapshot into MQTT text with retain off. `ControllerInfoPublisher` publishes `board N firmware N` on `{id}/controller`, also with retain off.
 
 ## Who holds what
 
@@ -163,7 +163,7 @@ slot 2       waits in Enumerating while slot 1 holds the lock
 
 Two sensors use that same enumeration. After a slot is online, only that slot starts its type cycle. How those cycles share a poller is described on the type page.
 
-Unplugging slot 2 returns slot 2 to `Empty`. That slot line is retained, because it is sent only when the text changes. When slot 2 was a sensor, its sensor topics publish `unavailable` with retain off. Slot 1 keeps its address, its type, and its own cycle. Why result topics are not retained is in the [MQTT reference](mqtt.md).
+Unplugging slot 2 returns slot 2 to `Empty` and publishes that slot line with retain off. Sensor, solenoid, and pump topics for that slot are left as they were. Slot 1 keeps its address, its type, and its own cycle. The retain rule is in the [MQTT reference](mqtt.md).
 
 ### Slot publication
 
@@ -171,15 +171,15 @@ Unplugging slot 2 returns slot 2 to `Empty`. That slot line is retained, because
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/1` through `{id}/slot/4` | publish, retained, QoS 0 | `writeSlotStatusBody`, for example `Empty` or `Online Sensor addr=0x10 board 2 firmware 1` |
-| `{id}/controller` | publish, retained, QoS 0 | `board 1 firmware 8`, from `kBoardRevision` and `kFirmwareRevision` in `src/main.cpp` |
+| `{id}/slot/1` through `{id}/slot/4` | publish, retain off, QoS 0 | `writeSlotStatusBody`, for example `Empty` or `Online Sensor addr=0x10 board 2 firmware 1` |
+| `{id}/controller` | publish, retain off, QoS 0 | `board 1 firmware 8`, from `kBoardRevision` and `kFirmwareRevision` in `src/main.cpp` |
 
 `ModuleSlotPublisher` sends those topics after the host has applied this pass's result. It reads the snapshot with `writeSlotStatusBody`. The phase and the identity stay on the slot controller. Each `update()`:
 
-1. Reads `MqttTopicLayout::generation()`. A new value clears `_published` and `_publishedOk` and stores the new generation. The current bodies go out once under the new root. Retained messages under the old prefix are left on the broker.
+1. Reads `MqttTopicLayout::generation()`. A new value clears `_published` and `_publishedOk` and stores the new generation. The current bodies go out once under the new root. A copy already stored on the broker under the old prefix is left there.
 2. For each slot, calls `writeSlotStatusBody` into an 80-byte buffer (`kSlotStatusBodyBytes`). The body is the serial slot line without the `Slot N:` prefix.
 3. Skips the slot when `_publishedOk` is set and the new body matches `_published`.
-4. Otherwise publishes the body retained on `{slotPrefix}/{N}`, where firmware index 0 is topic 1. QoS is 0.
+4. Otherwise publishes the body on `{slotPrefix}/{N}` with retain off, where firmware index 0 is topic 1. QoS is 0.
 5. On success, copies the body into `_published` and sets `_publishedOk`. On failure, leaves the flag clear so the next `update()` retries.
 
 `writeSlotStatusBody` reads `state`, and then the fields that state needs:
@@ -217,5 +217,5 @@ Defaults in `ModuleHostConfig`:
 ## Tests
 
 - `test/test_desktop/test_modules.cpp` — frames, enumeration, a module that kept its slot address, the lock, faults, `begin` pin modes.
-- `test/test_desktop/test_slot_publish.cpp` — retained slot text, retries, prefix generation, `testSlotPublisherPublishesDaughterRevision`, `testSlotPublisherPublishesUnsupportedRevision`, and the `testControllerInfo*` cases.
+- `test/test_desktop/test_slot_publish.cpp` — slot text with retain off, retries, prefix generation, `testSlotPublisherPublishesDaughterRevision`, `testSlotPublisherPublishesUnsupportedRevision`, and the `testControllerInfo*` cases.
 - `test/test_desktop/test_deep_modules.cpp` — `ModuleBus::update()` through the public module, including quiesce, the first `{id}/controller` publish, and the republish after a prefix change.

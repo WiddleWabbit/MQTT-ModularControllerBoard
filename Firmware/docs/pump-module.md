@@ -42,7 +42,7 @@ Control still wins the pass. A reset waits until the state is known. When it ret
 
 ## What is stored, and who reads it
 
-Each slot keeps its own state, desired on/off, poll timer, and the latest now, cycle, totals, and fault reason. The absence window is one timer for every pump: any accepted on/off command restarts it. Faulted pumps are not reset when the window elapses. The bridge publishes `{id}/slot/N/pump`, and `/now`, `/cycle`, `/totals`, and `/fault`, with retain off. A retained `on` stayed on the broker after the board was removed, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained. Unplug updates that slot line. The now, cycle, totals, and fault topics keep the last sample and are not published again until the next one is stored. The retain rule is in the [pump reference](reference/pump-module.md).
+Each slot keeps its own state, desired on/off, poll timer, and the latest now, cycle, totals, and fault reason. The absence window is one timer for every pump: any accepted on/off command restarts it. Faulted pumps are not reset when the window elapses. The bridge publishes `{id}/slot/N/pump`, and `/now`, `/cycle`, `/totals`, and `/fault`, with retain off. Unplug publishes nothing on those topics. `{id}/slot/N` is updated by the bus, also with retain off. The now, cycle, totals, and fault topics keep the last sample and are not published again until the next one is stored. The retain rule is in the [pump reference](reference/pump-module.md).
 
 Serial status prints the slot line only. The pump state is the MQTT payload.
 

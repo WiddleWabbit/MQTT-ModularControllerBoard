@@ -40,7 +40,7 @@ flowchart TD
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, the desired on or off for each input, a pending reset, the last state, a reading when that state is on, and the fault reason for each input. The bridge publishes `{id}/slot/N/sensor/M` from that store, `{id}/slot/N/sensors` as the count plus the indexes whose state is on, and `{id}/slot/N/sensors/fault` as the count plus one reason word per input. Those publishes are not retained. Unplug publishes `unavailable` once, with retain off. Another slot keeps its own cache.
+Each slot keeps its own count, the desired on or off for each input, a pending reset, the last state, a reading when that state is on, and the fault reason for each input. The bridge publishes `{id}/slot/N/sensor/M` from that store, `{id}/slot/N/sensors` as the count plus the indexes whose state is on, and `{id}/slot/N/sensors/fault` as the count plus one reason word per input. Those publishes are not retained. Unplug publishes nothing on the sensor topics. The slot line from `ModuleBus` becomes `Empty`. Another slot keeps its own cache.
 
 There is no silence timer. An input that was turned on stays on until an off command, a fault, or the slot is cleared. On and off are ignored while the input is faulted. `reset` is the only command that clears a fault, and the module leaves that input off. If it is still desired on, a later pass sends `SET_SENSOR` on.
 

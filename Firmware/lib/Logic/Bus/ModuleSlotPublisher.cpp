@@ -84,7 +84,7 @@ void ModuleSlotPublisher::_publishIfChanged(uint8_t slotIndex)
   const unsigned slotNumber = static_cast<unsigned>(slotIndex) + 1U;
   std::snprintf(topic, sizeof(topic), "%s/%u", _topics.slotPrefix(),
                 slotNumber);
-  if (!_mqttService.publish(topic, payload, true))
+  if (!_mqttService.publish(topic, payload, false))
   {
     return;
   }

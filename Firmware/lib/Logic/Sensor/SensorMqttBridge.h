@@ -67,12 +67,13 @@ public:
 
   /**
    * Publishes each new reading, including a repeated value, with
-   * retain off. An input that disappears publishes unavailable with
-   * retain off. Publishes the connected-input list when that text
-   * changes or a request asked again. Publishes the fault list when
-   * a reason is stored or a fault clears. A rejected publish stays
-   * pending. A new device id sends the current readings and the
-   * lists once on the new topics.
+   * retain off. An input that disappears publishes nothing. The
+   * slot status line is the notice that the board has left.
+   * Publishes the connected-input list when that text changes or a
+   * request asked again. Publishes the fault list when a reason is
+   * stored or a fault clears. A rejected publish stays pending. A
+   * new device id sends the current readings and the lists once on
+   * the new topics.
    *
    * @return Nothing.
    */
@@ -150,8 +151,8 @@ private:
 
   /**
    * Publishes the input list for each slot that can answer.
-   * A slot that could answer and no longer can publishes unavailable.
-   * Neither payload is retained.
+   * A slot that could answer and no longer can publishes nothing.
+   * The payload is not retained.
    *
    * @return Nothing.
    */
@@ -159,8 +160,8 @@ private:
 
   /**
    * Publishes the fault list for each slot that has one stored.
-   * A slot that could answer and no longer can publishes unavailable.
-   * Neither payload is retained.
+   * A slot that could answer and no longer can publishes nothing.
+   * The payload is not retained.
    *
    * @return Nothing.
    */

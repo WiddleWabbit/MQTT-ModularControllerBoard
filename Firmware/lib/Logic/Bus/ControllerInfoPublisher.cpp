@@ -33,7 +33,7 @@ void ControllerInfoPublisher::update()
 
   char payload[32];
   writeControllerIdentity(_identity, payload, sizeof(payload));
-  if (!_mqttService.publish(_topics.controller(), payload, true))
+  if (!_mqttService.publish(_topics.controller(), payload, false))
   {
     return;
   }

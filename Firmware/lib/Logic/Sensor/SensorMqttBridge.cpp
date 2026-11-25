@@ -375,36 +375,32 @@ void SensorMqttBridge::_publishDemand()
     return;
   }
 
+  if (!_heldDemand.ok)
+  {
+    _demandHeld = false;
+    return;
+  }
+  if (_heldDemand.state == SensorState::On && !_heldDemand.hasValue)
+  {
+    _demandHeld = false;
+    return;
+  }
+
   char payload[32];
-  if (_heldDemand.ok)
-  {
-    if (_heldDemand.state == SensorState::On && !_heldDemand.hasValue)
-    {
-      _demandHeld = false;
-      return;
-    }
-    _formatState(_heldDemand.state, _heldDemand.hasValue, _heldDemand.value,
-                 payload, sizeof(payload));
-  }
-  else
-  {
-    std::snprintf(payload, sizeof(payload), "unavailable");
-  }
+  _formatState(_heldDemand.state, _heldDemand.hasValue, _heldDemand.value,
+               payload, sizeof(payload));
   if (!_publish(_heldDemand.moduleSlot, _heldDemand.sensorIndex, payload))
   {
     return;
   }
-  if (_heldDemand.ok)
-  {
-    std::snprintf(_published[_heldDemand.moduleSlot][_heldDemand.sensorIndex],
-                  sizeof(_published[_heldDemand.moduleSlot]
-                                   [_heldDemand.sensorIndex]),
-                  "%s", payload);
-    _publishedOk[_heldDemand.moduleSlot][_heldDemand.sensorIndex] = true;
-    _publishedRevision[_heldDemand.moduleSlot][_heldDemand.sensorIndex] =
-        _poller.sampleRevision(_heldDemand.moduleSlot,
-                               _heldDemand.sensorIndex);
-  }
+  std::snprintf(_published[_heldDemand.moduleSlot][_heldDemand.sensorIndex],
+                sizeof(_published[_heldDemand.moduleSlot]
+                                 [_heldDemand.sensorIndex]),
+                "%s", payload);
+  _publishedOk[_heldDemand.moduleSlot][_heldDemand.sensorIndex] = true;
+  _publishedRevision[_heldDemand.moduleSlot][_heldDemand.sensorIndex] =
+      _poller.sampleRevision(_heldDemand.moduleSlot,
+                             _heldDemand.sensorIndex);
   _demandHeld = false;
 }
 
@@ -427,14 +423,11 @@ void SensorMqttBridge::_publishSnapshots()
       const bool known = _poller.sensorState(slot, index, &state);
       if (!active || index >= count || !known)
       {
-        if (_publishedOk[slot][index] &&
-            std::strcmp(_published[slot][index], "unavailable") != 0)
+        if (_publishedOk[slot][index])
         {
-          if (_publish(slot, index, "unavailable"))
-          {
-            std::snprintf(_published[slot][index],
-                          sizeof(_published[slot][index]), "unavailable");
-          }
+          _publishedOk[slot][index] = false;
+          _publishedRevision[slot][index] = 0;
+          _published[slot][index][0] = '\0';
         }
         continue;
       }
@@ -466,8 +459,8 @@ void SensorMqttBridge::_publishSnapshots()
 
 /**
  * Publishes the input list for each slot that can answer.
- * A slot that could answer and no longer can publishes unavailable.
- * Neither payload is retained.
+ * A slot that could answer and no longer can publishes nothing.
+ * The payload is not retained.
  *
  * @return Nothing.
  */
@@ -478,7 +471,7 @@ void SensorMqttBridge::_publishInventories()
     char text[80];
     if (!_formatInventory(slot, text, sizeof(text)))
     {
-      if (_inventoryOk[slot] && _publishInventory(slot, "unavailable"))
+      if (_inventoryOk[slot])
       {
         _inventoryOk[slot] = false;
         _inventoryPayload[slot][0] = '\0';
@@ -557,7 +550,7 @@ bool SensorMqttBridge::_formatInventory(uint8_t moduleSlot, char* out,
 
 /**
  * Publishes the fault list for each slot that has one stored.
- * A forgotten list publishes unavailable. A list that is waiting
+ * A forgotten list publishes nothing. A list that is waiting
  * for a new reason keeps the last payload.
  *
  * @return Nothing.
@@ -568,7 +561,7 @@ void SensorMqttBridge::_publishFaultLists()
   {
     if (!_poller.countKnown(slot) || _poller.faultRevision(slot) == 0)
     {
-      if (_faultOk[slot] && _publishFault(slot, "unavailable"))
+      if (_faultOk[slot])
       {
         _faultOk[slot] = false;
         _faultRevision[slot] = 0;

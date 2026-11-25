@@ -6,7 +6,7 @@ Reference: [pins, phases, the lock, and publication](reference/module-bus.md).
 
 ## Summary
 
-`ModuleBus` is the four-slot I2C bus. `main.cpp` creates it. A `SlotController` holds each slot's state. `ModuleHost` owns those four controllers, grants the enumeration lock, and is the class that talks to the I2C master. `ModuleSlotPublisher` reads the public snapshot and publishes a retained slot line when that line's text changed. `ControllerInfoPublisher` publishes the controller's board and firmware revisions on `{id}/controller`. Each `update()` lets the host do at most one I2C transaction, then asks both publishers. The identity line does not wait for a daughter to come online. Sensor, solenoid, and pump borrow the same host later in the pass, each for one transaction of their own.
+`ModuleBus` is the four-slot I2C bus. `main.cpp` creates it. A `SlotController` holds each slot's state. `ModuleHost` owns those four controllers, grants the enumeration lock, and is the class that talks to the I2C master. `ModuleSlotPublisher` reads the public snapshot and publishes that slot line, with retain off, when the text changed. `ControllerInfoPublisher` publishes the controller's board and firmware revisions on `{id}/controller`, also with retain off. Each `update()` lets the host do at most one I2C transaction, then asks both publishers. The identity line does not wait for a daughter to come online. Sensor, solenoid, and pump borrow the same host later in the pass, each for one transaction of their own.
 
 ## Where it sits
 
@@ -21,8 +21,8 @@ main.cpp
   ModuleBus                 host, then slot status, then controller identity
     ModuleHost              owns the four controllers, the lock, and the I2C calls
       SlotController        one per slot; holds that slot's state and proposes the next step
-    ModuleSlotPublisher     retained {id}/slot/1 .. {id}/slot/4
-    ControllerInfoPublisher retained {id}/controller, once per topic generation
+    ModuleSlotPublisher     {id}/slot/1 .. {id}/slot/4, retain off
+    ControllerInfoPublisher {id}/controller, retain off, once per topic generation
 ```
 
 `SlotController` watches SENSE, MOD, and CS for its slot. It remembers the phase, the address, the identity, and the last fault, and it proposes the next I2C operation. `ModuleHost` performs that operation and writes the result back onto the same controller. `ModuleSlotPublisher` reads the public snapshot through the host. `ControllerInfoPublisher` reads the two revision numbers `main.cpp` passed in. I2C stays in the host. MQTT stays in the publishers.
@@ -40,7 +40,7 @@ applyI2cResult() on that slot when a transaction ran
         |
 ModuleSlotPublisher reads every slot's public snapshot
         |
-retained {id}/slot/N for each body the broker has not accepted yet
+{id}/slot/N, retain off, for each body the broker has not accepted yet
         |
 ControllerInfoPublisher publishes board N firmware N once per generation
 ```
@@ -61,12 +61,12 @@ flowchart TD
   issue --> pub
   ping --> pub
   pub --> changed{"Text differs from the last payload the broker accepted?"}
-  changed -->|yes| mqtt["Publish retained {id}/slot/N"]
+  changed -->|yes| mqtt["Publish {id}/slot/N with retain off"]
   changed -->|no| same["Leave that topic as it is"]
   mqtt --> info["ControllerInfoPublisher"]
   same --> info
   info --> accepted{"This generation's identity was accepted?"}
-  accepted -->|no| idline["Publish retained {id}/controller"]
+  accepted -->|no| idline["Publish {id}/controller with retain off"]
   accepted -->|yes| idle["Leave {id}/controller as it is"]
 ```
 
@@ -87,7 +87,7 @@ Each `SlotController` stores that slot:
 
 `ModuleSlotPublisher` stores, per slot, the last payload the broker accepted and whether that publish succeeded, plus the topic generation those payloads belong to. Every update builds the text again from the host. The words come from `writeSlotStatusBody` in `SlotStatusText`: `Empty`, `Debouncing`, `Enumerating`, `Online Sensor addr=0x10 board 2 firmware 1`, `Unsupported type=0x02AA addr=0x12 board 1 firmware 2`, `Fault Nack`. Online and unsupported lines append `board N firmware N` from the identity word stored after `GET_IDENTITY`. The high byte is the board revision and the low byte is the firmware revision. Empty, debouncing, enumerating, and fault lines omit it. Firmware index 0 is topic `{id}/slot/1`.
 
-`ControllerInfoPublisher` stores whether the broker accepted this generation's payload. The text is `board 1 firmware 8`, from `kBoardRevision` and `kFirmwareRevision` in `src/main.cpp`. A rejected publish is retried. A reconnect does not send it again. A new device id clears that note and publishes once under the new root. The retained copy under the old prefix stays on the broker.
+`ControllerInfoPublisher` stores whether the broker accepted this generation's payload. The text is `board 1 firmware 8`, from `kBoardRevision` and `kFirmwareRevision` in `src/main.cpp`. A rejected publish is retried. A reconnect does not send it again. A new device id clears that note and publishes once under the new root. A copy already stored on the broker under the old prefix stays there.
 
 - `SerialConsole` prints that same body with a `Slot N:` prefix.
 - `SensorModule`, `SolenoidModule`, and `PumpModule` call `exchange()` for their own command after this `update()` has returned, and they keep their own samples.

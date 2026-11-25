@@ -8,7 +8,7 @@
 
 /**
  * Publishes the controller board and firmware revisions on {id}/controller.
- * The payload is retained. A rejected publish stays pending. A new device
+ * The payload is not retained. A rejected publish stays pending. A new device
  * id sends the same text once on the new topic.
  */
 class ControllerInfoPublisher

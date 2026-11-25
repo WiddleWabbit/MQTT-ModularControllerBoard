@@ -47,7 +47,7 @@ A state byte is off (`0`), on (`1`), fault (`2`), or disconnected (`3`). `SET_SE
 | Fault | Latched. On and off do nothing. | `fault` | no |
 | Disconnected | Loop closed, jack empty. | `disconnected` | no |
 
-There is no payload word `on`. On is `connected` plus the raw value. Storing the on state does not publish until that reading is stored. Until then the previous payload stays, including across the `Busy` reply from `SET_SENSOR` on. That gap is not published as `unavailable`.
+There is no payload word `on`. On is `connected` plus the raw value. Storing the on state does not publish until that reading is stored. Until then the previous payload stays, including across the `Busy` reply from `SET_SENSOR` on. That gap publishes nothing.
 
 Desired on is satisfied by on and disconnected for a later poll, so that poll does not send `SET_SENSOR` again. Desired off is satisfied by off. Fault matches neither, and `SET_SENSOR` is not sent while the input is faulted. Each accepted `on` still sends `SET_SENSOR` once the state is known, including when the stored state is already on or disconnected. The pass after that set reads the state, and reads the value when the confirm is on. An accepted `off` sends `SET_SENSOR` only when the stored state is not off.
 
@@ -75,7 +75,7 @@ After the count is known, the first state cycle starts on the following poller p
 
 A count of 0 stores that count and does not start a cycle. A command for an index outside the reported count is dropped once the count is known.
 
-Leaving `Online` drops the cache. Empty, slot `Fault`, `Unsupported`, or a different type also drops the desired state and any pending reset, and publishes `unavailable` once. A sense gap that leaves the slot `Online` keeps the cache. While the slot is still enumerating, the desired state is kept and the cache is dropped.
+Leaving `Online` drops the cache. Empty, slot `Fault`, `Unsupported`, or a different type also drops the desired state and any pending reset. The sensor topics publish nothing for that departure. `ModuleBus` publishes the new slot line. A sense gap that leaves the slot `Online` keeps the cache. While the slot is still enumerating, the desired state is kept and the cache is dropped.
 
 ### More than one module
 
@@ -124,7 +124,7 @@ That asks for sensor 2 on module slot 1. It does not turn the input on. The slot
 
 The callback enqueues the request. Up to four requests can wait. A fifth, while four are still waiting, is dropped and publishes nothing. The state is read first when it is not known. A state other than on publishes that word and does not send `GET_SENSOR_READING`. On sends the reading, and the bridge publishes `connected <value>`.
 
-If the named input is outside the module's reported count, the host does not send I2C. The bridge publishes `unavailable` with retain off. The same non-retained `unavailable` is published when the slot can never answer (empty, fault, unsupported, or a different type) or when three attempts come back busy or failed. A subscriber who is already connected sees that word. A subscriber who connects afterwards does not. The reason result topics are not retained is in the [MQTT reference](mqtt.md).
+If the named input is outside the module's reported count, the host does not send I2C and the bridge publishes nothing. The same silence applies when the slot can never answer (empty, fault, unsupported, or a different type) or when three attempts come back busy or failed. The slot line is the notice that the board has left. The retain rule is in the [MQTT reference](mqtt.md).
 
 While the module is still coming online, or its count is not known yet, the request stays queued. It is not failed and it is not published yet.
 
@@ -142,8 +142,8 @@ An input whose state is on is listed before its reading has been stored.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10 board 2 firmware 1` |
-| `{id}/slot/N/sensor/M` | publish, QoS 0, retain off | `off`, `fault`, `disconnected`, `connected <int32>`, or `unavailable` |
+| `{id}/slot/N` | publish, QoS 0, retain off | Slot status from `ModuleSlotPublisher`, such as `Online Sensor addr=0x10 board 2 firmware 1` |
+| `{id}/slot/N/sensor/M` | publish, QoS 0, retain off | `off`, `fault`, `disconnected`, or `connected <int32>` |
 | `{id}/slot/N/sensors` | publish, QoS 0, retain off | count, then indexes whose state is on, such as `2 1` |
 | `{id}/slot/N/sensors/fault` | publish, QoS 0, retain off | count, then one reason per input, such as `3 none overcurrent none` |
 | `{id}/sensor` | subscribe, QoS 1 | `N M on`, `N M off`, or `N M reset` |
@@ -171,16 +171,16 @@ connected -4
 | State is off, fault, or disconnected | `{id}/slot/N/sensor/M` | `off`, `fault`, or `disconnected` | no |
 | Reading stored while on | `{id}/slot/N/sensor/M` | `connected <value>` | no |
 | Immediate read of a state other than on | `{id}/slot/N/sensor/M` | that state's word | no |
-| Immediate read fails, or the sensor number is outside the reported count | `{id}/slot/N/sensor/M` | `unavailable` | no |
-| Slot is no longer an online sensor, or the new count drops an input that had a result | `{id}/slot/N/sensor/M` | `unavailable` | no, once |
+| Immediate read fails, or the sensor number is outside the reported count | — | nothing | — |
+| Slot is no longer an online sensor, or the new count drops an input that had a result | `{id}/slot/N` | the new slot line, such as `Empty` | no |
 | Count and every state are known, the on set changes, or `{id}/sensor/connected` asks again | `{id}/slot/N/sensors` | `2 1` | no |
-| Slot is no longer an online sensor after a list was published | `{id}/slot/N/sensors` | `unavailable` | no, once |
+| Slot is no longer an online sensor after a list was published | — | the sensor list is left as last published | — |
 | `GET_FAULT` succeeds, or a fault clears | `{id}/slot/N/sensors/fault` | `3 none overcurrent none`, `1 9`, or `3 none none none` | no |
-| Slot is no longer an online sensor after a fault list was published | `{id}/slot/N/sensors/fault` | `unavailable` | no, once |
+| Slot is no longer an online sensor after a fault list was published | — | the fault list is left as last published | — |
 | Count query, on before its reading, malformed command, or a dropped extra command | — | nothing new | — |
 | Bridge pass with no new observation and no list change | — | the result and the list are not repeated | — |
 
-Readings and the connected list are not retained. A retained reading survived after the board was unplugged, and a new subscriber received it as if the input were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
+Readings, the connected list, and the slot line are not retained. A copy already stored on the broker stays until it is removed there. The retain rule is in the [MQTT reference](mqtt.md).
 
 The list text is the count, then each index whose state is on. It is compared as text. An unchanged list is not sent again unless `{id}/sensor/connected` asked. The list can be published on the pass that stores the last state, before that input's reading.
 
@@ -241,9 +241,9 @@ There is no command-absence cutoff. Sensors are not turned off because `{id}/sen
 - Boot publishes `off` and does not read: `testBootPublishesOffAndDoesNotRead`.
 - `1 1 on` sends `SET_SENSOR`, then `GET_SENSOR_STATE`, then `GET_SENSOR_READING`, and publishes `connected` without waiting out the interval when the reading delay is zero: `testSensorOnConfirmsStateThenPublishesReading`. With `kSensorReadingDelayMs` of 1000, that state read waits one second, then publishes `connected <value>`: `testSensorOnWaitsThenPublishesLiveReading`. An open jack publishes `disconnected` after that same wait, and not before it, and does not read: `testSensorOnWithOpenJackPublishesDisconnected`, `testSensorOpenJackPublishesDisconnectedAfterDelay`. An `off` still confirms on the next pass when the delay is set: `testSensorOffConfirmsImmediatelyWhenReadingDelayIsSet`. A due periodic cycle during the wait reads the other input and leaves this one until the delay elapses: `testSensorSettleSkipsPeriodicReadOfThatInput`. A second `off` while already off confirms state and does not send `SET_SENSOR`: `testSensorOffConfirmsAndSecondOffSkipsSet`. An `on` while already on, and an `on` while disconnected, each send `SET_SENSOR` on: `testSensorOnWhileAlreadyOnSendsSet`, `testSensorOnWhileDisconnectedSendsSet`. A second `on` after that send does too. Two `on` payloads before the send become one `SET_SENSOR`: `testSensorOnsBeforeSendCollapseToOneSet`. The 60 second poll does not send it again: `testSensorDisconnectedOnIsNotRepeatedByPoll`. An `on` while the controller still says disconnected closes a loop the daughter has opened: `testSensorOnReclosesLoopThatDroppedOff`.
 - Fault ignores on and off. Only `reset` sends `RESET_SENSOR`, and a desired on is applied after the input is off: `testSensorFaultIgnoresOnAndOffUntilReset`. A periodic fault is not reset. The next pass reads `GET_FAULT` once: `testPeriodicFaultIsNotReset`.
-- The fault list is one record per input. Input 2 overcurrent publishes `3 none overcurrent none`, and a later fault reads the list once more: `testHostReadsSensorFaultList`, `testSensorFaultListPublishesReasons`. On and off do not send `GET_FAULT`: `testSensorOnAndOffDoNotReadFault`. Reset publishes `none` with no second read: `testSensorFaultClearPublishesNoneWithoutRead`. Three busy replies wait out the poll interval: `testSensorFaultReadWaitsAfterThreeBusyReplies`. The fault read runs before a confirm and before a reset: `testSensorFaultReadRunsBeforeConfirm`, `testSensorFaultReadRunsBeforeReset`. An odd payload and `Unsupported` store nothing: `testSensorFaultBadListIsNotStored`, `testSensorFaultUnsupportedIsNotStored`. Reason `9` publishes `1 9`, and unplug publishes `unavailable`: `testSensorFaultDecimalReasonAndUnplug`.
+- The fault list is one record per input. Input 2 overcurrent publishes `3 none overcurrent none`, and a later fault reads the list once more: `testHostReadsSensorFaultList`, `testSensorFaultListPublishesReasons`. On and off do not send `GET_FAULT`: `testSensorOnAndOffDoNotReadFault`. Reset publishes `none` with no second read: `testSensorFaultClearPublishesNoneWithoutRead`. Three busy replies wait out the poll interval: `testSensorFaultReadWaitsAfterThreeBusyReplies`. The fault read runs before a confirm and before a reset: `testSensorFaultReadRunsBeforeConfirm`, `testSensorFaultReadRunsBeforeReset`. An odd payload and `Unsupported` store nothing: `testSensorFaultBadListIsNotStored`, `testSensorFaultUnsupportedIsNotStored`. Reason `9` publishes `1 9`, and unplug publishes nothing on the fault topic: `testSensorFaultDecimalReasonAndUnplug`.
 - An immediate read of an off input publishes `off` and does not read: `testImmediateReadOfOffPublishesOff`. A fifth queued read is dropped: `testFifthSensorReadIsDropped`.
 - A new identity keeps desired on and does not reset. A slot that comes back as another type drops it: `testSensorCommandKeepsDesiredAcrossNewIdentity`, `testSensorCommandDropsDesiredWhenSlotChangesType`.
-- The connected list names only inputs whose state is on: `testConnectedListNamesOnlyInputsThatAreOn` and the earlier list cases. Unplug publishes `unavailable` with retain off.
+- The connected list names only inputs whose state is on: `testConnectedListNamesOnlyInputsThatAreOn` and the earlier list cases. Unplug publishes nothing on the sensor topics. The slot line becomes `Empty`.
 
 The sensor tests use one sensor module. Two slots enumerating together are in `test_modules.cpp`. `test_deep_modules.cpp` drives `SensorModule::update()`, including the six subscriptions and `{id}/sensor/connected`.

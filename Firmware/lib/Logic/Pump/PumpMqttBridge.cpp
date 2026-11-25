@@ -253,14 +253,11 @@ void PumpMqttBridge::_publishSnapshots()
     char payload[16];
     if (!_poller.stateKnown(slot) || !_formatState(slot, payload, sizeof(payload)))
     {
-      if (_publishedOk[slot] &&
-          std::strcmp(_published[slot], "unavailable") != 0)
+      if (_publishedOk[slot])
       {
-        if (_publish(slot, "unavailable"))
-        {
-          std::snprintf(_published[slot], sizeof(_published[slot]),
-                        "unavailable");
-        }
+        _publishedOk[slot] = false;
+        _publishedRevision[slot] = 0;
+        _published[slot][0] = '\0';
       }
       continue;
     }

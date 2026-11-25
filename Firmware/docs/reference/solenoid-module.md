@@ -84,7 +84,7 @@ The window is one timer for the whole controller. Any accepted command, for any 
 
 ### More than one module
 
-Each solenoid slot has its own count, states, and poll timer. The poller still runs one query per pass. Applying a command takes the bus ahead of periodic reads, after any missing count. Unplugging one module publishes `unavailable` on that module's topics only.
+Each solenoid slot has its own count, states, and poll timer. The poller still runs one query per pass. Applying a command takes the bus ahead of periodic reads, after any missing count. Unplugging one module publishes nothing on that module's topics. `ModuleBus` publishes the new slot line.
 
 ## Publication
 
@@ -92,8 +92,8 @@ Each solenoid slot has its own count, states, and poll timer. The poller still r
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10 board 1 firmware 3` |
-| `{id}/slot/N/solenoid/M` | publish, QoS 0, retain off | `on`, `off`, `disconnected`, or `unavailable` |
+| `{id}/slot/N` | publish, QoS 0, retain off | Slot status from `ModuleSlotPublisher`, such as `Online Solenoid addr=0x10 board 1 firmware 3` |
+| `{id}/slot/N/solenoid/M` | publish, QoS 0, retain off | `on`, `off`, or `disconnected` |
 | `{id}/solenoids` | subscribe, QoS 1 | `N on off ...` |
 | `{id}/solenoids/connected` | subscribe, QoS 1 | `N` |
 | `{id}/slot/N/solenoids` | publish, QoS 0, retain off | count, then connected indexes, such as `4 1 2 4` |
@@ -106,13 +106,13 @@ Each stored state is published, including a repeat of the same text, on the brid
 | --- | --- | --- | --- |
 | Periodic `GET_SOLENOID_STATE` succeeds | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | no |
 | `SET_SOLENOID` returns a state | `{id}/slot/N/solenoid/M` | `on`, `off`, or `disconnected` | no |
-| Slot is no longer an online solenoid, or the new count drops an output that had a state | `{id}/slot/N/solenoid/M` | `unavailable` | no, once |
+| Slot is no longer an online solenoid, or the new count drops an output that had a state | `{id}/slot/N` | the new slot line when the slot text changed | no |
 | Count and every output state are known, the connected set changes, or `{id}/solenoids/connected` asks again | `{id}/slot/N/solenoids` | `4 1 2 4` | no |
-| Slot is no longer an online solenoid after an inventory was published | `{id}/slot/N/solenoids` | `unavailable` | no, once |
+| Slot is no longer an online solenoid after an inventory was published | — | the output list is left as last published | — |
 | Count query, malformed command, or a command still waiting for the count | — | nothing | — |
 | Bridge pass with no new state | — | the state and the list are not repeated | — |
 
-Output states and the connected list are not retained. A retained state survived after the board was unplugged, and a new subscriber received it as if the output were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
+Output states, the connected list, and the slot line are not retained. A copy already stored on the broker stays until it is removed there. The retain rule is in the [MQTT reference](mqtt.md).
 
 The inventory text is the count, then each connected index. It is compared as text. An unchanged inventory is not sent again unless `{id}/solenoids/connected` asked.
 
@@ -159,4 +159,4 @@ A zero argument selects the poller's own default for that argument. It does not 
 
 ## Tests
 
-`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and `unavailable` with retain off after unplug. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.
+`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and silence on the solenoid topics after unplug. The slot line is published by the bus. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.

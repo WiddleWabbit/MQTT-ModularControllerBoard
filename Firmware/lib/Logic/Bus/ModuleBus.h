@@ -13,11 +13,12 @@ class SerialConsole;
 class Programming;
 
 /**
- * Four-slot module bus, its retained slot-status publication, and the
- * retained controller identity. update() runs at most one host
- * transaction, then publishes any slot text that changed and the
- * controller revisions until the broker accepts them. Typed module
- * commands use ModuleHost::exchange through the type modules.
+ * Four-slot module bus, its slot-status publication, and the
+ * controller identity. Both publishes leave retain off. update()
+ * runs at most one host transaction, then publishes any slot text
+ * that changed and the controller revisions until the broker
+ * accepts them. Typed module commands use ModuleHost::exchange
+ * through the type modules.
  */
 class ModuleBus
 {

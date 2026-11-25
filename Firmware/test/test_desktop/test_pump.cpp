@@ -906,8 +906,8 @@ void testPeriodicPumpPublishEachStateAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/pump",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/pump",
+                              "unavailable", false));
   const int once = countTopic(harness.client, "watering/slot/1/pump");
   harness.bridge.update();
   TEST_ASSERT_EQUAL(once, countTopic(harness.client, "watering/slot/1/pump"));

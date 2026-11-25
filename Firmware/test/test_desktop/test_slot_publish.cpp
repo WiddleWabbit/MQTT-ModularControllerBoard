@@ -77,22 +77,22 @@ void pumpHost(SlotPublishHarness& harness, uint32_t milliseconds)
 }
 
 /**
- * Reports whether a retained payload was published on a topic.
+ * Reports whether a payload was published on a topic with retain off.
  *
  * @param client Fake broker.
  * @param topic Expected topic.
  * @param payload Expected payload.
- * @return True when a matching retained message was recorded.
+ * @return True when a matching unretained message was recorded.
  */
-bool publishedRetained(const FakeMqttClient& client, const char* topic,
-                       const char* payload)
+bool publishedOpen(const FakeMqttClient& client, const char* topic,
+                   const char* payload)
 {
   for (size_t i = 0; i < client.publishedMessages.size(); ++i)
   {
     const FakeMqttClient::PublishedMessage& message =
       client.publishedMessages[i];
     if (message.topic == topic && message.payload == payload &&
-        message.retained)
+        !message.retained)
     {
       return true;
     }
@@ -122,7 +122,7 @@ int countTopic(const FakeMqttClient& client, const char* topic)
 
 }
 
-void testSlotPublisherPublishesRetainedEmptySlots()
+void testSlotPublisherPublishesEmptySlots()
 {
   SlotPublishHarness harness;
   harness.modules.host.begin();
@@ -131,13 +131,13 @@ void testSlotPublisherPublishesRetainedEmptySlots()
   harness.publisher.update();
 
   TEST_ASSERT_EQUAL(4, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/2",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/2",
                                       "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/3",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/3",
                                       "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/4",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/4",
                                       "Empty"));
 
   harness.client.publishedMessages.clear();
@@ -161,9 +161,9 @@ void testSlotPublisherWaitsUntilMqttConnected()
 
   TEST_ASSERT_EQUAL(4, harness.client.publishedMessages.size());
   TEST_ASSERT_EQUAL(1, countTopic(harness.client, "watering/slot/1"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Debouncing"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/2",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/2",
                                       "Empty"));
 }
 
@@ -191,7 +191,7 @@ void testSlotPublisherPublishesLatestSnapshotAfterReconnect()
   harness.publisher.update();
 
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Debouncing"));
 }
 
@@ -211,7 +211,7 @@ void testSlotPublisherRetriesRejectedSlotOnly()
   harness.client.publishedMessages.clear();
   harness.publisher.update();
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/3",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/3",
                                       "Empty"));
 
   harness.client.publishedMessages.clear();
@@ -232,7 +232,7 @@ void testSlotPublisherPublishesOnlyTheChangedSlot()
   harness.publisher.update();
 
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Debouncing"));
 
   harness.client.publishedMessages.clear();
@@ -241,7 +241,7 @@ void testSlotPublisherPublishesOnlyTheChangedSlot()
   harness.publisher.update();
 
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Enumerating"));
 }
 
@@ -258,9 +258,9 @@ void testSlotPublisherPublishesOnlineIdentityEcho()
   harness.connect();
   harness.publisher.update();
 
-  TEST_ASSERT_TRUE(publishedRetained(
+  TEST_ASSERT_TRUE(publishedOpen(
     harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10 board 0 firmware 1"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/4",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/4",
                                       "Empty"));
 }
 
@@ -278,7 +278,7 @@ void testSlotPublisherPublishesUnsupportedType()
   harness.connect();
   harness.publisher.update();
 
-  TEST_ASSERT_TRUE(publishedRetained(
+  TEST_ASSERT_TRUE(publishedOpen(
     harness.client, "watering/slot/1",
     "Unsupported type=0x02AA addr=0x10 board 0 firmware 1"));
 }
@@ -297,7 +297,7 @@ void testSlotPublisherPublishesDaughterRevision()
   harness.connect();
   harness.publisher.update();
 
-  TEST_ASSERT_TRUE(publishedRetained(
+  TEST_ASSERT_TRUE(publishedOpen(
     harness.client, "watering/slot/1",
     "Online IdentityEcho addr=0x10 board 2 firmware 1"));
 }
@@ -317,7 +317,7 @@ void testSlotPublisherPublishesUnsupportedRevision()
   harness.connect();
   harness.publisher.update();
 
-  TEST_ASSERT_TRUE(publishedRetained(
+  TEST_ASSERT_TRUE(publishedOpen(
     harness.client, "watering/slot/1",
     "Unsupported type=0x02AA addr=0x10 board 1 firmware 2"));
 }
@@ -366,13 +366,13 @@ void testControllerInfoWaitsUntilMqttConnected()
   TEST_ASSERT_EQUAL(0, harness.client.publishedMessages.size());
 }
 
-void testControllerInfoPublishesRetainedOnce()
+void testControllerInfoPublishesOnce()
 {
   InfoHarness harness(1, 8);
   harness.connect();
   harness.publisher.update();
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/controller",
                                       "board 1 firmware 8"));
 
   harness.publisher.update();
@@ -384,7 +384,7 @@ void testControllerInfoUsesConstructorRevisions()
   InfoHarness harness(2, 3);
   harness.connect();
   harness.publisher.update();
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/controller",
                                       "board 2 firmware 3"));
 }
 
@@ -399,7 +399,7 @@ void testControllerInfoRetriesRejectedPublish()
   harness.client.publishedMessages.clear();
   harness.publisher.update();
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/controller",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/controller",
                                       "board 1 firmware 8"));
 
   harness.publisher.update();
@@ -418,7 +418,7 @@ void testControllerInfoRepublishesWhenDeviceIdChanges()
   harness.topics.setDeviceId("shed");
   harness.publisher.update();
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/controller",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "shed/controller",
                                       "board 1 firmware 8"));
 }
 
@@ -434,7 +434,7 @@ void testSlotPublisherPublishesFaultNack()
   harness.connect();
   harness.publisher.update();
 
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Fault Nack"));
 }
 
@@ -457,7 +457,7 @@ void testSlotPublisherRepublishesEmptyAfterUnplug()
   harness.publisher.update();
 
   TEST_ASSERT_EQUAL(1, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Empty"));
 }
 
@@ -478,7 +478,7 @@ void testSlotPublisherDoesNotTouchTheBus()
   const size_t beforeOnline = harness.modules.bus.protocolOpCount();
   harness.publisher.update();
   TEST_ASSERT_EQUAL(beforeOnline, harness.modules.bus.protocolOpCount());
-  TEST_ASSERT_TRUE(publishedRetained(
+  TEST_ASSERT_TRUE(publishedOpen(
     harness.client, "watering/slot/1", "Online IdentityEcho addr=0x10 board 0 firmware 1"));
 }
 
@@ -488,7 +488,7 @@ void testSlotPublisherRepublishesWhenDeviceIdChanges()
   harness.modules.host.begin();
   harness.connect();
   harness.publisher.update();
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "watering/slot/1",
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "watering/slot/1",
                                       "Empty"));
   harness.client.publishedMessages.clear();
   harness.publisher.update();
@@ -497,10 +497,10 @@ void testSlotPublisherRepublishesWhenDeviceIdChanges()
   harness.topics.setDeviceId("shed");
   harness.publisher.update();
   TEST_ASSERT_EQUAL(4, harness.client.publishedMessages.size());
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/1", "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/2", "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/3", "Empty"));
-  TEST_ASSERT_TRUE(publishedRetained(harness.client, "shed/slot/4", "Empty"));
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "shed/slot/1", "Empty"));
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "shed/slot/2", "Empty"));
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "shed/slot/3", "Empty"));
+  TEST_ASSERT_TRUE(publishedOpen(harness.client, "shed/slot/4", "Empty"));
 
   harness.client.publishedMessages.clear();
   harness.publisher.update();
@@ -511,7 +511,7 @@ void testSlotPublisherRepublishesWhenDeviceIdChanges()
 // ========== Runner ==========
 
 /**
- * Registers the retained slot-status cases.
+ * Registers the slot-status cases. Retain is off on every publish.
  *
  * @return Nothing.
  */
@@ -519,7 +519,7 @@ void runSlotPublishTests()
 {
   // UNITY_BEGIN records test_main.cpp, so name this file for the report.
   UnitySetTestFile(__FILE__);
-  RUN_TEST(testSlotPublisherPublishesRetainedEmptySlots);
+  RUN_TEST(testSlotPublisherPublishesEmptySlots);
   RUN_TEST(testSlotPublisherWaitsUntilMqttConnected);
   RUN_TEST(testSlotPublisherPublishesLatestSnapshotAfterReconnect);
   RUN_TEST(testSlotPublisherRetriesRejectedSlotOnly);
@@ -530,7 +530,7 @@ void runSlotPublishTests()
   RUN_TEST(testSlotPublisherPublishesUnsupportedRevision);
   RUN_TEST(testSlotPublisherPublishesFaultNack);
   RUN_TEST(testControllerInfoWaitsUntilMqttConnected);
-  RUN_TEST(testControllerInfoPublishesRetainedOnce);
+  RUN_TEST(testControllerInfoPublishesOnce);
   RUN_TEST(testControllerInfoUsesConstructorRevisions);
   RUN_TEST(testControllerInfoRetriesRejectedPublish);
   RUN_TEST(testControllerInfoRepublishesWhenDeviceIdChanges);

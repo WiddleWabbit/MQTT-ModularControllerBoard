@@ -53,10 +53,10 @@ public:
   /**
    * Publishes each new state and info sample, including a repeated
    * value, with retain off. A pump that disappears publishes
-   * unavailable on the state topic only. Now, cycle, totals, and
-   * the fault reason are left as last published. A rejected publish
-   * stays pending. A new device id sends the current values once
-   * on the new topics.
+   * nothing. The slot status line is the notice that the board has
+   * left. Now, cycle, totals, and the fault reason are left as last
+   * published. A rejected publish stays pending. A new device id
+   * sends the current values once on the new topics.
    *
    * @return Nothing.
    */

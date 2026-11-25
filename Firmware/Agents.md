@@ -31,7 +31,7 @@ The seven modules:
 
 - `Network` — Wi-Fi, then NTP, then MQTT, plus persisted config and a four-handler fan-out.
 - `SerialConsole` — USB command lines, and the status snapshot.
-- `ModuleBus` — one I2C transaction, then retained slot status. Enumeration and health share that one transaction across all four slots.
+- `ModuleBus` — one I2C transaction, then slot status with retain off. Enumeration and health share that one transaction across all four slots.
 - `SensorModule`, `SolenoidModule`, `PumpModule` — one object per type, with a record per slot. `update()` runs that type's poller, then its bridge, and issues at most one exchange. Construct them before `Network::begin` so their handlers are registered.
 - `Programming` — Arduino-as-ISP on slot 1. `begin()` quiesces the bus.
 

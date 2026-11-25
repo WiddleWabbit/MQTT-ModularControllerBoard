@@ -57,9 +57,10 @@ public:
 
   /**
    * Publishes each new state, including a repeated value, with
-   * retain off. An output that disappears publishes unavailable
-   * with retain off. A rejected publish stays pending. A new
-   * device id sends the current states once on the new topics.
+   * retain off. An output that disappears publishes nothing. The
+   * slot status line is the notice that the board has left. A
+   * rejected publish stays pending. A new device id sends the
+   * current states once on the new topics.
    *
    * @return Nothing.
    */
@@ -117,8 +118,8 @@ private:
 
   /**
    * Publishes the output list for each slot that can answer.
-   * A slot that could answer and no longer can publishes unavailable.
-   * Neither payload is retained.
+   * A slot that could answer and no longer can publishes nothing.
+   * The payload is not retained.
    *
    * @return Nothing.
    */

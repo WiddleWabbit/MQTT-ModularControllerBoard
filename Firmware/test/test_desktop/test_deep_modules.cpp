@@ -382,7 +382,7 @@ struct SeatResult
  * @param board Composition under test.
  * @param device Simulated daughter.
  * @param slotIndex Firmware slot.
- * @param onlineText Retained slot body that means online.
+ * @param onlineText Slot body that means online. Retain is off.
  * @param prefix Topic root currently applied to the bus.
  * @return Whether the slot published that body, and whether every
  *         update issued at most one I2C transaction.
@@ -405,7 +405,7 @@ SeatResult seat(Board& board, FakeModuleDevice& device, uint8_t slotIndex,
     {
       result.oneTransactionPerUpdate = false;
     }
-    if (published(board.mqtt, topic, onlineText, true))
+    if (published(board.mqtt, topic, onlineText, false))
     {
       result.online = true;
       return result;
@@ -701,12 +701,12 @@ void testModuleBusPublishesEmptySlotsOnceWhenMqttConnects()
   board.wifi.linkState = WifiLinkState::Connected;
   board.network.update();
   board.bus.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", true));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/3", "Empty", true));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/4", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/3", "Empty", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/4", "Empty", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "watering/controller",
-                             "board 1 firmware 8", true));
+                             "board 1 firmware 8", false));
   TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/slot/1"));
   TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "watering/controller"));
 
@@ -726,7 +726,7 @@ void testModuleBusEnumeratesWithOneTransactionPerUpdate()
     seat(board, device, 0, "Online Sensor addr=0x10 board 0 firmware 1");
   TEST_ASSERT_TRUE(seated.online);
   TEST_ASSERT_TRUE(seated.oneTransactionPerUpdate);
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", false));
   TEST_ASSERT_EQUAL(0x10, board.slots.i2c.ops.back().address);
 }
 
@@ -735,7 +735,7 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
   Board board(kPollMs, kPollMs, kSolenoidSilenceMs, kPollMs, kPumpSilenceMs);
   board.start();
   board.bus.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", false));
 
   NetworkConfig staged = brokerDefaults();
   staged.mqttPrefix = "shed";
@@ -747,10 +747,10 @@ void testModuleBusFollowsAPrefixChangeAndQuiesces()
     board.mqtt.subscribedTopics.back().c_str();
   TEST_ASSERT_EQUAL_STRING("shed/sensor", last);
   board.bus.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/1", "Empty", true));
-  TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/4", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/1", "Empty", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "shed/slot/4", "Empty", false));
   TEST_ASSERT_TRUE(published(board.mqtt, "shed/controller",
-                             "board 1 firmware 8", true));
+                             "board 1 firmware 8", false));
   TEST_ASSERT_EQUAL(1, countTopic(board.mqtt, "shed/controller"));
 
   const size_t ops = board.slots.i2c.protocolOpCount();
@@ -859,8 +859,9 @@ void testSensorModuleReadCommandAndMalformedPayload()
   board.mqtt.deliver("watering/sensor/read", "1 2");
   board.sensor.update();
   TEST_ASSERT_EQUAL(afterRejects, board.slots.i2c.protocolOpCount());
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/2",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensor/2",
+                              "unavailable", false));
+  TEST_ASSERT_EQUAL(0, countTopic(board.mqtt, "watering/slot/1/sensor/2"));
 }
 
 void testSensorModuleHonorsPollIntervalAndUnplug()
@@ -905,11 +906,11 @@ void testSensorModuleHonorsPollIntervalAndUnplug()
     board.bus.update();
   }
   board.sensor.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensor/1",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1/sensors",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", true));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensor/1",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/1/sensors",
+                              "unavailable", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/1", "Empty", false));
 }
 
 void testSensorModulePublishesConnectedList()
@@ -1124,10 +1125,11 @@ void testSolenoidModuleClearsOnUnplug()
     board.bus.update();
   }
   board.solenoid.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/solenoid/1",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/solenoids",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/2/solenoid/1",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/2/solenoids",
+                              "unavailable", false));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", false));
 }
 
 
@@ -1229,7 +1231,7 @@ void testPumpModuleResetsFaultBeforeTurningOn()
     board.clock.advance(1);
     board.bus.update();
     if (published(board.mqtt, "watering/slot/1", "Online Pump addr=0x10 board 0 firmware 1",
-                  true))
+                  false))
     {
       onlineAgain = true;
       break;
@@ -1314,11 +1316,11 @@ void testPumpModuleAddressesSlotTwoAndClearsOnUnplug()
     board.bus.update();
   }
   board.pump.update();
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2/pump",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/2/pump",
+                              "unavailable", false));
   TEST_ASSERT_FALSE(published(board.mqtt, "watering/slot/2/pump/now",
                               "unavailable", false));
-  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", true));
+  TEST_ASSERT_TRUE(published(board.mqtt, "watering/slot/2", "Empty", false));
 }
 
 

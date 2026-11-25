@@ -121,7 +121,7 @@ The window is one timer for the whole controller. Any accepted on/off command, f
 
 ### More than one module
 
-Each pump slot has its own state and poll timer. The poller still runs one query per pass. Unplugging one module publishes `unavailable` on `{id}/slot/N/pump` only. The slot line is updated by the bus. Now, cycle, totals, and the fault reason are left as last published.
+Each pump slot has its own state and poll timer. The poller still runs one query per pass. Unplugging one module publishes nothing on `{id}/slot/N/pump`. The slot line is updated by the bus. Now, cycle, totals, and the fault reason are left as last published.
 
 ## Publication
 
@@ -131,8 +131,8 @@ Module numbers in MQTT are 1-based.
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `{id}/slot/N` | publish, retained, QoS 0 | Slot status from `ModuleSlotPublisher`, such as `Online Pump addr=0x10 board 1 firmware 4` |
-| `{id}/slot/N/pump` | publish, QoS 0, retain off | `on`, `off`, `fault`, or `unavailable` |
+| `{id}/slot/N` | publish, QoS 0, retain off | Slot status from `ModuleSlotPublisher`, such as `Online Pump addr=0x10 board 1 firmware 4` |
+| `{id}/slot/N/pump` | publish, QoS 0, retain off | `on`, `off`, or `fault` |
 | `{id}/slot/N/pump/now` | publish, QoS 0, retain off | phase, three flags, millivolts, milliamps, run seconds |
 | `{id}/slot/N/pump/cycle` | publish, QoS 0, retain off | eight numbers, below |
 | `{id}/slot/N/pump/totals` | publish, QoS 0, retain off | six numbers, below |
@@ -153,15 +153,15 @@ Each stored state is published, including a repeat of the same text, on the brid
 | `GET_PUMP_CYCLE` succeeds | `{id}/slot/N/pump/cycle` | `12000 0 4000 0 0 0 0 0` | no |
 | `GET_PUMP_TOTALS` succeeds | `{id}/slot/N/pump/totals` | `0 0 12000 4000 0 0` is cycles, seconds, peak mV, peak mA, failed starts, last run seconds | no |
 | `GET_FAULT` succeeds, or a fault clears | `{id}/slot/N/pump/fault` | `none 0`, `slow-start 0`, `overcurrent 0`, `undercurrent 0`, `stuck-on 0`, or `9 0` | no |
-| Slot is no longer an online pump | `{id}/slot/N/pump` | `unavailable` | no, once |
+| Slot is no longer an online pump | `{id}/slot/N` | the new slot line, such as `Empty` | no |
 | Slot is no longer an online pump | `{id}/slot/N/pump/now`, `/cycle`, `/totals`, `/fault` | the last sample stays; nothing new is published | — |
 | State query, malformed command, or a command still waiting for the state | — | nothing | — |
 | Bridge pass with no new sample | — | that sample is not repeated | — |
 | A new identity while the slot is still an online pump | the info topics | the next samples | no |
 
-While a record is unknown, the bridge forgets the generation it last published, so a new identity whose counters start again at 1 is published. `{id}/slot/N` is the retained notice that the board has left.
+While a record is unknown, the bridge forgets the generation it last published, so a new identity whose counters start again at 1 is published. `{id}/slot/N` is the notice that the board has left.
 
-Pump state is not retained. A retained `on` or `fault` survived after the board was unplugged, and a new subscriber received it as if the pump were still there. `{id}/slot/N` stays retained because that line is sent only when its text changes. The retain rule, including copies already stored on the broker, is in the [MQTT reference](mqtt.md).
+Pump state and the slot line are not retained. A copy already stored on the broker stays until it is removed there. The retain rule is in the [MQTT reference](mqtt.md).
 
 A failed read publishes nothing. The next successful read, set, or reset is published with retain off.
 

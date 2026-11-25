@@ -598,10 +598,9 @@ void testSensorReadCommandUnavailableWhenSensorMissing()
   harness.poller.update();
   TEST_ASSERT_EQUAL(afterCount, harness.modules.bus.protocolOpCount());
   harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/2",
-                             "unavailable", false));
   TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/2",
-                              "", true));
+                              "unavailable", false));
+  TEST_ASSERT_EQUAL(0, countTopic(harness.client, "watering/slot/1/sensor/2"));
 }
 
 void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
@@ -649,8 +648,8 @@ void testPeriodicSensorPublishEachReadingAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "unavailable", false));
 }
 
 void testSensorBridgeFollowsDeviceId()
@@ -862,10 +861,10 @@ void testSensorConnectedInventoryClearsWhenModuleUnplugged()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors",
-                             "unavailable", false));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensor/1",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors",
+                              "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensor/1",
+                              "unavailable", false));
 }
 
 void testBootPublishesOffAndDoesNotRead()
@@ -1841,8 +1840,8 @@ void testSensorFaultDecimalReasonAndUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/sensors/fault",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/sensors/fault",
+                              "unavailable", false));
 }
 
 // ========== Runner ==========

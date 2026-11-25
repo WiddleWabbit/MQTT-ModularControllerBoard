@@ -671,8 +671,8 @@ void testPeriodicSolenoidPublishEachStateAndClearOnUnplug()
   harness.poller.update();
   harness.bridge.update();
   TEST_ASSERT_EQUAL(SlotState::Empty, harness.modules.host.state(0));
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoid/1",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/solenoid/1",
+                              "unavailable", false));
 }
 
 void testConnectedQueryPublishesIndexesWithoutRefreshingSilence()
@@ -757,8 +757,8 @@ void testConnectedInventoryClearsWhenModuleUnplugged()
   pumpMs(harness.modules, 80);
   harness.poller.update();
   harness.bridge.update();
-  TEST_ASSERT_TRUE(published(harness.client, "watering/slot/1/solenoids",
-                             "unavailable", false));
+  TEST_ASSERT_FALSE(published(harness.client, "watering/slot/1/solenoids",
+                              "unavailable", false));
 }
 
 void testSolenoidBridgeFollowsDeviceId()

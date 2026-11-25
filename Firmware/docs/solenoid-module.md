@@ -40,7 +40,7 @@ A command step reads an output whose state is still unknown, or sends `SET_SOLEN
 
 ## What is stored, and who reads it
 
-Each slot keeps its own count, output states, desired state, and poll timer. The absence window is one timer for the whole controller: any accepted `{id}/solenoids` command restarts it. The bridge publishes `{id}/slot/N/solenoid/M` from the stored state, and `{id}/slot/N/solenoids` as the count plus the connected indexes. Those publishes are not retained. A retained state used to stay after the board was removed. `{id}/slot/N` stays retained. The retain rule is in the [solenoid reference](reference/solenoid-module.md).
+Each slot keeps its own count, output states, desired state, and poll timer. The absence window is one timer for the whole controller: any accepted `{id}/solenoids` command restarts it. The bridge publishes `{id}/slot/N/solenoid/M` from the stored state, and `{id}/slot/N/solenoids` as the count plus the connected indexes. Those publishes are not retained. Unplug publishes nothing on the solenoid topics. `{id}/slot/N` is updated by the bus, also with retain off. The retain rule is in the [solenoid reference](reference/solenoid-module.md).
 
 Serial status prints the slot line only.
 

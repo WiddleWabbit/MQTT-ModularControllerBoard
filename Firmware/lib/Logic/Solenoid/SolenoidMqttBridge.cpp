@@ -297,14 +297,11 @@ void SolenoidMqttBridge::_publishSnapshots()
       if (!active || index >= count ||
           !_formatState(slot, index, payload, sizeof(payload)))
       {
-        if (_publishedOk[slot][index] &&
-            std::strcmp(_published[slot][index], "unavailable") != 0)
+        if (_publishedOk[slot][index])
         {
-          if (_publish(slot, index, "unavailable"))
-          {
-            std::snprintf(_published[slot][index],
-                          sizeof(_published[slot][index]), "unavailable");
-          }
+          _publishedOk[slot][index] = false;
+          _publishedRevision[slot][index] = 0;
+          _published[slot][index][0] = '\0';
         }
         continue;
       }
@@ -327,8 +324,8 @@ void SolenoidMqttBridge::_publishSnapshots()
 
 /**
  * Publishes the output list for each slot that can answer.
- * A slot that could answer and no longer can publishes unavailable.
- * Neither payload is retained.
+ * A slot that could answer and no longer can publishes nothing.
+ * The payload is not retained.
  *
  * @return Nothing.
  */
@@ -339,7 +336,7 @@ void SolenoidMqttBridge::_publishInventories()
     char text[80];
     if (!_formatInventory(slot, text, sizeof(text)))
     {
-      if (_inventoryOk[slot] && _publishInventory(slot, "unavailable"))
+      if (_inventoryOk[slot])
       {
         _inventoryOk[slot] = false;
         _inventoryPayload[slot][0] = '\0';
