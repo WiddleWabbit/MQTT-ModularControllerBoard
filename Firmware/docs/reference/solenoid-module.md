@@ -6,7 +6,7 @@ Source: `lib/Logic/Solenoid/SolenoidModule.h`, `SolenoidPoller.h`, `SolenoidMqtt
 
 ## Purpose
 
-Type `0x0100` drives up to 16 outputs. The host learns the count when the module is identified, reads each output, and publishes the state. `{id}/solenoids` names the desired on/off state of every output. `SET_SOLENOID` is sent only where the known state differs.
+Type `0x0100` drives up to 16 outputs. The host learns the count when the module is identified, reads each output, and publishes the state. `{id}/solenoids` names the desired on/off state of every output. Each accepted command sends `SET_SOLENOID` for every `on` and every `off`, including when the known state already matches.
 
 The host sends these commands only while the slot is `Online`, the type is `0x0100`, and the protocol version is 1. `ECHO` is not part of this type.
 
@@ -47,8 +47,8 @@ Leaving `Online` drops the cache. A sense gap that leaves the slot `Online` keep
 `SolenoidPoller::update()` picks one query in this order:
 
 1. `GET_SOLENOID_COUNT` for an online solenoid that has not reported a count. Slot 1 before slot 2. A desired-state command for a slot with no count yet makes that slot the next count query, ahead of another slot's periodic read.
-2. A command step for a slot with a pending desired state. Unknown outputs are read first. `SET_SOLENOID` is then sent, lowest index first, only where the known state differs. One exchange per pass.
-3. The next periodic `GET_SOLENOID_STATE`.
+2. A command step for a slot with a pending desired state. Unknown outputs are read first. `SET_SOLENOID` is then sent, lowest index first, for every `on` and every `off`. A state that already matches is still sent. One exchange per pass.
+3. The next periodic step. An output that is on, and still desired on, is sent `SET_SOLENOID` on. Every other output is read with `GET_SOLENOID_STATE`.
 
 ```text
 topic:   {id}/solenoids
@@ -57,15 +57,15 @@ payload: 1 on on off off
 
 That asks slot 1 for on, on, off, off. The first number is the slot, 1..4. Each following word is `on` or `off`, lowercase. The number of words must equal the count the module reported. Anything else is ignored, including a missing slot number, `ON`, a slot outside 1..4, or a different topic.
 
-The callback records the desired state and restarts the absence window. It does not touch I2C. A desired state whose length does not match the count is not applied. A command that arrives before the count or the states are known waits through the count, then through each unknown state, then sends only the `SET` commands that still differ. A command for a slot that is still enumerating waits. A command for an empty, faulted, unsupported, or different module is dropped.
+The callback records the desired state and restarts the absence window. It does not touch I2C. A desired state whose length does not match the count is not applied. A command that arrives before the count or the states are known waits through the count, then through each unknown state, then sends every `on` and every `off`. A command for a slot that is still enumerating waits. A command for an empty, faulted, unsupported, or different module is dropped.
 
-A newer command for the same slot replaces the previous desired state.
+A newer command for the same slot replaces the previous desired state and is sent in full, even when nothing changed. The same map is sent again after the module is identified again.
 
 ```text
-solenoid 1 off, desired on  -> SET on
+solenoid 1 on,  desired on  -> SET on
 solenoid 2 off, desired on  -> SET on
-solenoid 3 off, desired off -> no command
-solenoid 4 off, desired off -> no command
+solenoid 3 off, desired off -> SET off
+solenoid 4 disconnected, desired off -> no command
 ```
 
 ### Connected outputs
@@ -76,7 +76,7 @@ The reply is published on `{id}/slot/N/solenoids` with retain off. The text is t
 
 ### Command absence
 
-`{id}/solenoids` is expected about once a minute. If no accepted command arrives for 15 minutes, the controller turns every solenoid output off.
+`{id}/solenoids` is expected about once a minute. Each accepted command is forwarded in full, so the solenoid board's hold restarts on either an `on` or an `off`. While the window stays open, an output that remains on is sent `SET_SOLENOID` on again at `kSolenoidPollIntervalMs`. An output that should stay off is not repeated on that interval. If no accepted command arrives for 15 minutes, the controller turns every solenoid output off.
 
 The window is `kSolenoidCommandTimeoutMs` in `src/main.cpp` (`15UL * 60UL * 1000UL`). It starts when the poller first runs. Each accepted command restarts it, including a command whose length later does not match the module. A malformed payload does not. When the window elapses, every online solenoid is given desired state off. Outputs that are already off or disconnected are not commanded. Outputs that are on receive `SET_SOLENOID` off, one per pass. A module that comes online after the window has elapsed is turned off once its count is known. The next accepted command restarts the window.
 
@@ -138,25 +138,29 @@ I2C  SET_SOLENOID index 0 on
 MQTT {id}/slot/1/solenoid/1  "on"
 I2C  SET_SOLENOID index 1 on
 MQTT {id}/slot/1/solenoid/2  "on"
+I2C  SET_SOLENOID index 2 off
+MQTT {id}/slot/1/solenoid/3  "off"
+I2C  SET_SOLENOID index 3 off
+MQTT {id}/slot/1/solenoid/4  "off"
 ```
 
-About one poll interval after the last state read, the four reads run again and publish again, even when the text is unchanged. If no accepted command arrives for `kSolenoidCommandTimeoutMs`, outputs that are on are commanded off.
+The same payload received again sends those four `SET` commands again. About one poll interval later, outputs that are still on are sent `SET` on again, and the others are read. Both publish even when the text is unchanged. If no accepted command arrives for `kSolenoidCommandTimeoutMs`, outputs that are on are commanded off.
 
 ## Errors
 
 An index outside the reported count is `BadLength`. The host treats a count above 16, a state byte other than 0, 1, or 2, or a mismatched index as a failed query. `Busy` repeats the same command. A busy solenoid query does not, by itself, move the slot to `Fault`.
 
-`Busy` or a failed query is tried up to three times for that step. The cycle then moves on. Three failed count queries wait `kSolenoidPollIntervalMs`. A failed on or off is tried up to three times. A later state poll that still shows an output on, while the absence cutoff is in effect, tries off again.
+`Busy` or a failed query is tried up to three times for that step. The cycle then moves on. Three failed count queries wait `kSolenoidPollIntervalMs`. A failed on or off is tried up to three times. Three failed on refreshes end that step, and the next cycle tries the on again while that output is still on. A later state poll that still shows an output on, while the absence cutoff is in effect, tries off again. A poll that shows an output off while the command still wants it on sends `SET` on again.
 
 ## Configuration
 
 | Constant in `src/main.cpp` | Value | Role |
 | --- | --- | --- |
-| `kSolenoidPollIntervalMs` | 60 seconds | Gap after a finished state cycle, and the wait after three failed count queries |
+| `kSolenoidPollIntervalMs` | 60 seconds | Gap after a finished state cycle, the repeated on while an output should stay on, and the wait after three failed count queries |
 | `kSolenoidCommandTimeoutMs` | 15 minutes | Absence window that turns every output off |
 
 A zero argument selects the poller's own default for that argument. It does not disable the poll or the cutoff.
 
 ## Tests
 
-`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again, a count of 0, busy retries, a desired state that sets only the outputs that differ, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and silence on the solenoid topics after unplug. The slot line is published by the bus. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.
+`test/test_desktop/test_solenoid.cpp` covers the three command frames, host rejection unless the slot is an online solenoid, count-then-poll ordering, the 60 second repeat, a module reset that reads the count again and sends the command again when the state already matches, a count of 0, busy retries, a desired state that sets every on and every off, the same command sent again when nothing changed, an on refreshed at the poll interval, a busy on refresh that waits and tries again, disconnected outputs left uncommanded, the 15 minute default, a configured absence cutoff, and silence on the solenoid topics after unplug. The slot line is published by the bus. The tests use one solenoid module. `test_deep_modules.cpp` drives `SolenoidModule::update()`.

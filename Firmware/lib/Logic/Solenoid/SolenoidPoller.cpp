@@ -48,8 +48,9 @@ void SolenoidPoller::update()
 /**
  * Records desired on/off states for one module. Does not touch I2C.
  * Restarts the command-absence timer. A later command for the same
- * slot replaces this one. The poller applies it only when that
- * module's reported count matches count.
+ * slot replaces this one. Each on and each off is sent again, even
+ * when the known state already matches. The poller applies it only
+ * when that module's reported count matches count.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param desiredOn True commands on. One entry per output.
@@ -74,6 +75,7 @@ bool SolenoidPoller::commandStates(uint8_t moduleSlot, const bool* desiredOn,
        ++index)
   {
     intent.desiredOn[index] = index < count ? desiredOn[index] : false;
+    intent.deliver[index] = index < count;
   }
   intent.pending = true;
   intent.applying = false;
@@ -217,6 +219,14 @@ void SolenoidPoller::_syncSessions()
         _intent[slot].index = 0;
         _intent[slot].attempts = 0;
       }
+      if (saved.kind == IntentKind::States)
+      {
+        for (uint8_t index = 0;
+             index < module_protocol::kMaxSolenoidsPerModule; ++index)
+        {
+          _intent[slot].deliver[index] = index < saved.tokenCount;
+        }
+      }
     }
   }
 }
@@ -267,6 +277,7 @@ void SolenoidPoller::_clearIntent(uint8_t moduleSlot)
        ++index)
   {
     intent.desiredOn[index] = false;
+    intent.deliver[index] = false;
   }
 }
 
@@ -321,6 +332,7 @@ void SolenoidPoller::_armAllOff(uint8_t moduleSlot)
        ++index)
   {
     intent.desiredOn[index] = false;
+    intent.deliver[index] = false;
   }
 }
 
@@ -396,8 +408,9 @@ bool SolenoidPoller::_serviceCount()
 }
 
 /**
- * Drives one output toward the desired state, or reads an unknown
- * state needed to decide. Skips outputs that already match.
+ * Drives one output of the accepted command. An unknown output is
+ * read first. On and off are then sent even when the known state
+ * already matches. A disconnected output is skipped.
  *
  * @return True when a query was issued.
  */
@@ -454,16 +467,17 @@ bool SolenoidPoller::_serviceApply()
       intent.attempts = static_cast<uint8_t>(intent.attempts + 1);
       if (intent.attempts >= kSolenoidQueryAttempts)
       {
-        intent.index = static_cast<uint8_t>(intent.index + 1);
-        intent.attempts = 0;
+        _advanceApply(slot);
       }
       return true;
     }
 
-    if (_matches(slot, intent.index))
+    const bool deliver = intent.kind == IntentKind::States &&
+                         intent.deliver[intent.index];
+    if (output.state == SolenoidOutputState::Disconnected ||
+        (_matches(slot, intent.index) && !deliver))
     {
-      intent.index = static_cast<uint8_t>(intent.index + 1);
-      intent.attempts = 0;
+      _advanceApply(slot);
       continue;
     }
 
@@ -472,18 +486,20 @@ bool SolenoidPoller::_serviceApply()
     if (written.status == SolenoidQueryStatus::Ok)
     {
       _rememberState(slot, intent.index, written.state);
+      if (intent.kind == IntentKind::States)
+      {
+        _postponePoll(slot);
+      }
       if (_matches(slot, intent.index))
       {
-        intent.index = static_cast<uint8_t>(intent.index + 1);
-        intent.attempts = 0;
+        _advanceApply(slot);
       }
       else
       {
         intent.attempts = static_cast<uint8_t>(intent.attempts + 1);
         if (intent.attempts >= kSolenoidQueryAttempts)
         {
-          intent.index = static_cast<uint8_t>(intent.index + 1);
-          intent.attempts = 0;
+          _advanceApply(slot);
         }
       }
       return true;
@@ -491,10 +507,43 @@ bool SolenoidPoller::_serviceApply()
     intent.attempts = static_cast<uint8_t>(intent.attempts + 1);
     if (intent.attempts >= kSolenoidQueryAttempts)
     {
-      intent.index = static_cast<uint8_t>(intent.index + 1);
-      intent.attempts = 0;
+      _advanceApply(slot);
     }
     return true;
+  }
+}
+
+/**
+ * Forgets the forced send for the current output and steps to the
+ * next one.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Nothing.
+ */
+void SolenoidPoller::_advanceApply(uint8_t moduleSlot)
+{
+  Intent& intent = _intent[moduleSlot];
+  if (intent.index < module_protocol::kMaxSolenoidsPerModule)
+  {
+    intent.deliver[intent.index] = false;
+  }
+  intent.index = static_cast<uint8_t>(intent.index + 1);
+  intent.attempts = 0;
+}
+
+/**
+ * Holds the periodic cycle off for one poll interval. A cycle that
+ * is already running is left to finish.
+ *
+ * @param moduleSlot Firmware slot 0..3.
+ * @return Nothing.
+ */
+void SolenoidPoller::_postponePoll(uint8_t moduleSlot)
+{
+  SlotRuntime& runtime = _runtime[moduleSlot];
+  if (!runtime.inCycle)
+  {
+    runtime.nextPollAt = _clock.millis() + _intervalMs;
   }
 }
 
@@ -569,10 +618,11 @@ bool SolenoidPoller::_desiredOn(uint8_t moduleSlot,
 /**
  * Reports whether a known state already satisfies the desired state.
  * Disconnected outputs match, because the host cannot energise them.
+ * A fresh command still sends on and off once.
  *
  * @param moduleSlot Firmware slot 0..3.
  * @param solenoidIndex Zero-based output.
- * @return True when no SET is required.
+ * @return True when the known state already matches.
  */
 bool SolenoidPoller::_matches(uint8_t moduleSlot, uint8_t solenoidIndex) const
 {
@@ -616,13 +666,21 @@ void SolenoidPoller::_rememberState(uint8_t moduleSlot, uint8_t solenoidIndex,
   {
     _intent[moduleSlot].pending = true;
   }
+  if (_intent[moduleSlot].kind == IntentKind::States &&
+      _intent[moduleSlot].desiredOn[solenoidIndex] &&
+      state == SolenoidOutputState::Off && !_intent[moduleSlot].applying)
+  {
+    _intent[moduleSlot].deliver[solenoidIndex] = true;
+    _intent[moduleSlot].pending = true;
+  }
 }
 
 
 // ========== Count And Periodic ==========
 
 /**
- * Reads the next due output state.
+ * Reads the next due output, or sends SET on when that output is
+ * already on and the accepted command still wants it on.
  *
  * @return True when a periodic query was issued.
  */
@@ -641,8 +699,16 @@ bool SolenoidPoller::_servicePeriodic()
     runtime.stepAttempts = 0;
   }
 
-  const SolenoidStateResult reading = querySolenoidState(
-      _moduleHost, static_cast<uint8_t>(slot), runtime.index);
+  const Output& output = runtime.outputs[runtime.index];
+  const bool refreshOn = _intent[slot].kind == IntentKind::States &&
+                         _desiredOn(static_cast<uint8_t>(slot), runtime.index) &&
+                         output.known &&
+                         output.state == SolenoidOutputState::On;
+  const SolenoidStateResult reading = refreshOn
+      ? setSolenoid(_moduleHost, static_cast<uint8_t>(slot), runtime.index,
+                    true)
+      : querySolenoidState(_moduleHost, static_cast<uint8_t>(slot),
+                           runtime.index);
   if (reading.status == SolenoidQueryStatus::Ok)
   {
     _rememberState(static_cast<uint8_t>(slot), runtime.index, reading.state);

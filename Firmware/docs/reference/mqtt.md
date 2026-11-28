@@ -133,7 +133,7 @@ Names the desired on or off state of every output on one slot. One lowercase wor
 mosquitto_pub -h <broker> -t watering/solenoids -q 1 -m "1 on on off off"
 ```
 
-`1 on on off off` asks slot 1 for on, on, off, off. `SET_SOLENOID` is sent only where the known state differs. Each stored state is then published on `{id}/slot/N/solenoid/M` with retain off, as `on`, `off`, or `disconnected`.
+`1 on on off off` asks slot 1 for on, on, off, off. `SET_SOLENOID` is sent for every `on` and every `off` each time this command is accepted, including when that output already matches. An output that stays on is sent `SET` on again at `kSolenoidPollIntervalMs` while the absence window is open. Each stored state is then published on `{id}/slot/N/solenoid/M` with retain off, as `on`, `off`, or `disconnected`.
 
 The number of words must equal the count the module reported, or the states are not applied. A parsed command still restarts the absence window, including one whose length does not match. `ON`, a missing slot, and a slot outside 1..4 are ignored and do not restart the window.
 

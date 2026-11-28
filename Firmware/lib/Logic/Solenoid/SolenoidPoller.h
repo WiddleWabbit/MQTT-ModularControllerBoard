@@ -10,10 +10,13 @@
 /**
  * Schedules Solenoid-module commands. Queries the output count when a
  * module comes online or is identified again, then reads each output
- * at pollIntervalMs. An MQTT desired-state command turns on or off
- * only the outputs that differ. When no command is accepted for
- * commandTimeoutMs, every output is turned off. At most one I2C query
- * per update(). Does not publish MQTT.
+ * at pollIntervalMs. An accepted desired-state command sends
+ * SET_SOLENOID for every on and every off, including when the known
+ * state already matches. A disconnected output is left alone. While
+ * the absence window is open, an output that is on is sent SET on
+ * again at pollIntervalMs, and that reply is its state sample. When
+ * no command is accepted for commandTimeoutMs, every output is turned
+ * off. At most one I2C query per update(). Does not publish MQTT.
  */
 class SolenoidPoller
 {
@@ -28,8 +31,9 @@ public:
    * @param moduleHost Host that issues solenoid queries.
    * @param clock Monotonic clock for the poll interval and the
    *        command-absence timeout.
-   * @param pollIntervalMs Period between state polls. Zero selects
-   *        kDefaultPollIntervalMs.
+   * @param pollIntervalMs Period between state polls, and between
+   *        repeated on commands while an output should stay on.
+   *        Zero selects kDefaultPollIntervalMs.
    * @param commandTimeoutMs Silence after which every output is
    *        commanded off. Zero selects kDefaultCommandTimeoutMs.
    *        The window starts when update() first runs, and restarts
@@ -50,8 +54,9 @@ public:
   /**
    * Records desired on/off states for one module. Does not touch I2C.
    * Restarts the command-absence timer. A later command for the same
-   * slot replaces this one. The poller applies it only when that
-   * module's reported count matches count.
+   * slot replaces this one. Each on and each off is sent again, even
+   * when the known state already matches. The poller applies it only
+   * when that module's reported count matches count.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param desiredOn True commands on. One entry per output.
@@ -151,6 +156,7 @@ private:
     bool applying;
     uint8_t index;
     uint8_t attempts;
+    bool deliver[module_protocol::kMaxSolenoidsPerModule];
   };
 
   ModuleHost& _moduleHost;
@@ -228,19 +234,39 @@ private:
   bool _serviceCount();
 
   /**
-   * Drives one output toward the desired state, or reads an unknown
-   * state needed to decide. Skips outputs that already match.
+   * Drives one output of the accepted command. An unknown output is
+   * read first. On and off are then sent even when the known state
+   * already matches. A disconnected output is skipped.
    *
    * @return True when a query was issued.
    */
   bool _serviceApply();
 
   /**
-   * Reads the next due output state.
+   * Reads the next due output, or sends SET on when that output is
+   * already on and the accepted command still wants it on.
    *
    * @return True when a periodic query was issued.
    */
   bool _servicePeriodic();
+
+  /**
+   * Forgets the forced send for the current output and steps to the
+   * next one.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return Nothing.
+   */
+  void _advanceApply(uint8_t moduleSlot);
+
+  /**
+   * Holds the periodic cycle off for one poll interval. A cycle that
+   * is already running is left to finish.
+   *
+   * @param moduleSlot Firmware slot 0..3.
+   * @return Nothing.
+   */
+  void _postponePoll(uint8_t moduleSlot);
 
   /**
    * Finds a slot whose count query is due, preferring a commanded slot.
@@ -284,10 +310,11 @@ private:
   /**
    * Reports whether a known state already satisfies the desired state.
    * Disconnected outputs match, because the host cannot energise them.
+   * A fresh command still sends on and off once.
    *
    * @param moduleSlot Firmware slot 0..3.
    * @param solenoidIndex Zero-based output.
-   * @return True when no SET is required.
+   * @return True when the known state already matches.
    */
   bool _matches(uint8_t moduleSlot, uint8_t solenoidIndex) const;
 

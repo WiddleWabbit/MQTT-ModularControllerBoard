@@ -34,11 +34,15 @@ const uint32_t kSensorPollIntervalMs = 60UL * 1000UL;
 // sample. An off confirm does not wait.
 const uint32_t kSensorReadingDelayMs = 1000UL;
 
-// State of each solenoid output is read and published on this period.
+// State of each solenoid output is read on this period. While an
+// accepted command still wants an output on, SET_SOLENOID on is sent
+// on this same period, and that reply is the state sample.
 const uint32_t kSolenoidPollIntervalMs = 60UL * 1000UL;
 
 // Accepted solenoid commands must arrive within this window.
 // After 15 minutes with none, every solenoid output is turned off.
+// Each accepted command is sent again, both on and off, even when
+// the output already matches.
 const uint32_t kSolenoidCommandTimeoutMs = 15UL * 60UL * 1000UL;
 
 // State of the pump is read on this period. While an accepted on

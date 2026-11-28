@@ -4,9 +4,9 @@
 
 ## Summary
 
-`SolenoidModule` talks to daughter boards of type `0x0100`. A board drives up to 16 outputs. The module learns that count when the board is identified, reads each output, and publishes `on`, `off`, or `disconnected`. An MQTT command names the desired on/off state of every output. The module sends `SET_SOLENOID` only where the known state differs.
+`SolenoidModule` talks to daughter boards of type `0x0100`. A board drives up to 16 outputs. The module learns that count when the board is identified, reads each output, and publishes `on`, `off`, or `disconnected`. An MQTT command names the desired on/off state of every output. Each accepted command sends `SET_SOLENOID` for every `on` and every `off`, including when that output already matches.
 
-If no accepted command arrives for `kSolenoidCommandTimeoutMs` (15 minutes), every output is turned off. Commands are expected about once a minute, and each one names the full set.
+If no accepted command arrives for `kSolenoidCommandTimeoutMs` (15 minutes), every output is turned off. Commands are expected about once a minute, and each one names the full set. While that window is still open, an output that is on is sent `SET` on again at `kSolenoidPollIntervalMs`, and that reply is the state sample.
 
 ## Where it sits
 
@@ -28,7 +28,7 @@ The callback only records the desired state. It does not touch I2C. `ModuleHost`
 ```mermaid
 flowchart TD
   upd["SolenoidModule.update()"] --> poll["SolenoidPoller: at most one exchange"]
-  poll --> order["A missing count, else a command step, else the next state read"]
+  poll --> order["A missing count, else one on or off from the command, else the next read"]
   order --> mem["Store the count or the state"]
   mem --> bridge["SolenoidMqttBridge"]
   bridge --> pub{"A state was stored, or the inventory changed?"}
@@ -36,7 +36,7 @@ flowchart TD
   pub -->|no| quiet["Do not repeat them"]
 ```
 
-A command step reads an output whose state is still unknown, or sends `SET_SOLENOID` where the known state differs. A disconnected output is left alone. A command whose word count does not match the module count is not applied.
+A command step reads an output whose state is still unknown, then sends `SET_SOLENOID` for that `on` or `off` even when the known state already matches. A disconnected output is left alone. A command whose word count does not match the module count is not applied. The next state cycle sends `SET` on again for an output that is still on, and reads the others.
 
 ## What is stored, and who reads it
 

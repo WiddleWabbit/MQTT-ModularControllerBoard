@@ -422,7 +422,7 @@ void testPollerRetriesBusySolenoidStateThenMovesOn()
   TEST_ASSERT_EQUAL(afterGiveUp, harness.modules.bus.protocolOpCount());
 }
 
-void testSolenoidCommandSetsOnlyMismatchedOutputs()
+void testSolenoidCommandSetsEveryOnAndOff()
 {
   SolenoidHarness harness;
   harness.device.solenoidCount = 4;
@@ -437,16 +437,20 @@ void testSolenoidCommandSetsOnlyMismatchedOutputs()
   harness.client.deliver(kSolenoidCommandTopic, "1 on on off off");
   TEST_ASSERT_EQUAL(learned, harness.modules.bus.protocolOpCount());
 
-  harness.poller.update();
-  TEST_ASSERT_EQUAL(learned + 1, harness.modules.bus.protocolOpCount());
-  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
-  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
-  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
-
-  harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
-  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
-  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  const uint8_t desired[4] = {
+    module_protocol::kSolenoidStateOn,
+    module_protocol::kSolenoidStateOn,
+    module_protocol::kSolenoidStateOff,
+    module_protocol::kSolenoidStateOff
+  };
+  for (uint8_t index = 0; index < 4; ++index)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid,
+                      lastCommand(harness.modules));
+    TEST_ASSERT_EQUAL(index, lastTx(harness.modules, 2));
+    TEST_ASSERT_EQUAL(desired[index], lastTx(harness.modules, 3));
+  }
 
   const size_t afterSets = harness.modules.bus.protocolOpCount();
   harness.poller.update();
@@ -486,6 +490,11 @@ void testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized()
 
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(2, lastTx(harness.modules, 2));
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
 
@@ -518,14 +527,18 @@ void testSolenoidCommandBeforeCountReadsStateThenSets()
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
   harness.poller.update();
   TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
                     lastCommand(harness.modules));
   TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
   harness.poller.update();
-  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
-                    lastCommand(harness.modules));
-  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+  const size_t afterSets = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterSets, harness.modules.bus.protocolOpCount());
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn,
                     harness.device.solenoidState[0]);
   TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff,
@@ -616,16 +629,20 @@ void testSolenoidCommandRefreshesAbsenceTimeout()
 
   harness.client.deliver(kSolenoidCommandTopic, "1 on");
   harness.poller.update();
-  const size_t afterMatch = harness.modules.bus.protocolOpCount();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  const size_t afterSet = harness.modules.bus.protocolOpCount();
   harness.clock.advance(4999);
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterMatch, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(afterSet, harness.modules.bus.protocolOpCount());
 
   harness.client.deliver(kSolenoidCommandTopic, "1 on");
   harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(afterSet + 1, harness.modules.bus.protocolOpCount());
   harness.clock.advance(4999);
   harness.poller.update();
-  TEST_ASSERT_EQUAL(afterMatch, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(afterSet + 1, harness.modules.bus.protocolOpCount());
 
   harness.clock.advance(1);
   harness.poller.update();
@@ -802,6 +819,197 @@ void testSolenoidBridgeFollowsDeviceId()
                              "on", false));
 }
 
+void testSolenoidCommandRepeatsMatchingOnAndOff()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 4;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  harness.device.solenoidState[1] = module_protocol::kSolenoidStateOff;
+  harness.device.solenoidState[2] = module_protocol::kSolenoidStateOff;
+  harness.device.solenoidState[3] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 4);
+
+  harness.client.deliver(kSolenoidCommandTopic, "1 on off off off");
+  const uint8_t desired[4] = {
+    module_protocol::kSolenoidStateOn,
+    module_protocol::kSolenoidStateOff,
+    module_protocol::kSolenoidStateOff,
+    module_protocol::kSolenoidStateOff
+  };
+  for (uint8_t index = 0; index < 4; ++index)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid,
+                      lastCommand(harness.modules));
+    TEST_ASSERT_EQUAL(index, lastTx(harness.modules, 2));
+    TEST_ASSERT_EQUAL(desired[index], lastTx(harness.modules, 3));
+  }
+  const size_t afterFirst = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterFirst, harness.modules.bus.protocolOpCount());
+
+  harness.client.deliver(kSolenoidCommandTopic, "1 on off off off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  TEST_ASSERT_EQUAL(afterFirst + 1, harness.modules.bus.protocolOpCount());
+}
+
+void testSolenoidCommandSetsMatchingOnAfterUnknownRead()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 1;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+
+  harness.client.deliver(kSolenoidCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidCount,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  const size_t afterSet = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterSet, harness.modules.bus.protocolOpCount());
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, harness.device.solenoidState[0]);
+}
+
+void testSolenoidOnRefreshFollowsInterval()
+{
+  SolenoidHarness harness(1000, 60000);
+  harness.device.solenoidCount = 2;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  harness.device.solenoidState[1] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 2);
+
+  harness.client.deliver(kSolenoidCommandTopic, "1 on off");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+
+  const size_t afterCommand = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterCommand, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+
+  harness.clock.advance(400);
+  harness.client.deliver(kSolenoidCommandTopic, "1 off on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  const size_t afterSecond = harness.modules.bus.protocolOpCount();
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterSecond, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+}
+
+void testSolenoidOnRefreshRetriesAfterBusy()
+{
+  SolenoidHarness harness(1000, 60000);
+  harness.device.solenoidCount = 1;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 1);
+  harness.client.deliver(kSolenoidCommandTopic, "1 on");
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+
+  harness.device.forceBusy = true;
+  harness.clock.advance(1000);
+  for (int attempt = 0; attempt < 3; ++attempt)
+  {
+    harness.poller.update();
+    TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid,
+                      lastCommand(harness.modules));
+  }
+  const size_t afterGiveUp = harness.modules.bus.protocolOpCount();
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterGiveUp, harness.modules.bus.protocolOpCount());
+  harness.clock.advance(999);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(afterGiveUp, harness.modules.bus.protocolOpCount());
+
+  harness.device.forceBusy = false;
+  harness.clock.advance(1);
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, harness.device.solenoidState[0]);
+}
+
+void testSolenoidCommandReappliesMatchingStateAfterModuleReset()
+{
+  SolenoidHarness harness;
+  harness.device.solenoidCount = 2;
+  harness.device.solenoidState[0] = module_protocol::kSolenoidStateOn;
+  harness.device.solenoidState[1] = module_protocol::kSolenoidStateOff;
+  plugAndPump(harness.modules, 0, harness.device);
+  learnOutputs(harness, 2);
+  harness.client.deliver(kSolenoidCommandTopic, "1 on off");
+  harness.poller.update();
+  harness.poller.update();
+
+  harness.device.resetToUnconfigured();
+  pumpMs(harness.modules, 4000);
+  TEST_ASSERT_EQUAL(SlotState::Online, harness.modules.host.state(0));
+
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidCount,
+                    lastCommand(harness.modules));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(0, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOn, lastTx(harness.modules, 3));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdGetSolenoidState,
+                    lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  harness.poller.update();
+  TEST_ASSERT_EQUAL(module_protocol::kCmdSetSolenoid, lastCommand(harness.modules));
+  TEST_ASSERT_EQUAL(1, lastTx(harness.modules, 2));
+  TEST_ASSERT_EQUAL(module_protocol::kSolenoidStateOff, lastTx(harness.modules, 3));
+}
+
 // ========== Runner ==========
 
 /**
@@ -822,11 +1030,16 @@ void runSolenoidTests()
   RUN_TEST(testPollerRequeriesSolenoidCountAfterModuleReset);
   RUN_TEST(testPollerIdleWhenSolenoidCountIsZero);
   RUN_TEST(testPollerRetriesBusySolenoidStateThenMovesOn);
-  RUN_TEST(testSolenoidCommandSetsOnlyMismatchedOutputs);
+  RUN_TEST(testSolenoidCommandSetsEveryOnAndOff);
+  RUN_TEST(testSolenoidCommandRepeatsMatchingOnAndOff);
+  RUN_TEST(testSolenoidCommandSetsMatchingOnAfterUnknownRead);
+  RUN_TEST(testSolenoidOnRefreshFollowsInterval);
+  RUN_TEST(testSolenoidOnRefreshRetriesAfterBusy);
   RUN_TEST(testSolenoidCommandSkipsDisconnectedAndTurnsOffEnergized);
   RUN_TEST(testSolenoidCommandBeforeCountReadsStateThenSets);
   RUN_TEST(testSolenoidCommandRejectsMalformedPayload);
   RUN_TEST(testSolenoidCommandReappliesAfterModuleReset);
+  RUN_TEST(testSolenoidCommandReappliesMatchingStateAfterModuleReset);
   RUN_TEST(testSolenoidCommandTimeoutTurnsOutputsOff);
   RUN_TEST(testSolenoidCommandRefreshesAbsenceTimeout);
   RUN_TEST(testPeriodicSolenoidPublishEachStateAndClearOnUnplug);

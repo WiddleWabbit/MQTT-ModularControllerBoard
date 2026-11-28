@@ -24,8 +24,9 @@ public:
    * @param bus Module bus. Must outlive this object.
    * @param network MQTT client, topics, and inbound fan-out.
    * @param clock Monotonic clock.
-   * @param pollIntervalMs Period between state polls. Zero selects
-   *        the poller's default.
+   * @param pollIntervalMs Period between state polls, and between
+   *        repeated on commands while an output should stay on.
+   *        Zero selects the poller's default.
    * @param commandTimeoutMs Silence after which every output is
    *        commanded off. Zero selects the poller's default.
    */
